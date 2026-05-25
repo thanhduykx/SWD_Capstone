@@ -1,0 +1,13 @@
+# .NET build output
+**/bin/
+**/obj/
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+
+# Local settings and temporary files
+*.user
+.vs/
+tmp/
