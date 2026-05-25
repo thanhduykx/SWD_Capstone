@@ -1,0 +1,319 @@
+using CPMS.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace CPMS.Infrastructure.Data;
+
+public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbContext(options)
+{
+    public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Lecturer> Lecturers => Set<Lecturer>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<TrainingDepartment> TrainingDepartments => Set<TrainingDepartment>();
+    public DbSet<SystemAdministrator> SystemAdministrators => Set<SystemAdministrator>();
+    public DbSet<EvaluationPanel> EvaluationPanels => Set<EvaluationPanel>();
+    public DbSet<Semester> Semesters => Set<Semester>();
+    public DbSet<Topic> Topics => Set<Topic>();
+    public DbSet<CapstoneGroup> CapstoneGroups => Set<CapstoneGroup>();
+    public DbSet<Syllabus> Syllabuses => Set<Syllabus>();
+    public DbSet<Clo> Clos => Set<Clo>();
+    public DbSet<RuleKeyword> RuleKeywords => Set<RuleKeyword>();
+    public DbSet<CapstoneDocument> Documents => Set<CapstoneDocument>();
+    public DbSet<EvaluationReport> EvaluationReports => Set<EvaluationReport>();
+    public DbSet<EvaluationDetail> EvaluationDetails => Set<EvaluationDetail>();
+    public DbSet<InlineComment> InlineComments => Set<InlineComment>();
+    public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
+    public DbSet<GroupReviewSlot> GroupReviewSlots => Set<GroupReviewSlot>();
+    public DbSet<Council> Councils => Set<Council>();
+    public DbSet<CouncilMember> CouncilMembers => Set<CouncilMember>();
+    public DbSet<CouncilGroup> CouncilGroups => Set<CouncilGroup>();
+    public DbSet<DefenseSession> DefenseSessions => Set<DefenseSession>();
+    public DbSet<Score> Scores => Set<Score>();
+    public DbSet<ScoreSubmissionHistory> ScoreSubmissionHistories => Set<ScoreSubmissionHistory>();
+    public DbSet<GroupResult> GroupResults => Set<GroupResult>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("users");
+            entity.HasIndex(x => x.Username).IsUnique();
+            entity.HasIndex(x => x.Email).IsUnique();
+            entity.Property(x => x.Role).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.Username).HasMaxLength(100);
+            entity.Property(x => x.Email).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Lecturer>(entity =>
+        {
+            entity.ToTable("lecturers");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Student>(entity =>
+        {
+            entity.ToTable("students");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.SetNull);
+        });
+        modelBuilder.Entity<TrainingDepartment>(entity =>
+        {
+            entity.ToTable("training_departments");
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SystemAdministrator>(entity =>
+        {
+            entity.ToTable("system_administrators");
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<EvaluationPanel>(entity =>
+        {
+            entity.ToTable("evaluation_panels");
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Semester>(entity =>
+        {
+            entity.ToTable("semesters");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => x.IsActive).IsUnique().HasFilter("\"is_active\" = TRUE");
+        });
+        modelBuilder.Entity<Topic>(entity =>
+        {
+            entity.ToTable("topics");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<CapstoneGroup>(entity =>
+        {
+            entity.ToTable("capstone_groups");
+            entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasOne<Topic>().WithMany().HasForeignKey(x => x.TopicId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Syllabus>(entity =>
+        {
+            entity.ToTable("syllabuses");
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.TrainingDepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Clo>(entity =>
+        {
+            entity.ToTable("clos");
+            entity.HasIndex(x => new { x.SyllabusId, x.Code }).IsUnique();
+            entity.Property(x => x.Weight).HasPrecision(5, 4);
+            entity.HasOne<Syllabus>().WithMany().HasForeignKey(x => x.SyllabusId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<RuleKeyword>(entity =>
+        {
+            entity.ToTable("rule_keywords");
+            entity.Property(x => x.Weight).HasPrecision(5, 4);
+            entity.HasOne<Clo>().WithMany().HasForeignKey(x => x.CloId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<SystemAdministrator>().WithMany().HasForeignKey(x => x.CreatedByAdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CapstoneDocument>(entity =>
+        {
+            entity.ToTable("documents");
+            entity.HasQueryFilter(x => !x.IsDeleted);
+            entity.Property(x => x.DocType).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Syllabus>().WithMany().HasForeignKey(x => x.SyllabusId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UploadedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<EvaluationReport>(entity =>
+        {
+            entity.ToTable("evaluation_reports");
+            entity.HasIndex(x => x.DocumentId).IsUnique();
+            entity.Property(x => x.OverallScore).HasPrecision(5, 2);
+            entity.Property(x => x.MatchPercentage).HasPrecision(5, 2);
+            entity.Property(x => x.TriggerType).HasConversion<string>();
+            entity.HasOne<CapstoneDocument>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<EvaluationPanel>().WithMany().HasForeignKey(x => x.ReviewedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<EvaluationDetail>(entity =>
+        {
+            entity.ToTable("evaluation_details");
+            entity.HasIndex(x => new { x.ReportId, x.CloId }).IsUnique();
+            entity.Property(x => x.Score).HasPrecision(5, 2);
+            entity.Property(x => x.MaxScore).HasPrecision(5, 2);
+            entity.Property(x => x.MatchPercentage).HasPrecision(5, 2);
+            entity.HasOne<EvaluationReport>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Clo>().WithMany().HasForeignKey(x => x.CloId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<InlineComment>(entity =>
+        {
+            entity.ToTable("inline_comments");
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasOne<CapstoneDocument>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AuthorId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InlineComment>().WithMany().HasForeignKey(x => x.ParentCommentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        ConfigureReviewAndDefense(modelBuilder);
+        ConfigureSystem(modelBuilder);
+    }
+
+    private static void ConfigureReviewAndDefense(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ReviewSession>(entity =>
+        {
+            entity.ToTable("review_sessions");
+            entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer1Id).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer2Id).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<GroupReviewSlot>(entity =>
+        {
+            entity.ToTable("group_review_slots");
+            entity.HasIndex(x => new { x.SessionId, x.GroupId }).IsUnique();
+            entity.Property(x => x.Result).HasConversion<string>();
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Council>(entity =>
+        {
+            entity.ToTable("councils");
+            entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ChairmanId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.SecretaryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<CouncilMember>(entity =>
+        {
+            entity.ToTable("council_members");
+            entity.HasKey(x => new { x.CouncilId, x.LecturerId });
+            entity.Property(x => x.Role).HasConversion<string>();
+            entity.HasOne<Council>().WithMany().HasForeignKey(x => x.CouncilId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<CouncilGroup>(entity =>
+        {
+            entity.ToTable("council_groups");
+            entity.HasIndex(x => new { x.CouncilId, x.GroupId }).IsUnique();
+            entity.HasOne<Council>().WithMany().HasForeignKey(x => x.CouncilId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<DefenseSession>(entity =>
+        {
+            entity.ToTable("defense_sessions");
+            entity.HasOne<Council>().WithMany().HasForeignKey(x => x.CouncilId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.StartedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Score>(entity =>
+        {
+            entity.ToTable("scores");
+            entity.HasIndex(x => new { x.DefenseSessionId, x.ScorerId, x.StudentId, x.ScoreType }).IsUnique();
+            entity.Property(x => x.ScoreType).HasConversion<string>();
+            entity.Property(x => x.ScoreValue).HasPrecision(4, 2);
+            entity.HasOne<DefenseSession>().WithMany().HasForeignKey(x => x.DefenseSessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ScorerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ScoreSubmissionHistory>(entity =>
+        {
+            entity.ToTable("score_submission_histories");
+            entity.Property(x => x.ScoreType).HasConversion<string>();
+            entity.Property(x => x.OldScoreValue).HasPrecision(4, 2);
+            entity.Property(x => x.NewScoreValue).HasPrecision(4, 2);
+            entity.Property(x => x.TrustReason).HasMaxLength(256);
+            entity.HasOne<Score>().WithMany().HasForeignKey(x => x.ScoreId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<DefenseSession>().WithMany().HasForeignKey(x => x.DefenseSessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ScorerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.SubmittedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<GroupResult>(entity =>
+        {
+            entity.ToTable("group_results");
+            entity.HasIndex(x => new { x.GroupId, x.SemesterId }).IsUnique();
+            entity.Property(x => x.Review1Result).HasConversion<string>();
+            entity.Property(x => x.Review2Result).HasConversion<string>();
+            entity.Property(x => x.Review3Result).HasConversion<string>();
+            entity.Property(x => x.SupervisorResult).HasConversion<string>();
+            entity.Property(x => x.Defense1Result).HasConversion<string>();
+            entity.Property(x => x.Defense2Result).HasConversion<string>();
+            entity.Property(x => x.FinalResult).HasConversion<string>();
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureSystem(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs");
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("notifications");
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.RecipientId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnforceImmutableData();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        EnforceImmutableData();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        EnforceImmutableData();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void EnforceImmutableData()
+    {
+        if (ChangeTracker.Entries<AuditLog>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("Audit logs are append-only and cannot be changed or deleted.");
+        }
+
+        foreach (var entry in ChangeTracker.Entries<Score>()
+                     .Where(x => x.State is EntityState.Modified or EntityState.Deleted))
+        {
+            if (entry.OriginalValues.GetValue<bool>(nameof(Score.IsLocked)))
+            {
+                throw new InvalidOperationException("Locked scores cannot be changed or deleted.");
+            }
+        }
+    }
+}

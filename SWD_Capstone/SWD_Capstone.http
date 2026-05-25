@@ -1,0 +1,6 @@
+@SWD_Capstone_HostAddress = http://localhost:5090
+
+GET {{SWD_Capstone_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
