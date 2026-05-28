@@ -1,7 +1,7 @@
 using CPMS.Core.Exceptions;
 using CPMS.Core.Services;
 
-namespace CPMS.Core.Tests.Services;
+namespace ServiceLayer.Tests.Services;
 
 public sealed class AssignmentRulesTests
 {

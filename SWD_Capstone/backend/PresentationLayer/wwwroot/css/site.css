@@ -1,0 +1,67 @@
+:root {
+  color: #172033;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f4f7fb;
+}
+
+body {
+  margin: 0;
+}
+
+.topbar {
+  align-items: center;
+  background: #10233f;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 32px;
+}
+
+.container {
+  margin: 0 auto;
+  max-width: 1080px;
+  padding: 40px 24px;
+}
+
+.hero {
+  background: #fff;
+  border: 1px solid #dfe7f1;
+  border-radius: 18px;
+  padding: 34px;
+}
+
+.hero h1 {
+  margin: 8px 0 12px;
+}
+
+.eyebrow {
+  color: #e96f24;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  margin-top: 22px;
+}
+
+.grid article {
+  background: #fff;
+  border: 1px solid #dfe7f1;
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.grid span {
+  color: #617089;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.grid strong {
+  color: #10233f;
+}

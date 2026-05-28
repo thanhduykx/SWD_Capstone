@@ -6,6 +6,7 @@ using CPMS.Api.Middleware;
 using CPMS.Api.Services;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
+using CPMS.Infrastructure.Data.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -73,7 +74,7 @@ builder.Services.AddRateLimiter(options =>
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
     policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
-builder.Services.AddControllers()
+builder.Services.AddControllersWithViews()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR()
     .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -93,6 +94,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+await SeedDefaultAccountAsync(app);
+
 app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
 {
@@ -101,13 +104,31 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapControllers();
 app.MapHub<DefenseScoringHub>("/hubs/defense");
 
 app.Run();
+
+static async Task SeedDefaultAccountAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
+    await dbContext.Database.MigrateAsync();
+
+    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    await DefaultDataSeeder.SeedDefaultAccountAsync(
+        dbContext,
+        configuration["DefaultAccount:Username"] ?? "admin",
+        configuration["DefaultAccount:Email"] ?? "admin@cpms.local",
+        configuration["DefaultAccount:Password"] ?? "123456");
+}
 
 public partial class Program;
