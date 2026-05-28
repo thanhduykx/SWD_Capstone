@@ -21,7 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\backend\CPMS.Core\CPMS.Core.csproj" />
+    <ProjectReference Include="..\..\backend\DataAccessLayer\DataAccessLayer.csproj" />
+    <ProjectReference Include="..\..\backend\ServiceLayer\ServiceLayer.csproj" />
   </ItemGroup>
 
 </Project>

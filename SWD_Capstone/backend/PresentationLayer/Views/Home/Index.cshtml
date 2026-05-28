@@ -1,0 +1,25 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<section class="hero">
+    <p class="eyebrow">Layered MVC Architecture</p>
+    <h1>@Model.ApplicationName</h1>
+    <p>PresentationLayer handles MVC screens and API endpoints. ServiceLayer keeps business rules. DataAccessLayer owns entities, enums, migrations and PostgreSQL context.</p>
+</section>
+
+<section class="grid">
+    <article>
+        <span>Database</span>
+        <strong>@Model.DatabaseProvider</strong>
+    </article>
+    <article>
+        <span>Default account</span>
+        <strong>@Model.DefaultUsername / 123456</strong>
+    </article>
+    <article>
+        <span>Architecture</span>
+        <strong>@Model.Architecture</strong>
+    </article>
+</section>

@@ -36,9 +36,9 @@ dotnet_diagnostic.CA1848.severity = suggestion
 indent_style = space
 indent_size = 2
 
-[backend/CPMS.Core/Services/AssignmentRules.cs]
+[backend/ServiceLayer/Services/AssignmentRules.cs]
 dotnet_diagnostic.CA1822.severity = none
 
-[backend/CPMS.Infrastructure/Data/Migrations/*.cs]
+[backend/DataAccessLayer/Migrations/*.cs]
 dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.CA1861.severity = none

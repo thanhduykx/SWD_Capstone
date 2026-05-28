@@ -4,7 +4,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 
 ## Current Implementation
 
-- Modular monolith backend solution: `CPMS.Api`, `CPMS.Core`, `CPMS.Infrastructure`.
+- Layered ASP.NET Core MVC solution: `PresentationLayer`, `ServiceLayer`, `DataAccessLayer`.
 - PostgreSQL 16 with EF Core/Npgsql covering the production reference entities: authentication, academic structure, documents/evaluation, review/defense, audit and notifications.
 - JWT access token and rotating refresh token endpoints, BCrypt password verification and login lockout handling.
 - API foundation for semesters, review-session assignment and defense score submission/locking.
@@ -30,7 +30,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 ## Stack
 
 - Frontend: React 18, TypeScript, Vite and React Router.
-- Backend: ASP.NET Core 8 Web API and EF Core 8.
+- Backend: ASP.NET Core 8 MVC/Web API hybrid and EF Core 8.
 - Real-time: ASP.NET Core SignalR over `/hubs/defense`.
 - Database: PostgreSQL 16 through `Npgsql.EntityFrameworkCore.PostgreSQL`.
 
@@ -39,10 +39,15 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 ```powershell
 docker compose up -d postgres
 dotnet tool restore
-dotnet tool run dotnet-ef database update --project .\backend\CPMS.Infrastructure\CPMS.Infrastructure.csproj --startup-project .\backend\CPMS.Api\CPMS.Api.csproj
+dotnet tool run dotnet-ef database update --project .\backend\DataAccessLayer\DataAccessLayer.csproj --startup-project .\backend\PresentationLayer\PresentationLayer.csproj
 ```
 
-The Docker development connection string targets PostgreSQL at `localhost:5433`, database `cpms`, username `postgres`, password `postgres`. Port `5433` avoids colliding with an existing local PostgreSQL installation on the default port. Supply secrets securely outside local development.
+The Docker development connection string targets PostgreSQL at `localhost:5433`, database `cpms`, username `postgres`, password `123456`. Port `5433` avoids colliding with an existing local PostgreSQL installation on the default port.
+
+Default web account:
+
+- Username: `admin`
+- Password: `123456`
 
 ## Run Backend
 
@@ -50,7 +55,7 @@ The Docker development connection string targets PostgreSQL at `localhost:5433`,
 dotnet restore .\CPMS.sln
 dotnet build .\CPMS.sln
 dotnet test .\CPMS.sln
-dotnet run --project .\backend\CPMS.Api\CPMS.Api.csproj
+dotnet run --project .\backend\PresentationLayer\PresentationLayer.csproj
 ```
 
 Before running outside local development, replace `Jwt:Key` and the PostgreSQL password using environment variables or a secret store.
