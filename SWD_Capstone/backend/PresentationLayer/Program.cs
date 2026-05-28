@@ -15,6 +15,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<CpmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("CpmsDatabase"))
         .UseSnakeCaseNamingConvention());
@@ -94,7 +95,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-await SeedDefaultAccountAsync(app);
+await InitializeDatabaseAsync(app);
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
@@ -113,22 +114,48 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapControllers();
+app.MapGet("/health/database", async (CpmsDbContext dbContext) =>
+{
+    try
+    {
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        return canConnect
+            ? Results.Ok(new { status = "Healthy", database = "PostgreSQL", port = 5433 })
+            : Results.Problem("PostgreSQL is not reachable at localhost:5433.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (Npgsql.NpgsqlException exception)
+    {
+        return Results.Problem(
+            detail: exception.Message,
+            title: "PostgreSQL is not reachable at localhost:5433",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 app.MapHub<DefenseScoringHub>("/hubs/defense");
 
 app.Run();
 
-static async Task SeedDefaultAccountAsync(WebApplication app)
+static async Task InitializeDatabaseAsync(WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
-    await dbContext.Database.MigrateAsync();
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
+        await dbContext.Database.MigrateAsync();
 
-    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    await DefaultDataSeeder.SeedDefaultAccountAsync(
-        dbContext,
-        configuration["DefaultAccount:Username"] ?? "admin",
-        configuration["DefaultAccount:Email"] ?? "admin@cpms.local",
-        configuration["DefaultAccount:Password"] ?? "123456");
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        await DefaultDataSeeder.SeedDefaultAccountAsync(
+            dbContext,
+            configuration["DefaultAccount:Username"] ?? "admin",
+            configuration["DefaultAccount:Email"] ?? "admin@cpms.local",
+            configuration["DefaultAccount:Password"] ?? "123456");
+    }
+    catch (Npgsql.NpgsqlException exception)
+    {
+        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
+        logger.LogWarning(exception,
+            "PostgreSQL is not reachable at localhost:5433. The web app will start, but DB-backed APIs will fail until PostgreSQL is running. Start Docker Desktop and run `docker compose up -d postgres`.");
+    }
 }
 
 public partial class Program;
