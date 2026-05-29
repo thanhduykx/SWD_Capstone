@@ -12,6 +12,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 - React 18/Vite frontend shell for Dashboard, Semesters, Reviews, Defense Scoring and Documents/CLO evaluation.
 - Unit tests for supervisor conflicts, repeated reviewers, council membership, chairman-only session control, council capacity and score locking rules.
 - Repository quality gates based on ISO/IEC 9126, ISO/IEC 25010, ISO/IEC/IEEE 12207 and ISO/IEC/IEEE 29119 are documented in `docs/QUALITY_STANDARDS.md`.
+- Business architecture and implementation boundaries are documented in `docs/BUSINESS_ARCHITECTURE.md`.
 
 ## Non-Negotiable Rules Implemented
 
@@ -44,10 +45,18 @@ dotnet tool run dotnet-ef database update --project .\backend\DataAccessLayer\Da
 
 The Docker development connection string targets PostgreSQL at `localhost:5433`, database `cpms`, username `postgres`, password `123456`. Port `5433` avoids colliding with an existing local PostgreSQL installation on the default port.
 
-Default web account:
+No application account is seeded automatically. Accounts must be created from official Training Department data or a controlled administration/import flow.
 
-- Username: `admin`
-- Password: `123456`
+For local development only, create the first administrator explicitly after the backend starts:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:5122/api/auth/bootstrap-admin `
+  -ContentType 'application/json' `
+  -Body '{"username":"admin","email":"admin@cpms.local","password":"123456"}'
+```
+
+This endpoint is available only in `Development` and only when the `users` table is empty.
 
 ## Run Backend
 
@@ -67,6 +76,17 @@ cd .\frontend
 npm install
 npm run dev
 ```
+
+## Gmail / Google Login
+
+Google login is account-bound: the Google email must already exist in `users.email`.
+
+Configure the same Google OAuth Client ID in:
+
+- Backend: `Authentication:Google:ClientId`
+- Frontend: `frontend/.env.local` as `VITE_GOOGLE_CLIENT_ID`
+
+Use `frontend/.env.example` as the template.
 
 ## Quality Gates
 

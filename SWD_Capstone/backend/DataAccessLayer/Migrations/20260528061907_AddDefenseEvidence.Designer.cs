@@ -3,17 +3,20 @@ using System;
 using CPMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace CPMS.Infrastructure.Data.Migrations
+namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(CpmsDbContext))]
-    partial class CpmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528061907_AddDefenseEvidence")]
+    partial class AddDefenseEvidence
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -268,10 +271,6 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("code");
 
-                    b.Property<int?>("ManagedByTrainingDepartmentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("managed_by_training_department_id");
-
                     b.Property<int>("SecretaryId")
                         .HasColumnType("integer")
                         .HasColumnName("secretary_id");
@@ -295,9 +294,6 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     b.HasIndex("ChairmanId")
                         .HasDatabaseName("ix_councils_chairman_id");
-
-                    b.HasIndex("ManagedByTrainingDepartmentId")
-                        .HasDatabaseName("ix_councils_managed_by_training_department_id");
 
                     b.HasIndex("SecretaryId")
                         .HasDatabaseName("ix_councils_secretary_id");
@@ -449,69 +445,6 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.ToTable("defense_evidences", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseRound", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("code");
-
-                    b.Property<int>("CreatedByTrainingDepartmentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("created_by_training_department_id");
-
-                    b.Property<DateOnly>("EndDate")
-                        .HasColumnType("date")
-                        .HasColumnName("end_date");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("SemesterId")
-                        .HasColumnType("integer")
-                        .HasColumnName("semester_id");
-
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date")
-                        .HasColumnName("start_date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_defense_rounds");
-
-                    b.HasIndex("CreatedByTrainingDepartmentId")
-                        .HasDatabaseName("ix_defense_rounds_created_by_training_department_id");
-
-                    b.HasIndex("Code", "SemesterId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_defense_rounds_code_semester_id");
-
-                    b.HasIndex("SemesterId", "Type", "Status")
-                        .HasDatabaseName("ix_defense_rounds_semester_id_type_status");
-
-                    b.ToTable("defense_rounds", (string)null);
-                });
-
             modelBuilder.Entity("CPMS.Core.Entities.DefenseSession", b =>
                 {
                     b.Property<int>("Id")
@@ -521,49 +454,21 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("AssignedByTrainingDepartmentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("assigned_by_training_department_id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("code");
-
                     b.Property<int>("CouncilId")
                         .HasColumnType("integer")
                         .HasColumnName("council_id");
-
-                    b.Property<int>("DefenseRoundId")
-                        .HasColumnType("integer")
-                        .HasColumnName("defense_round_id");
 
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
 
-                    b.Property<int>("GroupId")
-                        .HasColumnType("integer")
-                        .HasColumnName("group_id");
-
                     b.Property<bool>("IsLocked")
                         .HasColumnType("boolean")
                         .HasColumnName("is_locked");
 
-                    b.Property<string>("Room")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("room");
-
                     b.Property<DateTime>("SessionDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("session_date");
-
-                    b.Property<int>("Slot")
-                        .HasColumnType("integer")
-                        .HasColumnName("slot");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -576,30 +481,11 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_defense_sessions");
 
-                    b.HasIndex("AssignedByTrainingDepartmentId")
-                        .HasDatabaseName("ix_defense_sessions_assigned_by_training_department_id");
-
-                    b.HasIndex("GroupId")
-                        .HasDatabaseName("ix_defense_sessions_group_id");
+                    b.HasIndex("CouncilId")
+                        .HasDatabaseName("ix_defense_sessions_council_id");
 
                     b.HasIndex("StartedById")
                         .HasDatabaseName("ix_defense_sessions_started_by_id");
-
-                    b.HasIndex("Code", "DefenseRoundId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_defense_sessions_code_defense_round_id");
-
-                    b.HasIndex("DefenseRoundId", "GroupId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_defense_sessions_defense_round_id_group_id");
-
-                    b.HasIndex("CouncilId", "SessionDate", "Slot")
-                        .IsUnique()
-                        .HasDatabaseName("ix_defense_sessions_council_id_session_date_slot");
-
-                    b.HasIndex("SessionDate", "Room", "Slot")
-                        .IsUnique()
-                        .HasDatabaseName("ix_defense_sessions_session_date_room_slot");
 
                     b.ToTable("defense_sessions", (string)null);
                 });
@@ -1747,12 +1633,6 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_councils_lecturers_chairman_id");
 
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
-                        .WithMany()
-                        .HasForeignKey("ManagedByTrainingDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_councils_training_departments_managed_by_training_departmen");
-
                     b.HasOne("CPMS.Core.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("SecretaryId")
@@ -1826,51 +1706,14 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasConstraintName("fk_defense_evidences_defense_sessions_defense_session_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseRound", b =>
-                {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByTrainingDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_defense_rounds_training_departments_created_by_training_dep");
-
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
-                        .WithMany()
-                        .HasForeignKey("SemesterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_defense_rounds_semesters_semester_id");
-                });
-
             modelBuilder.Entity("CPMS.Core.Entities.DefenseSession", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
-                        .WithMany()
-                        .HasForeignKey("AssignedByTrainingDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_defense_sessions_training_departments_assigned_by_training_");
-
                     b.HasOne("CPMS.Core.Entities.Council", null)
                         .WithMany()
                         .HasForeignKey("CouncilId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_sessions_councils_council_id");
-
-                    b.HasOne("CPMS.Core.Entities.DefenseRound", null)
-                        .WithMany()
-                        .HasForeignKey("DefenseRoundId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_defense_sessions_defense_rounds_defense_round_id");
-
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_defense_sessions_capstone_groups_group_id");
 
                     b.HasOne("CPMS.Core.Entities.User", null)
                         .WithMany()

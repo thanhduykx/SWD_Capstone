@@ -1,14 +1,8 @@
-const metrics = [
-  { label: "Active groups", value: "128", note: "SP26 intake" },
-  { label: "Review 1 passed", value: "96", note: "75.0%" },
-  { label: "Defense sessions", value: "18", note: "6 live today" },
-  { label: "Reports completed", value: "84", note: "CLO evaluated" },
-];
-
-const alerts = [
-  "3 councils require conflict verification before assignment.",
-  "Review 2 must not repeat reviewers assigned in Review 1.",
-  "TEF export remains blocked until file format is confirmed.",
+const controls = [
+  "Import official group, student, supervisor and council lists before operating a semester.",
+  "Run server-side conflict checks before assigning reviewers or defense councils.",
+  "Open defense scoring only after the chairman starts the session.",
+  "Keep score history and audit logs immutable for accountability.",
 ];
 
 export function DashboardPage() {
@@ -19,22 +13,35 @@ export function DashboardPage() {
           <h2>Operations overview</h2>
           <p>Central control for review rounds, defense panels and syllabus evidence.</p>
         </div>
-        <button className="primary">Import group list</button>
+        <button className="primary">Import official data</button>
       </div>
       <div className="metric-grid">
-        {metrics.map((metric) => (
-          <article className="metric" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.note}</small>
-          </article>
-        ))}
+        <article className="metric">
+          <span>Groups</span>
+          <strong>-</strong>
+          <small>No official import yet</small>
+        </article>
+        <article className="metric">
+          <span>Review sessions</span>
+          <strong>-</strong>
+          <small>No schedule created yet</small>
+        </article>
+        <article className="metric">
+          <span>Defense sessions</span>
+          <strong>-</strong>
+          <small>No council session started yet</small>
+        </article>
+        <article className="metric">
+          <span>Documents</span>
+          <strong>-</strong>
+          <small>No submission uploaded yet</small>
+        </article>
       </div>
       <div className="dashboard-grid">
         <article className="panel">
           <h3>Required controls</h3>
-          {alerts.map((alert) => (
-            <p className="alert" key={alert}>{alert}</p>
+          {controls.map((control) => (
+            <p className="alert" key={control}>{control}</p>
           ))}
         </article>
         <article className="panel">

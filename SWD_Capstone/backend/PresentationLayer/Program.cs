@@ -6,7 +6,6 @@ using CPMS.Api.Middleware;
 using CPMS.Api.Services;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
-using CPMS.Infrastructure.Data.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +19,7 @@ builder.Services.AddDbContext<CpmsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("CpmsDatabase"))
         .UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<AssignmentRules>();
+builder.Services.AddScoped<DefenseScoringService>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddScoped<JwtTokenService>();
 
@@ -143,12 +143,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
         await dbContext.Database.MigrateAsync();
 
-        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        await DefaultDataSeeder.SeedDefaultAccountAsync(
-            dbContext,
-            configuration["DefaultAccount:Username"] ?? "admin",
-            configuration["DefaultAccount:Email"] ?? "admin@cpms.local",
-            configuration["DefaultAccount:Password"] ?? "123456");
+        // Only apply schema migrations. Business data must come from official import/admin flows.
     }
     catch (Npgsql.NpgsqlException exception)
     {

@@ -30,7 +30,13 @@ public sealed class DefenseScoringHub(CpmsDbContext dbContext, AssignmentRules r
             .Select(x => new
             {
                 x.Id,
+                x.Code,
+                x.DefenseRoundId,
                 x.CouncilId,
+                x.GroupId,
+                x.SessionDate,
+                x.Slot,
+                x.Room,
                 x.StartedAt,
                 x.EndedAt,
                 x.IsLocked,
@@ -61,7 +67,13 @@ public sealed class DefenseScoringHub(CpmsDbContext dbContext, AssignmentRules r
         await Clients.Caller.SendAsync("defenseSessionState", new
         {
             sessionId = session.Id,
+            sessionCode = session.Code,
+            session.DefenseRoundId,
             session.CouncilId,
+            session.GroupId,
+            session.SessionDate,
+            session.Slot,
+            session.Room,
             session.StartedAt,
             session.EndedAt,
             session.IsLocked,

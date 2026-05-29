@@ -3,8 +3,14 @@ import type { HubConnection } from "@microsoft/signalr";
 
 export type DefenseSessionState = {
   sessionId: number;
+  sessionCode: string;
+  defenseRoundId: number;
   councilId: number;
   councilCode: string;
+  groupId: number;
+  sessionDate: string;
+  slot: number;
+  room: string;
   startedAt?: string | null;
   endedAt?: string | null;
   isLocked: boolean;

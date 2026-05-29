@@ -10,3 +10,15 @@ Accept: application/json
 }
 
 ###
+
+POST {{PresentationLayer_HostAddress}}/api/auth/bootstrap-admin
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "admin",
+  "email": "admin@cpms.local",
+  "password": "123456"
+}
+
+###
