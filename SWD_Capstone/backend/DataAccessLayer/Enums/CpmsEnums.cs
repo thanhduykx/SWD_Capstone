@@ -18,6 +18,7 @@ public enum ReviewResult { Pass, Fail, Defense2, Drop }
 public enum CouncilType { Defense1, Defense2 }
 public enum CouncilStatus { Pending, Active, Closed }
 public enum CouncilMemberRole { Member, Chairman, Secretary }
+public enum DefenseRoundStatus { Draft, Published, InProgress, Completed, Cancelled }
 public enum ScoreType { BaoVe, Nguoi }
 public enum FinalResult { Pending, Pass, Fail, Drop }
 public enum CommentStatus { Open, Resolved }

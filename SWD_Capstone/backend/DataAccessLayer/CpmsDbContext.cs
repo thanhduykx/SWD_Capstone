@@ -27,9 +27,11 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<Council> Councils => Set<Council>();
     public DbSet<CouncilMember> CouncilMembers => Set<CouncilMember>();
     public DbSet<CouncilGroup> CouncilGroups => Set<CouncilGroup>();
+    public DbSet<DefenseRound> DefenseRounds => Set<DefenseRound>();
     public DbSet<DefenseSession> DefenseSessions => Set<DefenseSession>();
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<ScoreSubmissionHistory> ScoreSubmissionHistories => Set<ScoreSubmissionHistory>();
+    public DbSet<DefenseEvidence> DefenseEvidences => Set<DefenseEvidence>();
     public DbSet<GroupResult> GroupResults => Set<GroupResult>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -201,6 +203,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.Type).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>();
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.ManagedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ChairmanId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.SecretaryId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -219,10 +222,31 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<Council>().WithMany().HasForeignKey(x => x.CouncilId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
         });
+        modelBuilder.Entity<DefenseRound>(entity =>
+        {
+            entity.ToTable("defense_rounds");
+            entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
+            entity.HasIndex(x => new { x.SemesterId, x.Type, x.Status });
+            entity.Property(x => x.Code).HasMaxLength(50);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.CreatedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<DefenseSession>(entity =>
         {
             entity.ToTable("defense_sessions");
+            entity.HasIndex(x => new { x.Code, x.DefenseRoundId }).IsUnique();
+            entity.HasIndex(x => new { x.DefenseRoundId, x.GroupId }).IsUnique();
+            entity.HasIndex(x => new { x.CouncilId, x.SessionDate, x.Slot }).IsUnique();
+            entity.HasIndex(x => new { x.SessionDate, x.Room, x.Slot }).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(50);
+            entity.Property(x => x.Room).HasMaxLength(100);
+            entity.HasOne<DefenseRound>().WithMany().HasForeignKey(x => x.DefenseRoundId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Council>().WithMany().HasForeignKey(x => x.CouncilId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.AssignedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.StartedById).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<Score>(entity =>
@@ -247,6 +271,18 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ScorerId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.SubmittedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<DefenseEvidence>(entity =>
+        {
+            entity.ToTable("defense_evidences");
+            entity.HasIndex(x => x.DefenseSessionId);
+            entity.Property(x => x.FileName).HasMaxLength(255);
+            entity.Property(x => x.FilePath).HasMaxLength(512);
+            entity.Property(x => x.ContentType).HasMaxLength(100);
+            entity.Property(x => x.Note).HasMaxLength(500);
+            entity.HasOne<DefenseSession>().WithMany().HasForeignKey(x => x.DefenseSessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CapturedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.CapturedByLecturerId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<GroupResult>(entity =>
         {

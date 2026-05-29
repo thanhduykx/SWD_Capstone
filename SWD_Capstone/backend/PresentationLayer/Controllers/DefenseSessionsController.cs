@@ -19,13 +19,20 @@ namespace CPMS.Api.Controllers;
 public sealed class DefenseSessionsController(
     CpmsDbContext dbContext,
     AssignmentRules rules,
+    DefenseScoringService defenseScoringService,
+    IWebHostEnvironment environment,
     IHubContext<DefenseScoringHub> hubContext) : ControllerBase
 {
-    [HttpPost("{sessionId:int}/start")]
-    public async Task<ActionResult<DefenseSessionStateResponse>> Start(
-        int sessionId,
+    [HttpGet("resolve/{code}")]
+    public async Task<ActionResult<DefenseSessionStateDto>> ResolveByCode(
+        string code,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return BadRequest(new { error = "Defense code is required." });
+        }
+
         var userId = CurrentUserId();
         var lecturerId = await CurrentLecturerId(userId, cancellationToken);
         if (lecturerId is null)
@@ -33,33 +40,77 @@ public sealed class DefenseSessionsController(
             return Forbid();
         }
 
-        var session = await dbContext.DefenseSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        var normalizedCode = code.Trim();
+        var sessionQuery = dbContext.DefenseSessions.AsQueryable();
+        if (int.TryParse(normalizedCode, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sessionIdFromCode))
+        {
+            sessionQuery = sessionQuery.Where(x =>
+                x.Id == sessionIdFromCode ||
+                x.Code == normalizedCode ||
+                dbContext.Councils.Any(c => c.Id == x.CouncilId && c.Code == normalizedCode));
+        }
+        else
+        {
+            sessionQuery = sessionQuery.Where(x =>
+                x.Code == normalizedCode ||
+                dbContext.Councils.Any(c => c.Id == x.CouncilId && c.Code == normalizedCode));
+        }
+
+        var session = await sessionQuery
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.DefenseRoundId,
+                x.CouncilId,
+                x.GroupId,
+                x.SessionDate,
+                x.Slot,
+                x.Room,
+                x.StartedAt,
+                x.EndedAt,
+                x.IsLocked,
+                CouncilCode = dbContext.Councils.Where(c => c.Id == x.CouncilId).Select(c => c.Code).Single(),
+                ChairmanId = dbContext.Councils.Where(c => c.Id == x.CouncilId).Select(c => c.ChairmanId).Single(),
+                MemberIds = dbContext.CouncilMembers
+                    .Where(m => m.CouncilId == x.CouncilId)
+                    .Select(m => m.LecturerId)
+                    .ToArray()
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
         if (session is null)
         {
-            return NotFound();
+            return NotFound(new { error = "Defense code was not found." });
         }
 
-        var council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
-        rules.EnsureChairman(lecturerId.Value, council.ChairmanId);
-        rules.EnsureSessionEditable(session.IsLocked);
+        rules.EnsureCouncilMember(lecturerId.Value, session.MemberIds);
 
-        if (session.StartedAt is null)
-        {
-            session.StartedAt = DateTime.UtcNow;
-            session.StartedById = userId;
-            council.Status = CouncilStatus.Active;
-            dbContext.AuditLogs.Add(NewAudit(userId, "START_DEFENSE_SESSION", session.Id, null, session.StartedAt));
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        var response = new DefenseSessionStateResponse(
+        return Ok(new DefenseSessionStateDto(
             session.Id,
+            session.Code,
+            session.DefenseRoundId,
             session.CouncilId,
-            council.Code,
+            session.CouncilCode,
+            session.GroupId,
+            session.SessionDate,
+            session.Slot,
+            session.Room,
             session.StartedAt,
             session.EndedAt,
             session.IsLocked,
-            true);
+            lecturerId.Value == session.ChairmanId));
+    }
+
+    [HttpPost("{sessionId:int}/start")]
+    public async Task<ActionResult<DefenseSessionStateDto>> Start(
+        int sessionId,
+        CancellationToken cancellationToken)
+    {
+        var response = await defenseScoringService.StartAsync(
+            sessionId,
+            CurrentActor(),
+            cancellationToken);
 
         await hubContext.Clients.Group(DefenseScoringHub.GroupName(sessionId))
             .SendAsync(DefenseScoringHub.SessionStarted, response, cancellationToken);
@@ -74,123 +125,163 @@ public sealed class DefenseSessionsController(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var userId = CurrentUserId();
-        var lecturerId = await CurrentLecturerId(userId, cancellationToken);
-        if (lecturerId is null)
-        {
-            return Forbid();
-        }
-
-        var session = await dbContext.DefenseSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
-        if (session is null)
-        {
-            return NotFound();
-        }
-
-        var councilMemberIds = await dbContext.CouncilMembers
-            .Where(x => x.CouncilId == session.CouncilId)
-            .Select(x => x.LecturerId)
-            .ToArrayAsync(cancellationToken);
-        rules.EnsureCouncilMember(lecturerId.Value, councilMemberIds);
-        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
-        rules.ValidateScore(request.ScoreValue);
-
-        var score = await dbContext.Scores.SingleOrDefaultAsync(
-            x => x.DefenseSessionId == sessionId && x.ScorerId == lecturerId &&
-                 x.StudentId == request.StudentId && x.ScoreType == request.ScoreType,
+        var score = await defenseScoringService.SubmitScoreAsync(
+            sessionId,
+            new SubmitDefenseScoreCommand(request.StudentId, request.ScoreType, request.ScoreValue),
+            CurrentActor(),
             cancellationToken);
-        var oldValue = score?.ScoreValue;
-        if (score is null)
-        {
-            score = new Score
-            {
-                DefenseSessionId = sessionId,
-                ScorerId = lecturerId.Value,
-                StudentId = request.StudentId,
-                ScoreType = request.ScoreType,
-                ScoreValue = request.ScoreValue
-            };
-            dbContext.Scores.Add(score);
-        }
-        else
-        {
-            score.ScoreValue = request.ScoreValue;
-            score.SubmittedAt = DateTime.UtcNow;
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        dbContext.ScoreSubmissionHistories.Add(new ScoreSubmissionHistory
-        {
-            ScoreId = score.Id,
-            DefenseSessionId = sessionId,
-            ScorerId = lecturerId.Value,
-            SubmittedByUserId = userId,
-            StudentId = request.StudentId,
-            ScoreType = request.ScoreType,
-            OldScoreValue = oldValue,
-            NewScoreValue = request.ScoreValue,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            UserAgent = Request.Headers.UserAgent,
-            TrustReason = "JWT user matched an assigned council member and the chairman had started the session."
-        });
-        dbContext.AuditLogs.Add(NewAudit(userId, "SUBMIT_SCORE", score.Id, oldValue, request.ScoreValue));
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         await hubContext.Clients.Group(DefenseScoringHub.GroupName(sessionId))
-            .SendAsync(DefenseScoringHub.ScoreSubmitted, new
-            {
-                sessionId,
-                score.Id,
-                scorerId = lecturerId.Value,
-                request.StudentId,
-                request.ScoreType,
-                request.ScoreValue,
-                score.SubmittedAt
-            }, cancellationToken);
+            .SendAsync(DefenseScoringHub.ScoreSubmitted, score, cancellationToken);
 
         return Ok(score);
     }
 
-    [HttpPost("{sessionId:int}/close")]
-    public async Task<ActionResult<DefenseSessionStateResponse>> Close(int sessionId, CancellationToken cancellationToken)
+    [HttpGet("{sessionId:int}/evidences")]
+    public async Task<ActionResult<IReadOnlyList<DefenseEvidenceResponse>>> GetEvidences(
+        int sessionId,
+        CancellationToken cancellationToken)
     {
         var userId = CurrentUserId();
         var lecturerId = await CurrentLecturerId(userId, cancellationToken);
+        if (lecturerId is null)
+        {
+            return Forbid();
+        }
+
         var session = await dbContext.DefenseSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
         if (session is null)
         {
             return NotFound();
         }
 
+        var memberIds = await dbContext.CouncilMembers
+            .Where(x => x.CouncilId == session.CouncilId)
+            .Select(x => x.LecturerId)
+            .ToArrayAsync(cancellationToken);
+        rules.EnsureCouncilMember(lecturerId.Value, memberIds);
+
+        var evidences = await dbContext.DefenseEvidences
+            .Where(x => x.DefenseSessionId == sessionId)
+            .OrderByDescending(x => x.CapturedAt)
+            .Select(x => new DefenseEvidenceResponse(
+                x.Id,
+                x.DefenseSessionId,
+                x.CapturedByLecturerId,
+                x.FileName,
+                x.FilePath,
+                x.ContentType,
+                x.FileSize,
+                x.Note,
+                x.CapturedAt))
+            .ToListAsync(cancellationToken);
+
+        return Ok(evidences);
+    }
+
+    [HttpPost("{sessionId:int}/evidences")]
+    [RequestSizeLimit(5_242_880)]
+    public async Task<ActionResult<DefenseEvidenceResponse>> UploadEvidence(
+        int sessionId,
+        [FromForm] UploadDefenseEvidenceRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.File is null || request.File.Length == 0)
+        {
+            return BadRequest(new { error = "Evidence image is required." });
+        }
+
+        if (!request.File.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "Only image evidence files are allowed." });
+        }
+
+        var userId = CurrentUserId();
+        var lecturerId = await CurrentLecturerId(userId, cancellationToken);
         if (lecturerId is null)
         {
             return Forbid();
         }
 
-        var council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
-        rules.EnsureChairman(lecturerId.Value, council.ChairmanId);
-        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
-        rules.EnsureSessionEditable(session.IsLocked);
-        session.IsLocked = true;
-        session.EndedAt = DateTime.UtcNow;
-        council.Status = CouncilStatus.Closed;
-        var scores = await dbContext.Scores.Where(x => x.DefenseSessionId == sessionId).ToListAsync(cancellationToken);
-        foreach (var score in scores)
+        var session = await dbContext.DefenseSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        if (session is null)
         {
-            score.IsLocked = true;
+            return NotFound();
         }
 
-        dbContext.AuditLogs.Add(NewAudit(userId, "LOCK_DEFENSE_SESSION", session.Id, false, true));
+        var memberIds = await dbContext.CouncilMembers
+            .Where(x => x.CouncilId == session.CouncilId)
+            .Select(x => x.LecturerId)
+            .ToArrayAsync(cancellationToken);
+        rules.EnsureCouncilMember(lecturerId.Value, memberIds);
+        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
+
+        var evidenceRoot = Path.Combine(environment.WebRootPath, "evidence", sessionId.ToString(CultureInfo.InvariantCulture));
+        Directory.CreateDirectory(evidenceRoot);
+
+        var extension = Path.GetExtension(request.File.FileName);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            extension = ".jpg";
+        }
+
+        var fileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{extension}";
+        var physicalPath = Path.Combine(evidenceRoot, fileName);
+        await using (var stream = System.IO.File.Create(physicalPath))
+        {
+            await request.File.CopyToAsync(stream, cancellationToken);
+        }
+
+        var publicPath = $"/evidence/{sessionId}/{fileName}";
+        var evidence = new DefenseEvidence
+        {
+            DefenseSessionId = sessionId,
+            CapturedByUserId = userId,
+            CapturedByLecturerId = lecturerId.Value,
+            FileName = fileName,
+            FilePath = publicPath,
+            ContentType = request.File.ContentType,
+            FileSize = request.File.Length,
+            Note = request.Note,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = Request.Headers.UserAgent
+        };
+
+        dbContext.DefenseEvidences.Add(evidence);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.AuditLogs.Add(NewAudit(userId, "CAPTURE_DEFENSE_EVIDENCE", nameof(DefenseEvidence), evidence.Id, null, new
+        {
+            evidence.DefenseSessionId,
+            evidence.FilePath,
+            evidence.Note
+        }));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var response = new DefenseSessionStateResponse(
-            session.Id,
-            session.CouncilId,
-            council.Code,
-            session.StartedAt,
-            session.EndedAt,
-            session.IsLocked,
-            true);
+        var response = new DefenseEvidenceResponse(
+            evidence.Id,
+            evidence.DefenseSessionId,
+            evidence.CapturedByLecturerId,
+            evidence.FileName,
+            evidence.FilePath,
+            evidence.ContentType,
+            evidence.FileSize,
+            evidence.Note,
+            evidence.CapturedAt);
+
+        await hubContext.Clients.Group(DefenseScoringHub.GroupName(sessionId))
+            .SendAsync("defenseEvidenceCaptured", response, cancellationToken);
+
+        return Ok(response);
+    }
+
+    [HttpPost("{sessionId:int}/close")]
+    public async Task<ActionResult<DefenseSessionStateDto>> Close(int sessionId, CancellationToken cancellationToken)
+    {
+        var response = await defenseScoringService.CloseAsync(
+            sessionId,
+            CurrentActor(),
+            cancellationToken);
 
         await hubContext.Clients.Group(DefenseScoringHub.GroupName(sessionId))
             .SendAsync(DefenseScoringHub.SessionClosed, response, cancellationToken);
@@ -203,18 +294,24 @@ public sealed class DefenseSessionsController(
                 ?? throw new UnauthorizedAccessException("Missing user identifier."),
             CultureInfo.InvariantCulture);
 
+    private ActorContext CurrentActor() =>
+        new(
+            CurrentUserId(),
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent);
+
     private Task<int?> CurrentLecturerId(int userId, CancellationToken cancellationToken) =>
         dbContext.Lecturers
             .Where(x => x.UserId == userId)
             .Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(cancellationToken);
 
-    private AuditLog NewAudit(int userId, string action, int entityId, object? oldValue, object? newValue) =>
+    private AuditLog NewAudit(int userId, string action, string entityType, int entityId, object? oldValue, object? newValue) =>
         new()
         {
             UserId = userId,
             Action = action,
-            EntityType = action == "SUBMIT_SCORE" ? nameof(Score) : nameof(DefenseSession),
+            EntityType = entityType,
             EntityId = entityId,
             OldValue = JsonSerializer.Serialize(oldValue),
             NewValue = JsonSerializer.Serialize(newValue),
@@ -224,11 +321,19 @@ public sealed class DefenseSessionsController(
 }
 
 public sealed record SubmitScoreRequest(int StudentId, ScoreType ScoreType, decimal ScoreValue);
-public sealed record DefenseSessionStateResponse(
-    int SessionId,
-    int CouncilId,
-    string CouncilCode,
-    DateTime? StartedAt,
-    DateTime? EndedAt,
-    bool IsLocked,
-    bool IsChairman);
+public sealed class UploadDefenseEvidenceRequest
+{
+    public IFormFile? File { get; set; }
+    public string? Note { get; set; }
+}
+
+public sealed record DefenseEvidenceResponse(
+    int Id,
+    int DefenseSessionId,
+    int CapturedByLecturerId,
+    string FileName,
+    string FilePath,
+    string ContentType,
+    long FileSize,
+    string? Note,
+    DateTime CapturedAt);

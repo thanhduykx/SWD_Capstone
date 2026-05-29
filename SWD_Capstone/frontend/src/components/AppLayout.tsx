@@ -1,14 +1,18 @@
-import { NavLink, Outlet } from "react-router-dom";
-
-const navigation = [
-  { to: "/", label: "Dashboard" },
-  { to: "/semesters", label: "Semesters & Groups" },
-  { to: "/reviews", label: "Review Scheduling" },
-  { to: "/defense", label: "Defense Scoring" },
-  { to: "/documents", label: "Documents & CLO" },
-];
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export function AppLayout() {
+  const { language, setLanguage, t } = useLanguage();
+  const { loginCode, role, signOut } = useAuth();
+  const navigate = useNavigate();
+  const navigation = getNavigation(role, t);
+
+  function handleSignOut() {
+    signOut();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -27,24 +31,50 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-note">
-          <small>Active semester</small>
-          <strong>SP26 - SEP490</strong>
-          <span>Document evaluation cycle</span>
+          <small>{t.activeSemester}</small>
+          <strong>{t.noActiveSemester}</strong>
+          <span>{t.evaluationCycle}</span>
         </div>
       </aside>
       <main className="content">
         <header className="topbar">
           <div>
-            <p className="eyebrow">CAPSTONE PROJECT MANAGEMENT SYSTEM</p>
-            <h1>Syllabus-based evaluation</h1>
+            <p className="eyebrow">{t.appEyebrow}</p>
+            <h1>{t.appTitle}</h1>
           </div>
+          <label className="language-switcher">
+            {t.language}
+            <select value={language} onChange={(event) => setLanguage(event.target.value === "en" ? "en" : "vi")}>
+              <option value="vi">VN</option>
+              <option value="en">EN</option>
+            </select>
+          </label>
           <div className="user-chip">
-            <strong>Training Department</strong>
-            <small>Admin / Staff</small>
+            <strong>{loginCode ?? t.trainingDepartment}</strong>
+            <small>{t.adminStaff}</small>
           </div>
+          <button className="secondary" type="button" onClick={handleSignOut}>{t.signOut}</button>
         </header>
         <Outlet />
       </main>
     </div>
   );
+}
+
+function getNavigation(role: string | null, t: ReturnType<typeof useLanguage>["t"]) {
+  if (role === "SystemAdministrator") {
+    return [{ to: "/admin", label: t.admin }];
+  }
+
+  if (role === "TrainingDepartment") {
+    return [{ to: "/training", label: t.training }];
+  }
+
+  return [
+    { to: "/", label: t.dashboard },
+    { to: "/semesters", label: t.semesters },
+    { to: "/reviews", label: t.reviews },
+    { to: "/defense", label: t.defense },
+    { to: "/documents", label: t.documents },
+  ];
 }

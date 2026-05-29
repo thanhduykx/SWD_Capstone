@@ -32,6 +32,7 @@ public sealed class Council
     public int Id { get; set; }
     public required string Code { get; set; }
     public int SemesterId { get; set; }
+    public int? ManagedByTrainingDepartmentId { get; set; }
     public int ChairmanId { get; set; }
     public int SecretaryId { get; set; }
     public CouncilType Type { get; set; }
@@ -57,12 +58,31 @@ public sealed class CouncilGroup
 public sealed class DefenseSession
 {
     public int Id { get; set; }
+    public required string Code { get; set; }
+    public int DefenseRoundId { get; set; }
     public int CouncilId { get; set; }
+    public int GroupId { get; set; }
     public DateTime SessionDate { get; set; }
+    public int Slot { get; set; }
+    public required string Room { get; set; }
+    public int? AssignedByTrainingDepartmentId { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
     public int? StartedById { get; set; }
     public bool IsLocked { get; set; }
+}
+
+public sealed class DefenseRound
+{
+    public int Id { get; set; }
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public int SemesterId { get; set; }
+    public CouncilType Type { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public DefenseRoundStatus Status { get; set; } = DefenseRoundStatus.Draft;
+    public int CreatedByTrainingDepartmentId { get; set; }
 }
 
 public sealed class ScoreSubmissionHistory
@@ -81,6 +101,22 @@ public sealed class ScoreSubmissionHistory
     public string? UserAgent { get; set; }
     public bool IsTrusted { get; set; } = true;
     public required string TrustReason { get; set; }
+}
+
+public sealed class DefenseEvidence
+{
+    public int Id { get; set; }
+    public int DefenseSessionId { get; set; }
+    public int CapturedByUserId { get; set; }
+    public int CapturedByLecturerId { get; set; }
+    public required string FileName { get; set; }
+    public required string FilePath { get; set; }
+    public required string ContentType { get; set; }
+    public long FileSize { get; set; }
+    public string? Note { get; set; }
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class Score
