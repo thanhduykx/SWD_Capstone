@@ -11,12 +11,14 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<CpmsDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("CpmsDatabase"))
+    options.UseNpgsql(cpmsConnectionString)
         .UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddScoped<DefenseScoringService>();
@@ -105,14 +107,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapControllers();
 app.MapGet("/health/database", async (CpmsDbContext dbContext) =>
 {
@@ -120,18 +120,28 @@ app.MapGet("/health/database", async (CpmsDbContext dbContext) =>
     {
         var canConnect = await dbContext.Database.CanConnectAsync();
         return canConnect
-            ? Results.Ok(new { status = "Healthy", database = "PostgreSQL", port = 5433 })
-            : Results.Problem("PostgreSQL is not reachable at localhost:5433.", statusCode: StatusCodes.Status503ServiceUnavailable);
+            ? Results.Ok(new { status = "Healthy", database = "PostgreSQL" })
+            : Results.Problem("PostgreSQL is not reachable.", statusCode: StatusCodes.Status503ServiceUnavailable);
     }
     catch (Npgsql.NpgsqlException exception)
     {
         return Results.Problem(
             detail: exception.Message,
-            title: "PostgreSQL is not reachable at localhost:5433",
+            title: "PostgreSQL is not reachable",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
 app.MapHub<DefenseScoringHub>("/hubs/defense");
+if (app.Environment.IsProduction() && File.Exists(Path.Combine(app.Environment.WebRootPath, "index.html")))
+{
+    app.MapFallbackToFile("index.html");
+}
+else
+{
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
+}
 
 app.Run();
 
@@ -149,8 +159,33 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     {
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
         logger.LogWarning(exception,
-            "PostgreSQL is not reachable at localhost:5433. The web app will start, but DB-backed APIs will fail until PostgreSQL is running. Start Docker Desktop and run `docker compose up -d postgres`.");
+            "PostgreSQL is not reachable. The web app will start, but DB-backed APIs will fail until PostgreSQL is configured and reachable.");
     }
+}
+
+static string GetCpmsConnectionString(IConfiguration configuration)
+{
+    var databaseUrl = configuration["DATABASE_URL"];
+    if (!string.IsNullOrWhiteSpace(databaseUrl))
+    {
+        var uri = new Uri(databaseUrl);
+        var credentials = uri.UserInfo.Split(':', 2);
+
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = uri.AbsolutePath.TrimStart('/'),
+            Username = Uri.UnescapeDataString(credentials.ElementAtOrDefault(0) ?? string.Empty),
+            Password = Uri.UnescapeDataString(credentials.ElementAtOrDefault(1) ?? string.Empty),
+            SslMode = SslMode.Require
+        };
+
+        return builder.ConnectionString;
+    }
+
+    return configuration.GetConnectionString("CpmsDatabase")
+        ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
 }
 
 public partial class Program;
