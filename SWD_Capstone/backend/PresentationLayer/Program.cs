@@ -15,6 +15,7 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
+var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<CpmsDbContext>(options =>
@@ -100,7 +101,7 @@ var app = builder.Build();
 await InitializeDatabaseAsync(app);
 
 app.UseMiddleware<ApiExceptionMiddleware>();
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
