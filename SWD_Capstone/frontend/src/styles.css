@@ -86,8 +86,61 @@ input, select { border: 1px solid #d4dee9; border-radius: 8px; padding: 12px; }
 .evidence-grid { display: grid; gap: 12px; margin-top: 14px; }
 .evidence-grid a { color: #193653; display: grid; gap: 7px; text-decoration: none; }
 .evidence-grid img { border-radius: 10px; max-height: 160px; object-fit: cover; width: 100%; }
+.segmented-tabs { background: #eaf0f5; border: 1px solid #d4dee9; border-radius: 8px; display: inline-grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); justify-self: start; overflow: hidden; }
+.segmented-tabs button { background: transparent; border: 0; color: #506176; cursor: pointer; font-weight: 700; padding: 11px 14px; }
+.segmented-tabs button.active { background: #193653; color: #fff; }
+.form-row { align-items: end; display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(180px, 1fr)); }
+.form-row.compact { grid-template-columns: 1.2fr .7fr 1fr; }
+.form-row.two-columns { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.align-end { align-self: end; }
+textarea { border: 1px solid #d4dee9; border-radius: 8px; font: inherit; min-height: 44px; padding: 12px; resize: vertical; }
+.slot-grid { display: grid; gap: 6px; grid-template-columns: 74px repeat(7, minmax(76px, 1fr)); overflow-x: auto; }
+.slot-grid > strong, .slot-corner { background: #eef3f7; border-radius: 7px; color: #193653; padding: 10px; text-align: center; }
+.slot-row-fragment { display: contents; }
+.slot-row-fragment > strong { align-items: center; background: #eef3f7; border-radius: 7px; color: #193653; display: flex; justify-content: center; min-height: 42px; }
+.slot-cell { background: #fff; border: 1px solid #d4dee9; border-radius: 7px; color: #7a8796; cursor: pointer; min-height: 42px; padding: 8px; }
+.slot-cell.selected { background: #eaf8f1; border-color: #25a36f; color: #196545; font-weight: 700; }
+.availability-surface { display: grid; gap: 14px; }
+.availability-toolbar { align-items: end; display: flex; justify-content: space-between; gap: 16px; }
+.availability-toolbar h3 { color: #10233c; font-size: 20px; margin-bottom: 5px; }
+.schedule-picker-row { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(230px, 1.2fr) 120px minmax(210px, .8fr) 170px; max-width: 980px; }
+.resolved-semester { background: #eef3f7; border: 1px solid #d4dee9; border-radius: 8px; display: grid; gap: 4px; min-height: 68px; padding: 10px 12px; }
+.resolved-semester small { color: #68778a; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.resolved-semester strong { color: #0e3155; font-size: 15px; }
+.resolved-semester span { color: #68778a; font-size: 12px; }
+.availability-table { display: grid; gap: 6px; grid-template-columns: 74px repeat(7, minmax(110px, 1fr)); overflow-x: auto; }
+.availability-table > strong, .availability-table .slot-corner { align-items: center; background: #e8eff5; border-radius: 6px; color: #0e3155; display: grid; font-weight: 800; justify-items: center; min-height: 44px; padding: 7px 8px; text-align: center; }
+.availability-table > strong small, .availability-table .slot-corner small { color: #506176; font-size: 12px; font-weight: 600; margin-top: 2px; }
+.availability-table .slot-row-fragment > strong { align-items: center; background: #e8eff5; border-radius: 6px; color: #0e3155; display: grid; justify-items: center; line-height: 1.15; min-height: 42px; padding: 6px; }
+.availability-table .slot-row-fragment > strong small { color: #506176; font-size: 11px; font-weight: 600; }
+.availability-table .slot-cell { border-radius: 6px; min-height: 42px; }
+.availability-table .slot-cell.selected { background: #e8f8ef; border-color: #28a66f; color: #075f3d; }
+.review-form-panel { display: grid; gap: 18px; }
+.checklist-list { display: grid; gap: 12px; }
+.checklist-section { background: #193653; border-radius: 7px; color: #fff; font-size: 15px; margin: 8px 0 0; padding: 11px 13px; }
+.checklist-item { border: 1px solid #e3e9ef; border-radius: 8px; display: grid; gap: 12px; padding: 14px; }
+.checklist-item strong { color: #142942; display: inline-block; margin-right: 8px; }
+.answer-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.radio-chip { align-items: center; background: #eef3f7; border-radius: 999px; display: inline-flex; gap: 7px; padding: 7px 11px; }
+.radio-chip input { margin: 0; }
+.preline { margin-top: 8px; white-space: pre-line; }
+.availability-list { display: grid; gap: 12px; max-height: 560px; overflow: auto; }
+.availability-row { border: 1px solid #e3e9ef; border-radius: 8px; display: grid; gap: 12px; grid-template-columns: minmax(170px, .7fr) minmax(260px, 1fr); padding: 12px; }
+.availability-row div:first-child { display: grid; gap: 3px; }
+.availability-row span, .availability-row small { color: #68778a; }
+.mini-slot-grid { display: grid; gap: 4px; grid-template-columns: repeat(8, 18px); }
+.mini-slot { background: #eef3f7; border-radius: 4px; color: #196545; font-size: 10px; height: 18px; line-height: 18px; text-align: center; }
+.mini-slot.available { background: #bce9d0; }
+.semester-quick-create { align-items: end; display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(120px, 1fr)) auto; }
+.soft-divider { border: 0; border-top: 1px solid #edf0f4; margin: 16px 0; }
 
 @media (max-width: 920px) {
   .sidebar { width: 210px; }
   .metric-grid, .dashboard-grid { grid-template-columns: 1fr; }
+  .form-row, .form-row.compact, .form-row.two-columns { grid-template-columns: 1fr; }
+  .schedule-picker-row { grid-template-columns: 1fr; max-width: none; }
+  .semester-quick-create { grid-template-columns: 1fr; }
+  .availability-toolbar { align-items: start; flex-direction: column; }
+  .segmented-tabs { grid-template-columns: 1fr; width: 100%; }
+  .availability-row { grid-template-columns: 1fr; }
 }

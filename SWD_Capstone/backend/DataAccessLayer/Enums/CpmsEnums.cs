@@ -15,6 +15,9 @@ public enum DocumentStatus { Submitted, Evaluating, NeedsRevision, Approved, Rej
 public enum EvaluationTriggerType { Auto, Manual }
 public enum ReviewType { Review1, Review2, Review3 }
 public enum ReviewResult { Pass, Fail, Defense2, Drop }
+public enum ReviewSessionStatus { Draft, Published, Cancelled }
+public enum ReviewSubmissionStatus { Draft, Submitted }
+public enum ReviewChecklistAnswer { Yes, No, NotApplicable }
 public enum CouncilType { Defense1, Defense2 }
 public enum CouncilStatus { Pending, Active, Closed }
 public enum CouncilMemberRole { Member, Chairman, Secretary }
@@ -22,4 +25,5 @@ public enum DefenseRoundStatus { Draft, Published, InProgress, Completed, Cancel
 public enum ScoreType { BaoVe, Nguoi }
 public enum FinalResult { Pending, Pass, Fail, Drop }
 public enum CommentStatus { Open, Resolved }
+public enum EmailDeliveryStatus { Pending, Sent, Failed }
 public enum NotificationType { DocStatusChange, NewComment, ReportDone, ScoreLocked }

@@ -1,4 +1,28 @@
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cpms-backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Swagger__Enabled: "true"
+      ConnectionStrings__CpmsDatabase: Host=postgres;Port=5432;Database=cpms;Username=postgres;Password=123456
+      Jwt__Issuer: PresentationLayer
+      Jwt__Audience: CPMS.Frontend
+      Jwt__Key: LOCAL_DOCKER_SECRET_KEY_AT_LEAST_32_CHARS
+      Cors__AllowedOrigins__0: http://localhost:5173
+      AdminSeed__Enabled: "true"
+      AdminSeed__Username: admin@gmail.com
+      AdminSeed__Email: admin@gmail.com
+      AdminSeed__Password: "12345"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: cpms-postgres

@@ -1,5 +1,8 @@
+using System.Globalization;
+using System.Security.Claims;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
+using CPMS.Core.Exceptions;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -10,45 +13,187 @@ namespace CPMS.Api.Controllers;
 
 [ApiController]
 [Route("api/review-sessions")]
-[Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+[Authorize]
 public sealed class ReviewSessionsController(CpmsDbContext dbContext, AssignmentRules rules) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<ReviewSession>> Create(CreateReviewSessionRequest request, CancellationToken cancellationToken)
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<ReviewSessionResponse>> Create(
+        CreateReviewSessionRequest request,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.Slot is < 1 or > 5)
+        var response = await CreateSessionAsync(
+            new BulkAssignReviewSessionRequest(
+                request.Code,
+                request.GroupId,
+                request.GroupPosition,
+                request.Type,
+                [request.Reviewer1Id, request.Reviewer2Id],
+                request.PreviousReviewerIds,
+                request.Slot,
+                request.Room,
+                request.SessionDate),
+            cancellationToken);
+
+        return CreatedAtAction(nameof(Create), new { response.Id }, response);
+    }
+
+    [HttpPost("bulk-assign")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<IReadOnlyList<ReviewSessionResponse>>> BulkAssign(
+        BulkAssignReviewSessionsRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Sessions.Count == 0)
         {
-            return BadRequest(new { error = "Review slot must be between 1 and 5." });
+            return BadRequest(new { error = "At least one review session assignment is required." });
         }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var responses = new List<ReviewSessionResponse>();
+        foreach (var item in request.Sessions)
+        {
+            responses.Add(await CreateSessionAsync(item, cancellationToken));
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return Ok(responses);
+    }
+
+    [HttpPatch("{sessionId:int}")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<ReviewSessionResponse>> Update(
+        int sessionId,
+        UpdateReviewSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        rules.ValidateReviewSlot(request.Slot);
+        var sessionDate = NormalizeSessionDate(request.SessionDate);
+        var reviewerIds = request.ReviewerIds.Distinct().ToArray();
+        var groupId = await dbContext.GroupReviewSlots
+            .Where(x => x.SessionId == sessionId)
+            .Select(x => x.GroupId)
+            .SingleAsync(cancellationToken);
+        var supervisorId = await dbContext.CapstoneGroups
+            .Where(x => x.Id == groupId)
+            .Select(x => x.LecturerId)
+            .SingleAsync(cancellationToken);
+
+        rules.ValidateReviewAssignment(supervisorId, reviewerIds, request.PreviousReviewerIds);
+        await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
+        await EnsureNoSlotConflictAsync(session.Id, sessionDate, request.Slot, reviewerIds, cancellationToken);
+
+        session.Code = request.Code.Trim();
+        session.Room = request.Room.Trim();
+        session.SessionDate = sessionDate;
+        session.DayOfWeek = IsoDayOfWeek(sessionDate);
+        session.Slot = request.Slot;
+        session.Reviewer1Id = reviewerIds.ElementAtOrDefault(0);
+        session.Reviewer2Id = reviewerIds.ElementAtOrDefault(1) == 0 ? null : reviewerIds.ElementAtOrDefault(1);
+        session.Status = request.Status;
+
+        var existingSubmissions = await dbContext.ReviewChecklistSubmissions
+            .Where(x => x.SessionId == session.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var staleSubmission in existingSubmissions.Where(x => !reviewerIds.Contains(x.ReviewerId)))
+        {
+            dbContext.ReviewChecklistSubmissions.Remove(staleSubmission);
+        }
+
+        foreach (var reviewerId in reviewerIds.Where(id => existingSubmissions.All(x => x.ReviewerId != id)))
+        {
+            dbContext.ReviewChecklistSubmissions.Add(NewSubmission(session, groupId, reviewerId));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(await MapSessionAsync(session.Id, cancellationToken));
+    }
+
+    [HttpGet("my")]
+    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    public async Task<IReadOnlyList<MyReviewSessionResponse>> GetMySessions(CancellationToken cancellationToken)
+    {
+        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+        if (lecturerId is null)
+        {
+            return [];
+        }
+
+        return await dbContext.ReviewChecklistSubmissions
+            .Where(submission => submission.ReviewerId == lecturerId.Value)
+            .OrderBy(submission => dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.SessionDate).Single())
+            .ThenBy(submission => dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.Slot).Single())
+            .Select(submission => new MyReviewSessionResponse(
+                submission.SessionId,
+                submission.Id,
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.Code).Single(),
+                submission.Type,
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.Status).Single(),
+                dbContext.CapstoneGroups.Where(group => group.Id == submission.GroupId).Select(group => group.Code).Single(),
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.SessionDate).Single(),
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.Slot).Single(),
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId).Select(session => session.Room).Single(),
+                submission.Status,
+                submission.LastSavedAt))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<ReviewSessionResponse> CreateSessionAsync(
+        BulkAssignReviewSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        rules.ValidateReviewSlot(request.Slot);
+        var sessionDate = NormalizeSessionDate(request.SessionDate);
+
+        var reviewerIds = request.ReviewerIds.Distinct().ToArray();
+        await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
 
         var group = await dbContext.CapstoneGroups.SingleOrDefaultAsync(x => x.Id == request.GroupId, cancellationToken);
         if (group is null)
         {
-            return NotFound(new { error = "Capstone group does not exist." });
+            throw new KeyNotFoundException("Capstone group does not exist.");
         }
 
         rules.ValidateReviewAssignment(
             group.LecturerId,
-            request.Reviewer1Id,
-            request.Reviewer2Id,
+            reviewerIds,
             request.Type == ReviewType.Review2 ? request.PreviousReviewerIds : null);
+
+        var alreadyScheduled = await dbContext.GroupReviewSlots.AnyAsync(slot =>
+            slot.GroupId == group.Id &&
+            dbContext.ReviewSessions.Any(session => session.Id == slot.SessionId && session.Type == request.Type),
+            cancellationToken);
+        rules.EnsureGroupCanBeScheduledForReviewType(alreadyScheduled);
+        await EnsureNoSlotConflictAsync(null, sessionDate, request.Slot, reviewerIds, cancellationToken);
 
         var session = new ReviewSession
         {
             Code = request.Code.Trim(),
             SemesterId = group.SemesterId,
-            DayOfWeek = (int)request.SessionDate.DayOfWeek,
+            DayOfWeek = IsoDayOfWeek(sessionDate),
             Slot = request.Slot,
             Room = request.Room.Trim(),
             Type = request.Type,
-            Reviewer1Id = request.Reviewer1Id,
-            Reviewer2Id = request.Reviewer2Id,
-            SessionDate = request.SessionDate
+            Reviewer1Id = reviewerIds.ElementAtOrDefault(0),
+            Reviewer2Id = reviewerIds.ElementAtOrDefault(1) == 0 ? null : reviewerIds.ElementAtOrDefault(1),
+            SessionDate = sessionDate,
+            Status = ReviewSessionStatus.Draft
         };
+
         dbContext.ReviewSessions.Add(session);
         await dbContext.SaveChangesAsync(cancellationToken);
+
         dbContext.GroupReviewSlots.Add(new GroupReviewSlot
         {
             SessionId = session.Id,
@@ -56,10 +201,110 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
             GroupPosition = request.GroupPosition,
             ConflictFlag = false
         });
-        await dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreatedAtAction(nameof(Create), new { session.Id }, session);
+        foreach (var reviewerId in reviewerIds)
+        {
+            dbContext.ReviewChecklistSubmissions.Add(NewSubmission(session, group.Id, reviewerId));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await MapSessionAsync(session.Id, cancellationToken);
     }
+
+    private async Task EnsureLecturersExistAsync(IReadOnlyCollection<int> reviewerIds, CancellationToken cancellationToken)
+    {
+        if (reviewerIds.Count == 0)
+        {
+            throw new BusinessRuleException("At least one reviewer is required.");
+        }
+
+        var existingCount = await dbContext.Lecturers.CountAsync(x => reviewerIds.Contains(x.Id), cancellationToken);
+        if (existingCount != reviewerIds.Count)
+        {
+            throw new KeyNotFoundException("One or more reviewers do not exist.");
+        }
+    }
+
+    private async Task EnsureNoSlotConflictAsync(
+        int? currentSessionId,
+        DateTime sessionDate,
+        int slot,
+        IReadOnlyCollection<int> reviewerIds,
+        CancellationToken cancellationToken)
+    {
+        var hasConflict = await dbContext.ReviewSessions.AnyAsync(session =>
+            (!currentSessionId.HasValue || session.Id != currentSessionId.Value) &&
+            session.SessionDate.Date == sessionDate.Date &&
+            session.Slot == slot &&
+            session.Status != ReviewSessionStatus.Cancelled &&
+            ((session.Reviewer1Id.HasValue && reviewerIds.Contains(session.Reviewer1Id.Value)) ||
+             (session.Reviewer2Id.HasValue && reviewerIds.Contains(session.Reviewer2Id.Value))),
+            cancellationToken);
+        rules.EnsureLecturerAvailableForReviewSlot(hasConflict);
+    }
+
+    private async Task<ReviewSessionResponse> MapSessionAsync(int sessionId, CancellationToken cancellationToken)
+    {
+        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        var slot = await dbContext.GroupReviewSlots.SingleAsync(x => x.SessionId == sessionId, cancellationToken);
+        var groupCode = await dbContext.CapstoneGroups
+            .Where(x => x.Id == slot.GroupId)
+            .Select(x => x.Code)
+            .SingleAsync(cancellationToken);
+        var reviewerIds = new[] { session.Reviewer1Id, session.Reviewer2Id }
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .ToArray();
+
+        return new ReviewSessionResponse(
+            session.Id,
+            session.Code,
+            session.SemesterId,
+            slot.GroupId,
+            groupCode,
+            slot.GroupPosition,
+            session.Type,
+            session.Status,
+            reviewerIds,
+            session.SessionDate,
+            session.Slot,
+            session.Room);
+    }
+
+    private static ReviewChecklistSubmission NewSubmission(ReviewSession session, int groupId, int reviewerId) =>
+        new()
+        {
+            SessionId = session.Id,
+            GroupId = groupId,
+            ReviewerId = reviewerId,
+            Type = session.Type,
+            Status = ReviewSubmissionStatus.Draft,
+            LastSavedAt = DateTime.UtcNow
+        };
+
+    private async Task<int?> CurrentLecturerIdAsync(CancellationToken cancellationToken)
+    {
+        var userId = CurrentUserId();
+        return await dbContext.Lecturers
+            .Where(x => x.UserId == userId)
+            .Select(x => (int?)x.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private int CurrentUserId() =>
+        int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? throw new UnauthorizedAccessException("Missing user identifier."),
+            CultureInfo.InvariantCulture);
+
+    private static int IsoDayOfWeek(DateTime date)
+    {
+        var value = (int)date.DayOfWeek;
+        return value == 0 ? 7 : value;
+    }
+
+    private static DateTime NormalizeSessionDate(DateTime date) =>
+        DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
 }
 
 public sealed record CreateReviewSessionRequest(
@@ -73,3 +318,52 @@ public sealed record CreateReviewSessionRequest(
     int Slot,
     string Room,
     DateTime SessionDate);
+
+public sealed record BulkAssignReviewSessionsRequest(IReadOnlyCollection<BulkAssignReviewSessionRequest> Sessions);
+
+public sealed record BulkAssignReviewSessionRequest(
+    string Code,
+    int GroupId,
+    int GroupPosition,
+    ReviewType Type,
+    IReadOnlyCollection<int> ReviewerIds,
+    IReadOnlyCollection<int> PreviousReviewerIds,
+    int Slot,
+    string Room,
+    DateTime SessionDate);
+
+public sealed record UpdateReviewSessionRequest(
+    string Code,
+    IReadOnlyCollection<int> ReviewerIds,
+    IReadOnlyCollection<int> PreviousReviewerIds,
+    int Slot,
+    string Room,
+    DateTime SessionDate,
+    ReviewSessionStatus Status);
+
+public sealed record ReviewSessionResponse(
+    int Id,
+    string Code,
+    int SemesterId,
+    int GroupId,
+    string GroupCode,
+    int GroupPosition,
+    ReviewType Type,
+    ReviewSessionStatus Status,
+    IReadOnlyCollection<int> ReviewerIds,
+    DateTime SessionDate,
+    int Slot,
+    string Room);
+
+public sealed record MyReviewSessionResponse(
+    int SessionId,
+    int SubmissionId,
+    string Code,
+    ReviewType Type,
+    ReviewSessionStatus SessionStatus,
+    string GroupCode,
+    DateTime SessionDate,
+    int Slot,
+    string Room,
+    ReviewSubmissionStatus SubmissionStatus,
+    DateTime LastSavedAt);

@@ -75,7 +75,7 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        AddRoleProfile(user.Id, request);
+        AddRoleProfile(user.Id, request with { Username = username, Email = email });
         dbContext.AuditLogs.Add(new AuditLog
         {
             UserId = CurrentUserId(),
@@ -147,11 +147,10 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 dbContext.Lecturers.Add(new Lecturer
                 {
                     UserId = userId,
-                    Code = request.Code ?? request.Username,
+                    Code = request.Username,
                     FullName = Required(request.FullName, "Full name is required for lecturers."),
                     Department = Required(request.Department, "Department is required for lecturers."),
-                    IsPartTime = request.IsPartTime,
-                    MaxGroups = request.MaxGroups ?? 0
+                    IsPartTime = request.IsPartTime
                 });
                 break;
             case UserRole.EvaluationPanel:
@@ -166,9 +165,9 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 dbContext.TrainingDepartments.Add(new TrainingDepartment
                 {
                     UserId = userId,
-                    DepartmentName = request.Department ?? "Training Department",
-                    StaffCode = request.Code ?? request.Username,
-                    Position = request.Position ?? "Staff"
+                    DepartmentName = OptionalOrDefault(request.Department, "Training Department"),
+                    StaffCode = request.Username,
+                    Position = OptionalOrDefault(request.Position, "Moderator")
                 });
                 break;
             case UserRole.SystemAdministrator:
@@ -183,7 +182,7 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 dbContext.Students.Add(new Student
                 {
                     UserId = userId,
-                    Code = request.Code ?? request.Username,
+                    Code = request.Username,
                     FullName = Required(request.FullName, "Full name is required for students."),
                     ClassCode = Required(request.ClassCode, "Class code is required for students."),
                     Batch = request.Batch,
@@ -202,6 +201,9 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
 
     private static string Required(string? value, string message) =>
         string.IsNullOrWhiteSpace(value) ? throw new ArgumentException(message) : value.Trim();
+
+    private static string OptionalOrDefault(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 }
 
 public sealed record AccountResponse(
@@ -218,13 +220,11 @@ public sealed record CreateAccountRequest(
     string Email,
     string Password,
     UserRole Role,
-    string? Code,
     string? FullName,
     string? Department,
     string? Position,
     string? PermissionScope,
     bool IsPartTime,
-    int? MaxGroups,
     string? ClassCode,
     string? Batch,
     string? Major);

@@ -24,7 +24,7 @@ export function App() {
           <Route path="/training" element={<TrainingDepartmentPage />} />
         </Route>
       </Route>
-      <Route element={<RequireAuth allowedRoles={["Lecturer", "EvaluationPanel"]} />}>
+      <Route element={<RequireAuth allowedRoles={["Lecturer"]} />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="/semesters" element={<SemestersPage />} />
