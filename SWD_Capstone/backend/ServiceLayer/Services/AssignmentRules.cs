@@ -4,6 +4,14 @@ namespace CPMS.Core.Services;
 
 public sealed class AssignmentRules
 {
+    public void ValidateReviewSlot(int slot)
+    {
+        if (slot is < 1 or > 8)
+        {
+            throw new BusinessRuleException("Review slot must be between 1 and 8.");
+        }
+    }
+
     public void ValidateReviewAssignment(
         int supervisorId,
         int reviewer1Id,
@@ -24,6 +32,50 @@ public sealed class AssignmentRules
             (previousRoundReviewerIds.Contains(reviewer1Id) || previousRoundReviewerIds.Contains(reviewer2Id)))
         {
             throw new BusinessRuleException("Review 2 reviewers cannot repeat reviewers from Review 1.");
+        }
+    }
+
+    public void ValidateReviewAssignment(
+        int supervisorId,
+        IReadOnlyCollection<int> reviewerIds,
+        IReadOnlyCollection<int>? previousRoundReviewerIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(reviewerIds);
+
+        if (reviewerIds.Count is < 1 or > 2)
+        {
+            throw new BusinessRuleException("A review session must have one or two reviewers.");
+        }
+
+        if (reviewerIds.Count != reviewerIds.Distinct().Count())
+        {
+            throw new BusinessRuleException("A review session cannot repeat the same reviewer.");
+        }
+
+        if (reviewerIds.Contains(supervisorId))
+        {
+            throw new BusinessRuleException("The supervisor cannot review their own capstone group.");
+        }
+
+        if (previousRoundReviewerIds is not null && reviewerIds.Any(previousRoundReviewerIds.Contains))
+        {
+            throw new BusinessRuleException("Review 2 reviewers cannot repeat reviewers from Review 1.");
+        }
+    }
+
+    public void EnsureLecturerAvailableForReviewSlot(bool hasSlotConflict)
+    {
+        if (hasSlotConflict)
+        {
+            throw new BusinessRuleException("A lecturer cannot be assigned to more than one review session in the same date and slot.");
+        }
+    }
+
+    public void EnsureGroupCanBeScheduledForReviewType(bool alreadyScheduled)
+    {
+        if (alreadyScheduled)
+        {
+            throw new BusinessRuleException("A capstone group already has a session for this review round.");
         }
     }
 

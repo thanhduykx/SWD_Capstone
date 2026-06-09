@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.20" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.Json" Version="8.0.20" />
@@ -20,6 +21,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ServiceLayer\ServiceLayer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ReviewTemplates\*.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

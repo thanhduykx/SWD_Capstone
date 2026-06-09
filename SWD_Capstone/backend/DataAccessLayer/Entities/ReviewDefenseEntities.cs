@@ -2,6 +2,17 @@ using CPMS.Core.Enums;
 
 namespace CPMS.Core.Entities;
 
+public sealed class ReviewAvailability
+{
+    public int Id { get; set; }
+    public int SemesterId { get; set; }
+    public int LecturerId { get; set; }
+    public DateOnly WeekStartDate { get; set; }
+    public int DayOfWeek { get; set; }
+    public int Slot { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public sealed class ReviewSession
 {
     public int Id { get; set; }
@@ -14,6 +25,9 @@ public sealed class ReviewSession
     public int? Reviewer1Id { get; set; }
     public int? Reviewer2Id { get; set; }
     public DateTime SessionDate { get; set; }
+    public ReviewSessionStatus Status { get; set; } = ReviewSessionStatus.Draft;
+    public DateTime? PublishedAt { get; set; }
+    public int? PublishedByTrainingDepartmentId { get; set; }
 }
 
 public sealed class GroupReviewSlot
@@ -25,6 +39,59 @@ public sealed class GroupReviewSlot
     public ReviewResult? Result { get; set; }
     public string? Notes { get; set; }
     public bool ConflictFlag { get; set; }
+}
+
+public sealed class ReviewChecklistSubmission
+{
+    public int Id { get; set; }
+    public int SessionId { get; set; }
+    public int GroupId { get; set; }
+    public int ReviewerId { get; set; }
+    public ReviewType Type { get; set; }
+    public ReviewSubmissionStatus Status { get; set; } = ReviewSubmissionStatus.Draft;
+    public string? WorkProductVersion { get; set; }
+    public string? WorkProductSize { get; set; }
+    public decimal? EffortHours { get; set; }
+    public string? ReviewerComment { get; set; }
+    public string? Suggestion { get; set; }
+    public string? ResultText { get; set; }
+    public DateTime LastSavedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? SubmittedAt { get; set; }
+}
+
+public sealed class ReviewChecklistItemResponse
+{
+    public int Id { get; set; }
+    public int SubmissionId { get; set; }
+    public required string ItemKey { get; set; }
+    public ReviewChecklistAnswer? Answer { get; set; }
+    public string? Comment { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class ReviewSchedulePublication
+{
+    public int Id { get; set; }
+    public int SemesterId { get; set; }
+    public ReviewType ReviewType { get; set; }
+    public DateOnly WeekStartDate { get; set; }
+    public int PublishedByTrainingDepartmentId { get; set; }
+    public DateTime PublishedAt { get; set; } = DateTime.UtcNow;
+    public required string Subject { get; set; }
+    public required string Body { get; set; }
+}
+
+public sealed class EmailDeliveryLog
+{
+    public int Id { get; set; }
+    public int? PublicationId { get; set; }
+    public int? RecipientUserId { get; set; }
+    public required string RecipientEmail { get; set; }
+    public required string Subject { get; set; }
+    public EmailDeliveryStatus Status { get; set; } = EmailDeliveryStatus.Pending;
+    public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? SentAt { get; set; }
 }
 
 public sealed class Council

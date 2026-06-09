@@ -35,7 +35,6 @@ public sealed class Lecturer
     public required string FullName { get; set; }
     public required string Department { get; set; }
     public bool IsPartTime { get; set; }
-    public int MaxGroups { get; set; }
 }
 
 public sealed class Student

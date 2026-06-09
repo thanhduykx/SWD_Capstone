@@ -1,4 +1,5 @@
 using CPMS.Core.Entities;
+using CPMS.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.Infrastructure.Data;
@@ -22,8 +23,13 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<EvaluationReport> EvaluationReports => Set<EvaluationReport>();
     public DbSet<EvaluationDetail> EvaluationDetails => Set<EvaluationDetail>();
     public DbSet<InlineComment> InlineComments => Set<InlineComment>();
+    public DbSet<ReviewAvailability> ReviewAvailabilities => Set<ReviewAvailability>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
     public DbSet<GroupReviewSlot> GroupReviewSlots => Set<GroupReviewSlot>();
+    public DbSet<ReviewChecklistSubmission> ReviewChecklistSubmissions => Set<ReviewChecklistSubmission>();
+    public DbSet<ReviewChecklistItemResponse> ReviewChecklistItemResponses => Set<ReviewChecklistItemResponse>();
+    public DbSet<ReviewSchedulePublication> ReviewSchedulePublications => Set<ReviewSchedulePublication>();
+    public DbSet<EmailDeliveryLog> EmailDeliveryLogs => Set<EmailDeliveryLog>();
     public DbSet<Council> Councils => Set<Council>();
     public DbSet<CouncilMember> CouncilMembers => Set<CouncilMember>();
     public DbSet<CouncilGroup> CouncilGroups => Set<CouncilGroup>();
@@ -179,14 +185,32 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
 
     private static void ConfigureReviewAndDefense(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ReviewAvailability>(entity =>
+        {
+            entity.ToTable("review_availabilities", table =>
+            {
+                table.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 7");
+                table.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 8");
+            });
+            entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate, x.DayOfWeek, x.Slot }).IsUnique();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ReviewSession>(entity =>
         {
-            entity.ToTable("review_sessions");
+            entity.ToTable("review_sessions", table =>
+            {
+                table.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 8");
+            });
             entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
+            entity.HasIndex(x => new { x.SemesterId, x.Type, x.SessionDate, x.Slot });
             entity.Property(x => x.Type).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewSessionStatus.Draft);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer1Id).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer2Id).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.PublishedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<GroupReviewSlot>(entity =>
         {
@@ -195,6 +219,49 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.Result).HasConversion<string>();
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewChecklistSubmission>(entity =>
+        {
+            entity.ToTable("review_checklist_submissions");
+            entity.HasIndex(x => new { x.SessionId, x.ReviewerId }).IsUnique();
+            entity.HasIndex(x => new { x.GroupId, x.Type });
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewSubmissionStatus.Draft);
+            entity.Property(x => x.WorkProductVersion).HasMaxLength(100);
+            entity.Property(x => x.WorkProductSize).HasMaxLength(100);
+            entity.Property(x => x.EffortHours).HasPrecision(6, 2);
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewChecklistItemResponse>(entity =>
+        {
+            entity.ToTable("review_checklist_item_responses");
+            entity.HasIndex(x => new { x.SubmissionId, x.ItemKey }).IsUnique();
+            entity.Property(x => x.ItemKey).HasMaxLength(80);
+            entity.Property(x => x.Answer).HasConversion<string>();
+            entity.HasOne<ReviewChecklistSubmission>().WithMany().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ReviewSchedulePublication>(entity =>
+        {
+            entity.ToTable("review_schedule_publications");
+            entity.HasIndex(x => new { x.SemesterId, x.ReviewType, x.WeekStartDate });
+            entity.Property(x => x.ReviewType).HasConversion<string>();
+            entity.Property(x => x.Subject).HasMaxLength(250);
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.PublishedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<EmailDeliveryLog>(entity =>
+        {
+            entity.ToTable("email_delivery_logs");
+            entity.HasIndex(x => x.PublicationId);
+            entity.HasIndex(x => x.RecipientEmail);
+            entity.Property(x => x.RecipientEmail).HasMaxLength(256);
+            entity.Property(x => x.Subject).HasMaxLength(250);
+            entity.Property(x => x.Status).HasConversion<string>();
+            entity.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            entity.HasOne<ReviewSchedulePublication>().WithMany().HasForeignKey(x => x.PublicationId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.RecipientUserId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<Council>(entity =>
         {
