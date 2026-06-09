@@ -1,3 +1,4 @@
+using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -9,11 +10,20 @@ namespace CPMS.Api.Controllers;
 [ApiController]
 [Route("api/semesters")]
 [Authorize]
-public sealed class SemestersController(CpmsDbContext dbContext) : ControllerBase
+public sealed class SemestersController(
+    CpmsDbContext dbContext,
+    SemesterResolverService semesterResolver) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<Semester>> GetAll(CancellationToken cancellationToken) =>
-        await dbContext.Semesters.OrderByDescending(x => x.StartDate).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<Semester>> GetAll(CancellationToken cancellationToken)
+    {
+        await semesterResolver.ResolveForDateAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
+        return await dbContext.Semesters.OrderByDescending(x => x.StartDate).ToListAsync(cancellationToken);
+    }
+
+    [HttpGet("resolve")]
+    public async Task<ActionResult<Semester>> Resolve(DateOnly date, CancellationToken cancellationToken) =>
+        await semesterResolver.ResolveForDateAsync(date, cancellationToken);
 
     [HttpPost]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]

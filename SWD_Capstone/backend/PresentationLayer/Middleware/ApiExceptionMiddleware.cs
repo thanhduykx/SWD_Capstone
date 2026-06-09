@@ -17,6 +17,16 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsJsonAsync(new { error = exception.Message });
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = exception.Message });
+        }
+        catch (ArgumentException exception)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { error = exception.Message });
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Unhandled API error.");

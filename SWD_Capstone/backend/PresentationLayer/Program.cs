@@ -4,6 +4,8 @@ using System.Threading.RateLimiting;
 using CPMS.Api.Hubs;
 using CPMS.Api.Middleware;
 using CPMS.Api.Services;
+using CPMS.Core.Entities;
+using CPMS.Core.Enums;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +24,9 @@ builder.Services.AddDbContext<CpmsDbContext>(options =>
         .UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddScoped<DefenseScoringService>();
+builder.Services.AddScoped<SemesterResolverService>();
+builder.Services.AddSingleton<ReviewChecklistTemplateService>();
+builder.Services.AddScoped<IReviewEmailSender, SmtpReviewEmailSender>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddScoped<JwtTokenService>();
 
@@ -152,8 +157,9 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
         await dbContext.Database.MigrateAsync();
+        await SeedAdminAccountAsync(app, dbContext);
 
-        // Only apply schema migrations. Business data must come from official import/admin flows.
+        // Business data must come from official import/admin flows. Admin seeding is opt-in for deployments.
     }
     catch (Npgsql.NpgsqlException exception)
     {
@@ -161,6 +167,78 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         logger.LogWarning(exception,
             "PostgreSQL is not reachable. The web app will start, but DB-backed APIs will fail until PostgreSQL is configured and reachable.");
     }
+}
+
+static async Task SeedAdminAccountAsync(WebApplication app, CpmsDbContext dbContext)
+{
+    var configuration = app.Configuration;
+    if (!configuration.GetValue<bool>("AdminSeed:Enabled"))
+    {
+        return;
+    }
+
+    var username = configuration["AdminSeed:Username"]?.Trim();
+    var email = configuration["AdminSeed:Email"]?.Trim();
+    var password = configuration["AdminSeed:Password"];
+    if (string.IsNullOrWhiteSpace(username) ||
+        string.IsNullOrWhiteSpace(email) ||
+        string.IsNullOrWhiteSpace(password))
+    {
+        throw new InvalidOperationException(
+            "Admin seed is enabled, but AdminSeed:Username, AdminSeed:Email, or AdminSeed:Password is missing.");
+    }
+
+    await using var transaction = await dbContext.Database.BeginTransactionAsync();
+    var user = await dbContext.Users
+        .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
+
+    if (user is null)
+    {
+        user = new User
+        {
+            Username = username,
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+            Role = UserRole.SystemAdministrator,
+            IsActive = true
+        };
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+    }
+    else
+    {
+        user.Username = username;
+        user.Email = email;
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+        user.Role = UserRole.SystemAdministrator;
+        user.IsActive = true;
+        user.LockedUntil = null;
+        user.FailedLoginAttempts = 0;
+        user.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+    }
+
+    if (!await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == user.Id))
+    {
+        dbContext.SystemAdministrators.Add(new SystemAdministrator
+        {
+            UserId = user.Id,
+            AdminLevel = "Root",
+            PermissionScope = "System"
+        });
+    }
+
+    dbContext.AuditLogs.Add(new AuditLog
+    {
+        UserId = user.Id,
+        Action = "SEED_ADMIN_ACCOUNT",
+        EntityType = nameof(User),
+        EntityId = user.Id,
+        NewValue = user.Username,
+        UserAgent = "ApplicationStartup"
+    });
+    await dbContext.SaveChangesAsync();
+    await transaction.CommitAsync();
 }
 
 static string GetCpmsConnectionString(IConfiguration configuration)
