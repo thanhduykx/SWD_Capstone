@@ -7,6 +7,16 @@ public sealed class AssignmentRulesTests
 {
     private readonly AssignmentRules _rules = new();
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(9)]
+    public void ReviewSlot_RejectsValueOutsideOneToEight(int slot)
+    {
+        var action = () => _rules.ValidateReviewSlot(slot);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
     [Fact]
     public void ReviewAssignment_RejectsSupervisorAsReviewer()
     {
@@ -16,9 +26,33 @@ public sealed class AssignmentRulesTests
     }
 
     [Fact]
+    public void ReviewAssignment_RejectsDuplicateReviewerInFlexibleList()
+    {
+        var action = () => _rules.ValidateReviewAssignment(10, [11, 11]);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
     public void ReviewTwo_RejectsReviewerRepeatedFromReviewOne()
     {
         var action = () => _rules.ValidateReviewAssignment(10, 11, 12, [9, 11]);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void ReviewSlotConflict_RejectsLecturerDoubleBooked()
+    {
+        var action = () => _rules.EnsureLecturerAvailableForReviewSlot(true);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void ReviewRound_RejectsGroupAlreadyScheduled()
+    {
+        var action = () => _rules.EnsureGroupCanBeScheduledForReviewType(true);
 
         Assert.Throws<BusinessRuleException>(action);
     }
