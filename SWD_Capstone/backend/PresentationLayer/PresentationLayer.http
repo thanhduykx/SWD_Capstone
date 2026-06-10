@@ -1,16 +1,47 @@
 @PresentationLayer_HostAddress = http://localhost:5122
+@AccessToken = paste-access-token-here
 
+### FE Swagger/testing guide
+GET {{PresentationLayer_HostAddress}}/api/test-support/swagger-guide
+Accept: application/json
+
+### Local test accounts
+GET {{PresentationLayer_HostAddress}}/api/test-support/test-accounts
+Accept: application/json
+
+### Login: moderator for account management
 POST {{PresentationLayer_HostAddress}}/api/auth/login
 Content-Type: application/json
 Accept: application/json
 
 {
-  "username": "admin",
-  "password": "123456"
+  "username": "test.training",
+  "password": "Test@123456"
+}
+
+### Login: lecturer
+POST {{PresentationLayer_HostAddress}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "test.lecturer",
+  "password": "Test@123456"
+}
+
+### Login: legacy local admin
+POST {{PresentationLayer_HostAddress}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "admin@gmail.com",
+  "password": "12345"
 }
 
 ###
 
+### Bootstrap first admin: Development only and only when users table is empty
 POST {{PresentationLayer_HostAddress}}/api/auth/bootstrap-admin
 Content-Type: application/json
 Accept: application/json
@@ -22,3 +53,65 @@ Accept: application/json
 }
 
 ###
+
+### List accounts
+GET {{PresentationLayer_HostAddress}}/api/accounts
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+### Create lecturer without department
+POST {{PresentationLayer_HostAddress}}/api/accounts
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": null,
+  "identityCode": "SE194673",
+  "email": "gv001@cpms.local",
+  "password": "Test@123456",
+  "role": "Lecturer",
+  "fullName": "Duong Thanh Thanh Duy",
+  "department": null,
+  "position": null,
+  "permissionScope": null,
+  "isPartTime": false,
+  "classCode": null,
+  "batch": null,
+  "major": null
+}
+
+### Create evaluation panel account
+POST {{PresentationLayer_HostAddress}}/api/accounts
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": null,
+  "identityCode": "PN001",
+  "email": "panel001@cpms.local",
+  "password": "Test@123456",
+  "role": "EvaluationPanel",
+  "fullName": "Nguyen Van Panel",
+  "department": "Software Engineering",
+  "position": null,
+  "permissionScope": null,
+  "isPartTime": false,
+  "classCode": null,
+  "batch": null,
+  "major": null
+}
+
+### Save lecturer weekly availability
+PUT {{PresentationLayer_HostAddress}}/api/review-availability/week?semesterId=1&weekStart=2026-06-15
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "slots": [
+    { "dayOfWeek": 1, "slot": 1 },
+    { "dayOfWeek": 3, "slot": 2 }
+  ]
+}

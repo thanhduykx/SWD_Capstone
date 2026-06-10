@@ -4,16 +4,19 @@ using System.Threading.RateLimiting;
 using CPMS.Api.Hubs;
 using CPMS.Api.Middleware;
 using CPMS.Api.Services;
+using CPMS.Api.Swagger;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Npgsql;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
@@ -89,7 +92,22 @@ builder.Services.AddSignalR()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "CPMS API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "CPMS API - FE Testing",
+        Version = "v1",
+        Description = """
+                      Frontend test flow:
+                      1. Open GET /api/test-support/swagger-guide for the role matrix and recommended flows.
+                      2. Login with POST /api/auth/login.
+                      3. Copy accessToken, click Authorize, paste the token value, then call protected endpoints.
+                      4. Use ids returned from GET endpoints instead of guessing ids.
+                      """
+    });
+    options.CustomOperationIds(SwaggerOperationId);
+    options.TagActionsBy(api => [SwaggerTagFor(api)]);
+    options.OrderActionsBy(SwaggerOrderFor);
+    options.OperationFilter<SwaggerTestingOperationFilter>();
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -108,7 +126,17 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.DocumentTitle = "CPMS API - FE Testing";
+        options.DisplayRequestDuration();
+        options.EnableDeepLinking();
+        options.EnablePersistAuthorization();
+        options.DisplayOperationId();
+        options.DocExpansion(DocExpansion.None);
+        options.DefaultModelExpandDepth(2);
+        options.DefaultModelsExpandDepth(1);
+    });
 }
 
 app.UseHttpsRedirection();
@@ -264,6 +292,56 @@ static string GetCpmsConnectionString(IConfiguration configuration)
 
     return configuration.GetConnectionString("CpmsDatabase")
         ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
+}
+
+static string SwaggerOperationId(ApiDescription apiDescription)
+{
+    apiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller);
+    apiDescription.ActionDescriptor.RouteValues.TryGetValue("action", out var action);
+    controller ??= "Api";
+    action ??= apiDescription.HttpMethod ?? "Action";
+    return $"{controller}_{action}";
+}
+
+static string SwaggerTagFor(ApiDescription apiDescription)
+{
+    apiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller);
+    if (apiDescription.RelativePath?.StartsWith("health/", StringComparison.OrdinalIgnoreCase) == true)
+    {
+        return "99 - Health";
+    }
+
+    return controller switch
+    {
+        "TestSupport" => "00 - FE Test Guide",
+        "Auth" => "01 - Auth",
+        "Accounts" => "02 - Accounts",
+        "Semesters" => "03 - Semesters",
+        "ReviewAvailability" => "04 - Review Availability",
+        "ReviewScheduling" => "05 - Review Scheduling",
+        "ReviewSessions" => "06 - Review Sessions",
+        "ReviewSchedules" => "07 - Review Publish",
+        "ReviewSubmissions" => "08 - Review Submissions",
+        "DefenseManagement" => "09 - Defense Management",
+        "DefenseSessions" => "10 - Defense Sessions",
+        _ => controller ?? "API"
+    };
+}
+
+static string SwaggerOrderFor(ApiDescription apiDescription)
+{
+    var tag = SwaggerTagFor(apiDescription);
+    var methodOrder = apiDescription.HttpMethod?.ToUpperInvariant() switch
+    {
+        "GET" => "1",
+        "POST" => "2",
+        "PUT" => "3",
+        "PATCH" => "4",
+        "DELETE" => "5",
+        _ => "9"
+    };
+
+    return $"{tag}_{methodOrder}_{apiDescription.RelativePath}";
 }
 
 public partial class Program;

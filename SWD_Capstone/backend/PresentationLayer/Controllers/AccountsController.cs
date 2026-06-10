@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Security.Claims;
+using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
+using CPMS.Core.Exceptions;
+using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +15,9 @@ namespace CPMS.Api.Controllers;
 [ApiController]
 [Route("api/accounts")]
 [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
+public sealed class AccountsController(
+    CpmsDbContext dbContext,
+    IReviewEmailSender emailSender) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<AccountResponse>> GetAll(CancellationToken cancellationToken)
@@ -34,22 +39,18 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<AccountResponse>> Create(CreateAccountRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountCreatedResponse>> Create(CreateAccountRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.Role == UserRole.SystemAdministrator && !User.IsInRole(nameof(UserRole.SystemAdministrator)))
-        {
-            return Forbid();
-        }
-
-        var username = request.Username.Trim();
-        var email = request.Email.Trim();
-        if (string.IsNullOrWhiteSpace(username) ||
-            string.IsNullOrWhiteSpace(email) ||
+        var fullName = Required(request.FullName, "Full name is required for generated account usernames.");
+        var identityCode = Required(request.IdentityCode ?? request.Username, "Identity code is required.");
+        var username = AccountUsernameGenerator.Generate(fullName, identityCode);
+        var email = request.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email) ||
             string.IsNullOrWhiteSpace(request.Password))
         {
-            return BadRequest(new { error = "Username, email and password are required." });
+            return BadRequest(new { error = "Email and password are required." });
         }
 
         if (request.Password.Length < 6)
@@ -75,7 +76,13 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        AddRoleProfile(user.Id, request with { Username = username, Email = email });
+        AddRoleProfile(user.Id, request with
+        {
+            Username = username,
+            IdentityCode = identityCode,
+            Email = email,
+            FullName = fullName
+        });
         dbContext.AuditLogs.Add(new AuditLog
         {
             UserId = CurrentUserId(),
@@ -89,14 +96,19 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return CreatedAtAction(nameof(GetAll), new { user.Id }, new AccountResponse(
+        var emailResult = await SendAccountCreatedEmailAsync(user, fullName, request.Password, cancellationToken);
+
+        return CreatedAtAction(nameof(GetAll), new { user.Id }, new AccountCreatedResponse(
             user.Id,
             user.Username,
             user.Email,
             user.Role,
             user.IsActive,
             user.LastLoginAt,
-            user.LockedUntil));
+            user.LockedUntil,
+            identityCode,
+            emailResult.Status,
+            emailResult.Error));
     }
 
     [HttpPatch("{userId:int}/status")]
@@ -147,9 +159,9 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 dbContext.Lecturers.Add(new Lecturer
                 {
                     UserId = userId,
-                    Code = request.Username,
+                    Code = Required(request.IdentityCode, "Identity code is required for lecturers."),
                     FullName = Required(request.FullName, "Full name is required for lecturers."),
-                    Department = Required(request.Department, "Department is required for lecturers."),
+                    Department = OptionalOrDefault(request.Department, string.Empty),
                     IsPartTime = request.IsPartTime
                 });
                 break;
@@ -166,7 +178,7 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 {
                     UserId = userId,
                     DepartmentName = OptionalOrDefault(request.Department, "Training Department"),
-                    StaffCode = request.Username,
+                    StaffCode = Required(request.IdentityCode, "Identity code is required for moderator accounts."),
                     Position = OptionalOrDefault(request.Position, "Moderator")
                 });
                 break;
@@ -182,7 +194,7 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
                 dbContext.Students.Add(new Student
                 {
                     UserId = userId,
-                    Code = request.Username,
+                    Code = Required(request.IdentityCode, "Identity code is required for students."),
                     FullName = Required(request.FullName, "Full name is required for students."),
                     ClassCode = Required(request.ClassCode, "Class code is required for students."),
                     Batch = request.Batch,
@@ -204,6 +216,47 @@ public sealed class AccountsController(CpmsDbContext dbContext) : ControllerBase
 
     private static string OptionalOrDefault(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private async Task<AccountEmailResult> SendAccountCreatedEmailAsync(
+        User user,
+        string fullName,
+        string initialPassword,
+        CancellationToken cancellationToken)
+    {
+        var subject = "CPMS account created";
+        var body = string.Join(Environment.NewLine, [
+            $"Hello {fullName},",
+            string.Empty,
+            "Your CPMS account has been created.",
+            $"Username: {user.Username}",
+            $"Initial password: {initialPassword}",
+            $"Role: {user.Role}",
+            string.Empty,
+            "Please sign in and change your password according to your department process."
+        ]);
+
+        try
+        {
+            await emailSender.SendAsync(user.Email, subject, body, cancellationToken);
+            return new AccountEmailResult("Sent", null);
+        }
+        catch (BusinessRuleException exception)
+        {
+            return new AccountEmailResult("Skipped", exception.Message);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return new AccountEmailResult("Failed", exception.Message);
+        }
+        catch (System.Net.Mail.SmtpException exception)
+        {
+            return new AccountEmailResult("Failed", exception.Message);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new AccountEmailResult("Failed", exception.Message);
+        }
+    }
 }
 
 public sealed record AccountResponse(
@@ -216,7 +269,8 @@ public sealed record AccountResponse(
     DateTime? LockedUntil);
 
 public sealed record CreateAccountRequest(
-    string Username,
+    string? Username,
+    string? IdentityCode,
     string Email,
     string Password,
     UserRole Role,
@@ -230,3 +284,17 @@ public sealed record CreateAccountRequest(
     string? Major);
 
 public sealed record UpdateAccountStatusRequest(bool IsActive, bool Unlock);
+
+public sealed record AccountCreatedResponse(
+    int Id,
+    string Username,
+    string Email,
+    UserRole Role,
+    bool IsActive,
+    DateTime? LastLoginAt,
+    DateTime? LockedUntil,
+    string IdentityCode,
+    string EmailDeliveryStatus,
+    string? EmailDeliveryError);
+
+internal sealed record AccountEmailResult(string Status, string? Error);
