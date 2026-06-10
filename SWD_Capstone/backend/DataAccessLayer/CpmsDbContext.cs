@@ -24,6 +24,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<EvaluationDetail> EvaluationDetails => Set<EvaluationDetail>();
     public DbSet<InlineComment> InlineComments => Set<InlineComment>();
     public DbSet<ReviewAvailability> ReviewAvailabilities => Set<ReviewAvailability>();
+    public DbSet<ReviewAvailabilitySubmission> ReviewAvailabilitySubmissions => Set<ReviewAvailabilitySubmission>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
     public DbSet<GroupReviewSlot> GroupReviewSlots => Set<GroupReviewSlot>();
     public DbSet<ReviewChecklistSubmission> ReviewChecklistSubmissions => Set<ReviewChecklistSubmission>();
@@ -193,6 +194,13 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
                 table.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 8");
             });
             entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate, x.DayOfWeek, x.Slot }).IsUnique();
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewAvailabilitySubmission>(entity =>
+        {
+            entity.ToTable("review_availability_submissions");
+            entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate }).IsUnique();
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
         });

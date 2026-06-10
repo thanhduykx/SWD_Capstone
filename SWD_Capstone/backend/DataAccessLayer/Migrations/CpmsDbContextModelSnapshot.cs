@@ -1172,6 +1172,48 @@ namespace CPMS.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailabilitySubmission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("LecturerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lecturer_id");
+
+                    b.Property<int>("SemesterId")
+                        .HasColumnType("integer")
+                        .HasColumnName("semester_id");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("week_start_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_availability_submissions");
+
+                    b.HasIndex("LecturerId")
+                        .HasDatabaseName("ix_review_availability_submissions_lecturer_id");
+
+                    b.HasIndex("SemesterId", "LecturerId", "WeekStartDate")
+                        .IsUnique()
+                        .HasDatabaseName("ix_review_availability_submissions_semester_id_lecturer_id_wee");
+
+                    b.ToTable("review_availability_submissions", (string)null);
+                });
+
             modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistItemResponse", b =>
                 {
                     b.Property<int>("Id")
@@ -2354,6 +2396,23 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_availabilities_semesters_semester_id");
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailabilitySubmission", b =>
+                {
+                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("LecturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_availability_submissions_lecturers_lecturer_id");
+
+                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                        .WithMany()
+                        .HasForeignKey("SemesterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_availability_submissions_semesters_semester_id");
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistItemResponse", b =>

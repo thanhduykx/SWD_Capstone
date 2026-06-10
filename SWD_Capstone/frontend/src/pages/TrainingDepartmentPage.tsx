@@ -29,12 +29,20 @@ type BoardAvailability = {
   slot: number;
 };
 
+type BoardAvailabilitySubmission = {
+  lecturerId: number;
+  isSubmitted: boolean;
+  submittedAt?: string | null;
+  slotCount: number;
+};
+
 type BoardGroup = {
   id: number;
   code: string;
   projectName: string;
   supervisorId: number;
   supervisorCode: string;
+  studentCount: number;
 };
 
 type BoardSession = {
@@ -57,7 +65,27 @@ type SchedulingBoard = {
   weekStart: string;
   lecturers: BoardLecturer[];
   availability: BoardAvailability[];
+  availabilitySubmissions: BoardAvailabilitySubmission[];
   groups: BoardGroup[];
+  sessions: BoardSession[];
+};
+
+type RandomAssignResponse = {
+  totalCandidateGroups: number;
+  assignedCount: number;
+  sentEmailCount: number;
+  failedEmailCount: number;
+  unassignedGroups: Array<{
+    groupId: number;
+    groupCode: string;
+    reason: string;
+  }>;
+  sessions: BoardSession[];
+};
+
+type BulkAssignResponse = {
+  sentEmailCount: number;
+  failedEmailCount: number;
   sessions: BoardSession[];
 };
 
@@ -96,6 +124,8 @@ export function TrainingDepartmentPage() {
   const [sessionDate, setSessionDate] = useState(toDateInput(new Date()));
   const [slot, setSlot] = useState(1);
   const [room, setRoom] = useState("");
+  const [reviewersPerSession, setReviewersPerSession] = useState(2);
+  const [roomPrefix, setRoomPrefix] = useState("AUTO");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
 
@@ -104,6 +134,15 @@ export function TrainingDepartmentPage() {
     board?.availability.map((item) => `${item.lecturerId}:${item.dayOfWeek}:${item.slot}`) ?? [],
   ), [board]);
   const selectedGroup = board?.groups.find((group) => group.id === Number(groupId));
+  const selectedSessionDayOfWeek = getIsoDayOfWeek(sessionDate);
+  const availableLecturersForSessionSlot = useMemo(() => (
+    board?.lecturers.filter((lecturer) =>
+      lecturer.id !== selectedGroup?.supervisorId &&
+      availabilitySet.has(`${lecturer.id}:${selectedSessionDayOfWeek}:${slot}`)) ?? []
+  ), [availabilitySet, board, selectedGroup?.supervisorId, selectedSessionDayOfWeek, slot]);
+  const submissionByLecturer = useMemo(() => new Map(
+    board?.availabilitySubmissions.map((item) => [item.lecturerId, item]) ?? [],
+  ), [board]);
   const selectedReviewers = [Number(reviewer1Id), Number(reviewer2Id)]
     .filter((id) => Number.isInteger(id) && id > 0);
 
@@ -146,7 +185,7 @@ export function TrainingDepartmentPage() {
     }
 
     const reviewerIds = Array.from(new Set(selectedReviewers));
-    await apiClient.post("/review-sessions/bulk-assign", {
+    const response = await apiClient.post<BulkAssignResponse>("/review-sessions/bulk-assign", {
       sessions: [{
         code,
         groupId: Number(groupId),
@@ -159,9 +198,31 @@ export function TrainingDepartmentPage() {
         sessionDate,
       }],
     });
-    setMessage("Review session assigned.");
+    setMessage(`Review session assigned. Sent ${response.data.sentEmailCount} email(s), failed ${response.data.failedEmailCount}.`);
     setCode("");
     setRoom("");
+    await loadBoard();
+  }
+
+  async function randomAssignSessions() {
+    if (!selectedSemesterId) {
+      setMessage("Cannot random assign before semester is resolved.");
+      return;
+    }
+
+    const response = await apiClient.post<RandomAssignResponse>("/review-scheduling/random-assign", {
+      semesterId: selectedSemesterId,
+      reviewType,
+      weekStart,
+      reviewersPerSession,
+      roomPrefix,
+      seed: null,
+    });
+    const unassignedText = response.data.unassignedGroups.length
+      ? ` ${response.data.unassignedGroups.length} group(s) not assigned.`
+      : "";
+    const emailText = ` Sent ${response.data.sentEmailCount} email(s), failed ${response.data.failedEmailCount}.`;
+    setMessage(`Random assigned ${response.data.assignedCount}/${response.data.totalCandidateGroups} group(s).${emailText}${unassignedText}`);
     await loadBoard();
   }
 
@@ -223,7 +284,11 @@ export function TrainingDepartmentPage() {
           </label>
           <label>
             Week start
-            <input type="date" value={weekStart} onChange={(event) => setWeekStart(toDateInput(getMonday(new Date(event.target.value))))} />
+            <input type="date" value={weekStart} onChange={(event) => {
+              const nextWeekStart = toDateInput(getMonday(new Date(event.target.value)));
+              setWeekStart(nextWeekStart);
+              setSessionDate(nextWeekStart);
+            }} />
           </label>
           <button className="secondary align-end" onClick={loadBoard} disabled={!selectedSemesterId}>Refresh board</button>
         </div>
@@ -241,6 +306,11 @@ export function TrainingDepartmentPage() {
                     <strong>{lecturer.code}</strong>
                     <span>{lecturer.fullName}</span>
                     <small>{lecturer.email}</small>
+                    {submissionByLecturer.get(lecturer.id)?.isSubmitted ? (
+                      <small className="tag">Submitted {submissionByLecturer.get(lecturer.id)?.slotCount ?? 0} slot(s)</small>
+                    ) : (
+                      <small className="muted">Not submitted</small>
+                    )}
                   </div>
                   <div className="mini-slot-grid">
                     {days.flatMap((day) => slots.map((slotItem) => {
@@ -257,6 +327,20 @@ export function TrainingDepartmentPage() {
         <article className="panel">
           <h3>Assign review session</h3>
           <div className="form-grid">
+            <div className="form-row compact">
+              <label>
+                Reviewers/session
+                <select value={reviewersPerSession} onChange={(event) => setReviewersPerSession(Number(event.target.value))}>
+                  <option value={1}>1 reviewer</option>
+                  <option value={2}>2 reviewers</option>
+                </select>
+              </label>
+              <label>
+                Room prefix
+                <input value={roomPrefix} onChange={(event) => setRoomPrefix(event.target.value)} placeholder="AUTO" />
+              </label>
+              <button className="primary align-end" onClick={randomAssignSessions} disabled={!board || board.availability.length === 0}>Random assign groups</button>
+            </div>
             <label>
               Session code
               <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="VD: R1-D1-S3-G01" />
@@ -265,7 +349,7 @@ export function TrainingDepartmentPage() {
               Group
               <select value={groupId} onChange={(event) => setGroupId(event.target.value ? Number(event.target.value) : "")}>
                 <option value="">Select group</option>
-                {board?.groups.map((group) => <option key={group.id} value={group.id}>{group.code} - {group.projectName}</option>)}
+                {board?.groups.map((group) => <option key={group.id} value={group.id}>{group.code} - {group.projectName} ({group.studentCount} students)</option>)}
               </select>
             </label>
             {selectedGroup && <p className="alert">Supervisor: {selectedGroup.supervisorCode}. Do not assign this lecturer as reviewer.</p>}
@@ -273,16 +357,19 @@ export function TrainingDepartmentPage() {
               Reviewer 1
               <select value={reviewer1Id} onChange={(event) => setReviewer1Id(event.target.value ? Number(event.target.value) : "")}>
                 <option value="">Select reviewer</option>
-                {board?.lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.code} - {lecturer.fullName}</option>)}
+                {availableLecturersForSessionSlot.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.code} - {lecturer.fullName}</option>)}
               </select>
             </label>
             <label>
               Reviewer 2
               <select value={reviewer2Id} onChange={(event) => setReviewer2Id(event.target.value ? Number(event.target.value) : "")}>
                 <option value="">Optional reviewer</option>
-                {board?.lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.code} - {lecturer.fullName}</option>)}
+                {availableLecturersForSessionSlot.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.code} - {lecturer.fullName}</option>)}
               </select>
             </label>
+            {board && availableLecturersForSessionSlot.length === 0 && (
+              <p className="alert">No lecturer submitted availability for this date and slot.</p>
+            )}
             <div className="form-row compact">
               <label>
                 Date
@@ -372,4 +459,9 @@ function formatDate(value: string) {
 function formatSlot(slot: number) {
   const definition = slots.find((item) => item.value === slot);
   return definition ? `Slot ${slot} (${definition.time})` : `Slot ${slot}`;
+}
+
+function getIsoDayOfWeek(dateValue: string) {
+  const day = new Date(dateValue).getDay();
+  return day === 0 ? 7 : day;
 }

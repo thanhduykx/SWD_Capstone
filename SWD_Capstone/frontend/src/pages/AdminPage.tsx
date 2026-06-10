@@ -16,6 +16,7 @@ type Account = {
 
 type AccountCreated = Account & {
   identityCode: string;
+  initialPassword: string;
   emailDeliveryStatus: "Sent" | "Skipped" | "Failed";
   emailDeliveryError?: string | null;
 };
@@ -82,7 +83,7 @@ export function AdminPage() {
         major: major.trim(),
       });
       setCreatedAccount(response.data);
-      setMessage(`${t.accountCreated} ${t.generatedUsername}: ${response.data.username}. ${emailDeliveryText(response.data, t)}`);
+      setMessage(`${t.accountCreated} ${t.generatedUsername}: ${response.data.username}. ${t.initialPassword}: ${response.data.initialPassword}. ${emailDeliveryText(response.data, t)}`);
       setIdentityCode("");
       setEmail("");
       setFullName("");
@@ -114,6 +115,8 @@ export function AdminPage() {
             <div className="generated-account">
               <small>{t.generatedUsername}</small>
               <strong>{createdAccount.username}</strong>
+              <small>{t.initialPassword}</small>
+              <strong>{createdAccount.initialPassword}</strong>
               <span>{createdAccount.role} - {createdAccount.email}</span>
             </div>
             <p className={createdAccount.emailDeliveryStatus === "Sent" ? "alert success" : "alert warning"}>

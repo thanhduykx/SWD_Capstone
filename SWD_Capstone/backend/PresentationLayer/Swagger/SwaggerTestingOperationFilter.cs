@@ -56,20 +56,26 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Lecturer-only. weekStart may be any date in the week; API normalizes it to Monday."),
         ["PUT /api/review-availability/week"] = new(
             "Save my weekly availability",
-            "Lecturer-only. dayOfWeek uses ISO values Monday=1 through Sunday=7. slot must be 1 through 8."),
+            "Lecturer-only. Saves a draft availability week. Saving after submit returns the week to draft until the lecturer submits again."),
+        ["POST /api/review-availability/week/submit"] = new(
+            "Submit availability to moderator",
+            "Lecturer-only. Submits the saved weekly availability. Moderator scheduling only uses submitted availability."),
 
         ["GET /api/review-scheduling/board"] = new(
             "Review scheduling board",
-            "Moderator view. Returns lecturers, availability, groups, and sessions needed by FE scheduling screens. Legacy SystemAdministrator tokens are still accepted."),
+            "Moderator view. Returns lecturers, submitted availability, groups, and sessions needed by FE scheduling screens. Legacy SystemAdministrator tokens are still accepted."),
+        ["POST /api/review-scheduling/random-assign"] = new(
+            "Random assign groups to submitted lecturer slots",
+            "Moderator view. Randomly assigns active unscheduled groups to lecturers using only submitted availability, avoiding supervisor/self-review, repeated Review1 reviewers for Review2, and reviewer slot conflicts."),
         ["POST /api/review-sessions"] = new(
             "Create one review session",
-            "Assigns one group to one or two reviewers. Use ids returned from review-scheduling/board."),
+            "Assigns one group to one or two reviewers. Reviewers must have submitted availability for the selected date and slot."),
         ["POST /api/review-sessions/bulk-assign"] = new(
             "Bulk assign review sessions",
-            "Assigns multiple sessions in one transaction. If one assignment violates a business rule, the whole batch is rejected."),
+            "Assigns multiple sessions in one transaction. Reviewers must have submitted availability for each selected date and slot. If one assignment violates a business rule, the whole batch is rejected."),
         ["PATCH /api/review-sessions/{sessionId}"] = new(
             "Update review session",
-            "Changes reviewer/date/slot/room/status and keeps checklist submissions aligned with assigned reviewers."),
+            "Changes reviewer/date/slot/room/status and keeps checklist submissions aligned with assigned reviewers. New reviewers must have submitted availability for the target date and slot."),
         ["GET /api/review-sessions/my"] = new(
             "My review sessions",
             "Lecturer view. Use this to get submissionId before opening or saving a checklist."),
@@ -176,6 +182,13 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
                 Obj(("dayOfWeek", Int(1)), ("slot", Int(1))),
                 Obj(("dayOfWeek", Int(3)), ("slot", Int(2))),
                 Obj(("dayOfWeek", Int(5)), ("slot", Int(4)))))),
+        ["POST /api/review-scheduling/random-assign"] = Obj(
+            ("semesterId", Int(1)),
+            ("reviewType", Str("Review1")),
+            ("weekStart", Str("2026-06-15")),
+            ("reviewersPerSession", Int(2)),
+            ("roomPrefix", Str("AUTO")),
+            ("seed", Null())),
 
         ["POST /api/review-sessions"] = Obj(
             ("code", Str("R1-SU26-G01")),

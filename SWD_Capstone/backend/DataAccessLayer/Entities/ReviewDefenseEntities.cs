@@ -13,6 +13,16 @@ public sealed class ReviewAvailability
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public sealed class ReviewAvailabilitySubmission
+{
+    public int Id { get; set; }
+    public int SemesterId { get; set; }
+    public int LecturerId { get; set; }
+    public DateOnly WeekStartDate { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? SubmittedAt { get; set; }
+}
+
 public sealed class ReviewSession
 {
     public int Id { get; set; }
