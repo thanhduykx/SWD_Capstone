@@ -15,7 +15,7 @@ namespace CPMS.Api.Controllers;
 
 [ApiController]
 [Route("api/defense-sessions")]
-[Authorize(Roles = "Lecturer,EvaluationPanel")]
+[Authorize(Roles = "Lecturer")]
 public sealed class DefenseSessionsController(
     CpmsDbContext dbContext,
     AssignmentRules rules,

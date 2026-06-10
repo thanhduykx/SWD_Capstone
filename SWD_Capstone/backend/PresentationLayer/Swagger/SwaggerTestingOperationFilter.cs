@@ -72,7 +72,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Changes reviewer/date/slot/room/status and keeps checklist submissions aligned with assigned reviewers."),
         ["GET /api/review-sessions/my"] = new(
             "My review sessions",
-            "Lecturer/EvaluationPanel view. Use this to get submissionId before opening or saving a checklist."),
+            "Lecturer view. Use this to get submissionId before opening or saving a checklist."),
         ["POST /api/review-schedules/publish"] = new(
             "Publish weekly review schedule",
             "Publishes all matching sessions for the selected week and sends email if SMTP is configured."),
@@ -109,10 +109,10 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Schedules a group into a board and defense round. Round, board, and group must belong to the same semester."),
         ["GET /api/defense-management/my-board-sessions"] = new(
             "My defense board sessions",
-            "Lecturer/EvaluationPanel view. Use this to get defense session ids for scoring."),
+            "Lecturer view. Use this to get defense session ids for scoring."),
         ["GET /api/defense-sessions/resolve/{code}"] = new(
             "Resolve defense session by code",
-            "Lecturer/EvaluationPanel view. code can be session code, council code, or session id."),
+            "Lecturer view. code can be session code, council code, or session id."),
         ["POST /api/defense-sessions/{sessionId}/start"] = new(
             "Start defense scoring",
             "Chairman-only. Judges cannot submit scores until this succeeds."),

@@ -81,28 +81,6 @@ Accept: application/json
   "major": null
 }
 
-### Create evaluation panel account
-POST {{PresentationLayer_HostAddress}}/api/accounts
-Authorization: Bearer {{AccessToken}}
-Content-Type: application/json
-Accept: application/json
-
-{
-  "username": null,
-  "identityCode": "PN001",
-  "email": "panel001@cpms.local",
-  "password": "Test@123456",
-  "role": "EvaluationPanel",
-  "fullName": "Nguyen Van Panel",
-  "department": "Software Engineering",
-  "position": null,
-  "permissionScope": null,
-  "isPartTime": false,
-  "classCode": null,
-  "batch": null,
-  "major": null
-}
-
 ### Save lecturer weekly availability
 PUT {{PresentationLayer_HostAddress}}/api/review-availability/week?semesterId=1&weekStart=2026-06-15
 Authorization: Bearer {{AccessToken}}
