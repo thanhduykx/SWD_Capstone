@@ -69,7 +69,8 @@ If one account is missing in a fresh database, login as moderator and create it 
 3. Call `GET /api/review-scheduling/board`.
 4. Use returned `lecturerId` and `groupId`.
 5. Call `POST /api/review-scheduling/random-assign` for automatic scheduling, or `POST /api/review-sessions/bulk-assign` for manual scheduling.
-6. Call `POST /api/review-schedules/publish`.
+6. Check `sentEmailCount` and `failedEmailCount`; scheduling sends lecturer notification emails after a successful assignment.
+7. Call `POST /api/review-schedules/publish` when the schedule is final.
 
 ### Review Checklist Flow
 
