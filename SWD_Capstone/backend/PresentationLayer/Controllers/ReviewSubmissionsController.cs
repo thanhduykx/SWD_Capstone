@@ -35,7 +35,7 @@ public sealed class ReviewSubmissionsController(
     }
 
     [HttpPut("{submissionId:int}/draft")]
-    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewSubmissionResponse>> SaveDraft(
         int submissionId,
         SaveReviewSubmissionDraftRequest request,
@@ -66,7 +66,7 @@ public sealed class ReviewSubmissionsController(
     }
 
     [HttpPost("{submissionId:int}/submit")]
-    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewSubmissionResponse>> Submit(
         int submissionId,
         CancellationToken cancellationToken)
@@ -290,7 +290,7 @@ public sealed class ReviewSubmissionsController(
             return;
         }
 
-        if (User.IsInRole(nameof(UserRole.Lecturer)) || User.IsInRole(nameof(UserRole.EvaluationPanel)))
+        if (User.IsInRole(nameof(UserRole.Lecturer)))
         {
             var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
             if (lecturerId == submission.ReviewerId)

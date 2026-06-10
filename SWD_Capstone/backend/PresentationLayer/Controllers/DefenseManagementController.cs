@@ -182,7 +182,7 @@ public sealed class DefenseManagementController(CpmsDbContext dbContext) : Contr
     }
 
     [HttpGet("my-board-sessions")]
-    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<IReadOnlyList<DefenseSessionAssignmentResponse>> GetBoardSessionsForCurrentLecturer(CancellationToken cancellationToken)
     {
         var userId = CurrentUserId();
