@@ -165,14 +165,6 @@ public sealed class AccountsController(
                     IsPartTime = request.IsPartTime
                 });
                 break;
-            case UserRole.EvaluationPanel:
-                dbContext.EvaluationPanels.Add(new EvaluationPanel
-                {
-                    UserId = userId,
-                    FullName = Required(request.FullName, "Full name is required for panel accounts."),
-                    Department = Required(request.Department, "Department is required for panel accounts.")
-                });
-                break;
             case UserRole.TrainingDepartment:
                 dbContext.TrainingDepartments.Add(new TrainingDepartment
                 {

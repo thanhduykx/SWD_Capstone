@@ -24,7 +24,6 @@ These accounts are for local development only.
 | TrainingDepartment | `test.training` | `Test@123456` |
 | Lecturer | `test.lecturer` | `Test@123456` |
 | Lecturer | `test.lecturer.nodept` | `Test@123456` |
-| EvaluationPanel | `test.panel` | `Test@123456` |
 | Student | `test.student` | `Test@123456` |
 
 Moderator is the main operator for account management. `SystemAdministrator` is kept only for compatibility with old local data and is not part of the normal FE test flow.

@@ -13,7 +13,7 @@ type TokenResponse = {
   refreshTokenExpiresAt: string;
 };
 
-export type UserRole = "Student" | "Lecturer" | "EvaluationPanel" | "TrainingDepartment" | "SystemAdministrator";
+export type UserRole = "Student" | "Lecturer" | "TrainingDepartment" | "SystemAdministrator";
 
 type AuthContextValue = {
   isAuthenticated: boolean;

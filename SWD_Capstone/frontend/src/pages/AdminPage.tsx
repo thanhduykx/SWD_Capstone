@@ -40,7 +40,6 @@ export function AdminPage() {
   const accountRoles: Array<{ label: string; value: UserRole; note: string }> = [
     { label: t.student, value: "Student", note: t.studentNote },
     { label: t.lecturer, value: "Lecturer", note: t.lecturerNote },
-    { label: t.council, value: "EvaluationPanel", note: t.councilNote },
     { label: t.moderator, value: "TrainingDepartment", note: t.moderatorNote },
   ];
   const selectedRoleNote = accountRoles.find((item) => item.value === role)?.note;
@@ -74,7 +73,7 @@ export function AdminPage() {
         password,
         role,
         fullName: fullName.trim(),
-        department: role === "TrainingDepartment" || role === "EvaluationPanel" ? department.trim() : null,
+        department: role === "TrainingDepartment" ? department.trim() : null,
         position: position.trim(),
         permissionScope: "System",
         isPartTime: false,
@@ -142,7 +141,7 @@ export function AdminPage() {
             <label>{t.email}<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@fpt.edu.vn" type="email" required /></label>
             <label>{t.initialPassword}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={6} required /></label>
             <label>{t.fullName}<input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Duong Thanh Thanh Duy" required /></label>
-            {(role === "TrainingDepartment" || role === "EvaluationPanel") && (
+            {role === "TrainingDepartment" && (
               <label>{t.department}<input value={department} onChange={(event) => setDepartment(event.target.value)} required /></label>
             )}
             {role === "Student" && (
@@ -194,10 +193,6 @@ function roleLabel(role: UserRole, t: ReturnType<typeof useLanguage>["t"]) {
     return t.moderator;
   }
 
-  if (role === "EvaluationPanel") {
-    return t.council;
-  }
-
   return role;
 }
 
@@ -227,7 +222,7 @@ function validateAccountForm(
     return "Thiếu họ tên.";
   }
 
-  if ((role === "TrainingDepartment" || role === "EvaluationPanel") && !department.trim()) {
+  if (role === "TrainingDepartment" && !department.trim()) {
     return "Thiếu bộ môn.";
   }
 
@@ -257,8 +252,6 @@ function getAccountCreateError(error: unknown, fallback: string) {
     "Username or email already exists.": "Mã đăng nhập hoặc email đã tồn tại.",
     "Full name is required for lecturers.": "Giảng viên bắt buộc nhập họ tên.",
     "Department is required for lecturers.": "Giảng viên bắt buộc nhập bộ môn.",
-    "Full name is required for panel accounts.": "Hội đồng bắt buộc nhập họ tên.",
-    "Department is required for panel accounts.": "Hội đồng bắt buộc nhập bộ môn.",
     "Full name is required for students.": "Sinh viên bắt buộc nhập họ tên.",
     "Class code is required for students.": "Sinh viên bắt buộc nhập mã lớp.",
   };

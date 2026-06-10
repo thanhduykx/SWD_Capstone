@@ -121,7 +121,7 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
     }
 
     [HttpGet("my")]
-    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<IReadOnlyList<MyReviewSessionResponse>> GetMySessions(CancellationToken cancellationToken)
     {
         var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
