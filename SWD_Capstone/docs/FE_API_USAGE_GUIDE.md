@@ -53,6 +53,8 @@ sessionStorage.setItem("cpms_refresh_token", response.data.refreshToken);
 | Boolean | `true` / `false` |
 | Upload file | `FormData`, không set cứng `Content-Type: application/json` |
 
+Với lịch rảnh review, FE phải tách rõ hai hành động: `PUT /api/review-availability/week` chỉ lưu nháp; `POST /api/review-availability/week/submit` mới gửi lịch cho Moderator. Moderator chỉ thấy slot đã submit.
+
 Backend trả JSON camelCase. Request body nên dùng camelCase để thống nhất với FE.
 
 ## 2. Role sử dụng trong FE
@@ -415,6 +417,8 @@ Response:
   "semesterId": 1,
   "lecturerId": 3,
   "weekStart": "2026-06-15",
+  "isSubmitted": true,
+  "submittedAt": "2026-06-10T10:00:00Z",
   "slots": [
     { "dayOfWeek": 1, "slot": 1 },
     { "dayOfWeek": 3, "slot": 2 }
@@ -426,7 +430,7 @@ Response:
 
 Role: `Lecturer`.
 
-Query giống GET. Body là toàn bộ slot muốn lưu cho tuần đó, không phải patch từng slot.
+Query giống GET. Body là toàn bộ slot muốn lưu cho tuần đó, không phải patch từng slot. Đây là lưu nháp; nếu lịch đã submit trước đó thì save lại sẽ đưa tuần đó về trạng thái chưa submit để bắt giảng viên xác nhận lại.
 
 ```json
 {
@@ -444,6 +448,23 @@ Quy tắc:
 | `dayOfWeek` | Monday=1, Sunday=7 |
 | `slot` | 1 đến 8 |
 
+### POST `/api/review-availability/week/submit`
+
+Role: `Lecturer`.
+
+Submit lịch rảnh đã lưu cho Moderator. Phải có ít nhất 1 slot.
+
+```ts
+const response = await apiClient.post("/review-availability/week/submit", null, {
+  params: {
+    semesterId: 1,
+    weekStart: "2026-06-15",
+  },
+});
+```
+
+Sau API này, Moderator mới thấy slot trong board và random assign mới được dùng các slot đó.
+
 ## 8. Review Scheduling APIs
 
 Nhóm này dành cho Moderator.
@@ -452,7 +473,7 @@ Nhóm này dành cho Moderator.
 
 Role: Moderator.
 
-Lấy data cho màn hình xếp lịch review: lecturers, availability, groups, sessions.
+Lấy data cho màn hình xếp lịch review: lecturers, submitted availability, availability submission status, groups, sessions.
 
 ```ts
 const response = await apiClient.get("/review-scheduling/board", {
@@ -473,6 +494,7 @@ Response chính:
   "weekStart": "2026-06-15",
   "lecturers": [],
   "availability": [],
+  "availabilitySubmissions": [],
   "groups": [],
   "sessions": []
 }
@@ -487,6 +509,52 @@ FE lấy id thật từ response:
 | `sessionId` | `sessions[].id` |
 
 Không hard-code các id này.
+
+### POST `/api/review-scheduling/random-assign`
+
+Role: Moderator.
+
+Random xếp các nhóm active chưa có session của review round vào các slot giảng viên đã submit. Backend tự kiểm tra:
+
+| Rule | Ý nghĩa |
+| --- | --- |
+| Chỉ dùng submitted availability | Slot save nháp không được xếp |
+| Không cho GVHD tự review nhóm mình | Dựa trên `capstoneGroups.lecturerId` |
+| Không trùng lịch reviewer | Một reviewer không bị xếp 2 nhóm cùng ngày/slot |
+| Review2 không lặp reviewer Review1 | Backend lấy reviewer Review1 của cùng group |
+| Chỉ xếp group active đã có sinh viên và chưa có session round đó | Group chưa có team/student hoặc đã có Review1/2/3 session tương ứng sẽ bỏ qua |
+
+Request:
+
+```json
+{
+  "semesterId": 1,
+  "reviewType": "Review1",
+  "weekStart": "2026-06-15",
+  "reviewersPerSession": 2,
+  "roomPrefix": "AUTO",
+  "seed": null
+}
+```
+
+Response:
+
+```json
+{
+  "totalCandidateGroups": 12,
+  "assignedCount": 10,
+  "unassignedGroups": [
+    {
+      "groupId": 5,
+      "groupCode": "G05",
+      "reason": "No submitted available reviewer slot satisfies supervisor, previous reviewer, and conflict rules."
+    }
+  ],
+  "sessions": []
+}
+```
+
+FE sau khi gọi xong nên reload `GET /api/review-scheduling/board`.
 
 ### POST `/api/review-sessions`
 
@@ -544,6 +612,7 @@ Rules backend kiểm tra:
 | Không được trùng slot reviewer | cùng ngày + slot không gán cùng lecturer nhiều session |
 | Supervisor không được tự review nhóm của mình | backend chặn |
 | Review2 cần `previousReviewerIds` | dùng để tránh sai quy tắc phân công |
+| Reviewer phải submit availability đúng ngày/slot | backend chặn cả manual assign và random assign |
 
 ### PATCH `/api/review-sessions/{sessionId}`
 
@@ -1087,14 +1156,15 @@ Response healthy:
 3. FE gọi `GET /api/review-availability/week`.
 4. Lecturer tick slot.
 5. FE gọi `PUT /api/review-availability/week` với toàn bộ slot đã chọn.
+6. Lecturer bấm submit, FE gọi `POST /api/review-availability/week/submit`.
 
 ### Flow Moderator xếp lịch review
 
 1. Moderator chọn semester, review type, tuần.
 2. Gọi `GET /api/review-scheduling/board`.
-3. Render groups, lecturers, availability, sessions.
+3. Render groups, lecturers, submitted availability, availability submission status, sessions.
 4. Khi assign, dùng `groupId` và `lecturerId` từ board response.
-5. Gọi `POST /api/review-sessions/bulk-assign`.
+5. Gọi `POST /api/review-scheduling/random-assign` để tự xếp, hoặc `POST /api/review-sessions/bulk-assign` để xếp thủ công.
 6. Gọi lại board để refresh.
 7. Khi chốt, gọi `POST /api/review-schedules/publish`.
 

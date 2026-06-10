@@ -102,6 +102,7 @@ public sealed class AccountsController(
             user.Id,
             user.Username,
             user.Email,
+            request.Password,
             user.Role,
             user.IsActive,
             user.LastLoginAt,
@@ -215,12 +216,12 @@ public sealed class AccountsController(
         string initialPassword,
         CancellationToken cancellationToken)
     {
-        var subject = "CPMS account created";
+        var subject = "CPMS account login information";
         var body = string.Join(Environment.NewLine, [
             $"Hello {fullName},",
             string.Empty,
             "Your CPMS account has been created.",
-            $"Username: {user.Username}",
+            $"Username / Account: {user.Username}",
             $"Initial password: {initialPassword}",
             $"Role: {user.Role}",
             string.Empty,
@@ -281,6 +282,7 @@ public sealed record AccountCreatedResponse(
     int Id,
     string Username,
     string Email,
+    string InitialPassword,
     UserRole Role,
     bool IsActive,
     DateTime? LastLoginAt,

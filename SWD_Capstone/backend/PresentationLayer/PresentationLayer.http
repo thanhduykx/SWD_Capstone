@@ -93,3 +93,23 @@ Accept: application/json
     { "dayOfWeek": 3, "slot": 2 }
   ]
 }
+
+### Submit lecturer weekly availability to moderator
+POST {{PresentationLayer_HostAddress}}/api/review-availability/week/submit?semesterId=1&weekStart=2026-06-15
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+### Random assign submitted availability to review groups
+POST {{PresentationLayer_HostAddress}}/api/review-scheduling/random-assign
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "semesterId": 1,
+  "reviewType": "Review1",
+  "weekStart": "2026-06-15",
+  "reviewersPerSession": 2,
+  "roomPrefix": "AUTO",
+  "seed": null
+}

@@ -24,7 +24,7 @@ public sealed class SmtpReviewEmailSender(IConfiguration configuration) : IRevie
         var fromEmail = configuration["Smtp:FromEmail"];
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(fromEmail))
         {
-            throw new BusinessRuleException("SMTP is not configured. Set Smtp:Host and Smtp:FromEmail before publishing review schedules.");
+            throw new BusinessRuleException("SMTP is not configured. Set Smtp:Host and Smtp:FromEmail before sending CPMS emails.");
         }
 
         var port = configuration.GetValue("Smtp:Port", 587);
