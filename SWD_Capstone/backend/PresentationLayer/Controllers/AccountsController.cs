@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Security.Claims;
 using CPMS.Api.Services;
 using CPMS.Core.Entities;
@@ -217,20 +218,34 @@ public sealed class AccountsController(
         CancellationToken cancellationToken)
     {
         var subject = "CPMS account login information";
-        var body = string.Join(Environment.NewLine, [
+        var textBody = string.Join(Environment.NewLine, [
             $"Hello {fullName},",
             string.Empty,
-            "Your CPMS account has been created.",
+            "Your CPMS account has been created successfully.",
+            "Use the credentials below to sign in:",
             $"Username / Account: {user.Username}",
             $"Initial password: {initialPassword}",
-            $"Role: {user.Role}",
             string.Empty,
-            "Please sign in and change your password according to your department process."
+            "Important notes:",
+            "- Keep this account information private.",
+            "- Do not share your password with anyone.",
+            "- Sign in as soon as possible and change your password according to your department process.",
+            "- If you did not request or expect this account, contact the moderator immediately."
         ]);
+        var logoPath = AccountEmailLogoPath();
+        var logoContentId = "fpt-logo";
+        var htmlBody = BuildAccountCreatedEmailHtml(
+            fullName,
+            user.Username,
+            initialPassword,
+            logoPath is null ? null : $"cid:{logoContentId}");
+        var inlineImages = logoPath is null
+            ? Array.Empty<EmailInlineImage>()
+            : [new EmailInlineImage(logoContentId, logoPath, "image/png")];
 
         try
         {
-            await emailSender.SendAsync(user.Email, subject, body, cancellationToken);
+            await emailSender.SendHtmlAsync(user.Email, subject, htmlBody, textBody, inlineImages, cancellationToken);
             return new AccountEmailResult("Sent", null);
         }
         catch (BusinessRuleException exception)
@@ -249,6 +264,82 @@ public sealed class AccountsController(
         {
             return new AccountEmailResult("Failed", exception.Message);
         }
+    }
+
+    private static string? AccountEmailLogoPath()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "EmailAssets", "fptlogo.png");
+        return System.IO.File.Exists(path) ? path : null;
+    }
+
+    private static string BuildAccountCreatedEmailHtml(
+        string fullName,
+        string username,
+        string initialPassword,
+        string? logoSource)
+    {
+        var safeFullName = WebUtility.HtmlEncode(fullName);
+        var safeUsername = WebUtility.HtmlEncode(username);
+        var safePassword = WebUtility.HtmlEncode(initialPassword);
+        var logoHtml = string.IsNullOrWhiteSpace(logoSource)
+            ? "<div style=\"font-size:20px;font-weight:800;color:#0f5ea8;letter-spacing:.2px;\">FPT University</div>"
+            : $"<img src=\"{logoSource}\" width=\"180\" alt=\"FPT University\" style=\"display:block;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;\" />";
+
+        return $$"""
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CPMS account information</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f6fb;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;margin:0;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width:640px;max-width:100%;background:#ffffff;border:1px solid #e1e7f0;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:24px 28px 10px 28px;text-align:left;">
+                {{logoHtml}}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:10px 28px 28px 28px;">
+                <h1 style="margin:0 0 10px 0;font-size:24px;line-height:32px;color:#10243e;">CPMS account information</h1>
+                <p style="margin:0 0 18px 0;font-size:15px;line-height:23px;color:#44546a;">Hello <strong>{{safeFullName}}</strong>, your CPMS account has been created successfully. Use the credentials below to sign in.</p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0;margin:18px 0;border:1px solid #d8e2ef;border-radius:10px;overflow:hidden;">
+                  <tr>
+                    <td style="padding:13px 16px;background:#f7fafc;width:34%;font-size:13px;color:#667085;border-bottom:1px solid #d8e2ef;">Username / Account</td>
+                    <td style="padding:13px 16px;background:#ffffff;font-size:16px;font-weight:700;color:#0f5ea8;border-bottom:1px solid #d8e2ef;">{{safeUsername}}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:13px 16px;background:#f7fafc;font-size:13px;color:#667085;">Initial password</td>
+                    <td style="padding:13px 16px;background:#ffffff;font-size:16px;font-weight:700;color:#cc4b00;">{{safePassword}}</td>
+                  </tr>
+                </table>
+
+                <div style="margin:18px 0;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#7c2d12;font-size:14px;line-height:22px;">
+                  Keep this account information private. Do not forward this email or share your password with anyone.
+                </div>
+
+                <p style="margin:0 0 10px 0;font-size:14px;line-height:22px;color:#44546a;">Next steps:</p>
+                <ol style="margin:0 0 18px 20px;padding:0;color:#44546a;font-size:14px;line-height:22px;">
+                  <li>Sign in to CPMS using the username and initial password above.</li>
+                  <li>Change your password according to your department process after the first sign-in.</li>
+                  <li>If this account information looks incorrect, contact the moderator before using it.</li>
+                </ol>
+
+                <p style="margin:20px 0 0 0;font-size:12px;line-height:18px;color:#98a2b3;">This is an automated CPMS email. Please keep it for your first sign-in only.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+""";
     }
 }
 
