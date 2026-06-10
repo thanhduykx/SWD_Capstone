@@ -4,7 +4,6 @@ public enum UserRole
 {
     Student,
     Lecturer,
-    EvaluationPanel,
     TrainingDepartment,
     SystemAdministrator
 }

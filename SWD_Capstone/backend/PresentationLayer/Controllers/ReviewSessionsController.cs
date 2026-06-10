@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Core.Exceptions;
@@ -14,7 +15,10 @@ namespace CPMS.Api.Controllers;
 [ApiController]
 [Route("api/review-sessions")]
 [Authorize]
-public sealed class ReviewSessionsController(CpmsDbContext dbContext, AssignmentRules rules) : ControllerBase
+public sealed class ReviewSessionsController(
+    CpmsDbContext dbContext,
+    AssignmentRules rules,
+    ReviewAssignmentEmailNotifier assignmentEmailNotifier) : ControllerBase
 {
     [HttpPost]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
@@ -37,12 +41,13 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
                 request.SessionDate),
             cancellationToken);
 
+        await assignmentEmailNotifier.SendAssignedAsync([response.Id], cancellationToken);
         return CreatedAtAction(nameof(Create), new { response.Id }, response);
     }
 
     [HttpPost("bulk-assign")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-    public async Task<ActionResult<IReadOnlyList<ReviewSessionResponse>>> BulkAssign(
+    public async Task<ActionResult<BulkAssignReviewSessionsResponse>> BulkAssign(
         BulkAssignReviewSessionsRequest request,
         CancellationToken cancellationToken)
     {
@@ -60,7 +65,14 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return Ok(responses);
+        var emailSummary = await assignmentEmailNotifier.SendAssignedAsync(
+            responses.Select(response => response.Id).ToArray(),
+            cancellationToken);
+
+        return Ok(new BulkAssignReviewSessionsResponse(
+            emailSummary.SentEmailCount,
+            emailSummary.FailedEmailCount,
+            responses));
     }
 
     [HttpPatch("{sessionId:int}")]
@@ -92,6 +104,7 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
 
         rules.ValidateReviewAssignment(supervisorId, reviewerIds, request.PreviousReviewerIds);
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
+        await EnsureReviewersSubmittedAvailabilityAsync(session.SemesterId, sessionDate, request.Slot, reviewerIds, cancellationToken);
         await EnsureNoSlotConflictAsync(session.Id, sessionDate, request.Slot, reviewerIds, cancellationToken);
 
         session.Code = request.Code.Trim();
@@ -121,7 +134,7 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
     }
 
     [HttpGet("my")]
-    [Authorize(Roles = "Lecturer,EvaluationPanel")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<IReadOnlyList<MyReviewSessionResponse>> GetMySessions(CancellationToken cancellationToken)
     {
         var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
@@ -169,6 +182,7 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
             group.LecturerId,
             reviewerIds,
             request.Type == ReviewType.Review2 ? request.PreviousReviewerIds : null);
+        await EnsureReviewersSubmittedAvailabilityAsync(group.SemesterId, sessionDate, request.Slot, reviewerIds, cancellationToken);
 
         var alreadyScheduled = await dbContext.GroupReviewSlots.AnyAsync(slot =>
             slot.GroupId == group.Id &&
@@ -222,6 +236,35 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
         if (existingCount != reviewerIds.Count)
         {
             throw new KeyNotFoundException("One or more reviewers do not exist.");
+        }
+    }
+
+    private async Task EnsureReviewersSubmittedAvailabilityAsync(
+        int semesterId,
+        DateTime sessionDate,
+        int slot,
+        IReadOnlyCollection<int> reviewerIds,
+        CancellationToken cancellationToken)
+    {
+        var weekStart = NormalizeWeekStart(DateOnly.FromDateTime(sessionDate));
+        var dayOfWeek = IsoDayOfWeek(sessionDate);
+        var availableReviewerCount = await dbContext.ReviewAvailabilities
+            .Where(x => x.SemesterId == semesterId &&
+                        x.WeekStartDate == weekStart &&
+                        x.DayOfWeek == dayOfWeek &&
+                        x.Slot == slot &&
+                        reviewerIds.Contains(x.LecturerId) &&
+                        dbContext.ReviewAvailabilitySubmissions.Any(submission =>
+                            submission.SemesterId == x.SemesterId &&
+                            submission.LecturerId == x.LecturerId &&
+                            submission.WeekStartDate == x.WeekStartDate &&
+                            submission.SubmittedAt != null))
+            .Select(x => x.LecturerId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+        if (availableReviewerCount != reviewerIds.Count)
+        {
+            throw new BusinessRuleException("All reviewers must submit availability for the selected date and slot before scheduling.");
         }
     }
 
@@ -305,6 +348,13 @@ public sealed class ReviewSessionsController(CpmsDbContext dbContext, Assignment
 
     private static DateTime NormalizeSessionDate(DateTime date) =>
         DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+
+    private static DateOnly NormalizeWeekStart(DateOnly date)
+    {
+        var day = (int)date.DayOfWeek;
+        var daysFromMonday = day == 0 ? 6 : day - 1;
+        return date.AddDays(-daysFromMonday);
+    }
 }
 
 public sealed record CreateReviewSessionRequest(
@@ -320,6 +370,11 @@ public sealed record CreateReviewSessionRequest(
     DateTime SessionDate);
 
 public sealed record BulkAssignReviewSessionsRequest(IReadOnlyCollection<BulkAssignReviewSessionRequest> Sessions);
+
+public sealed record BulkAssignReviewSessionsResponse(
+    int SentEmailCount,
+    int FailedEmailCount,
+    IReadOnlyCollection<ReviewSessionResponse> Sessions);
 
 public sealed record BulkAssignReviewSessionRequest(
     string Code,

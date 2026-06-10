@@ -14,7 +14,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route element={<RequireAuth allowedRoles={["SystemAdministrator"]} />}>
+      <Route element={<RequireAuth allowedRoles={["TrainingDepartment", "SystemAdministrator"]} />}>
         <Route element={<AppLayout />}>
           <Route path="/admin" element={<AdminPage />} />
         </Route>

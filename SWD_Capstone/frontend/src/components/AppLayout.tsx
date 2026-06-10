@@ -62,12 +62,11 @@ export function AppLayout() {
 }
 
 function getNavigation(role: string | null, t: ReturnType<typeof useLanguage>["t"]) {
-  if (role === "SystemAdministrator") {
-    return [{ to: "/admin", label: t.admin }];
-  }
-
-  if (role === "TrainingDepartment") {
-    return [{ to: "/training", label: t.training }];
+  if (role === "SystemAdministrator" || role === "TrainingDepartment") {
+    return [
+      { to: "/admin", label: t.admin },
+      { to: "/training", label: t.training },
+    ];
   }
 
   return [

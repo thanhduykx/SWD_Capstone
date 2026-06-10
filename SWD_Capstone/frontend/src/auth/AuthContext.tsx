@@ -13,7 +13,7 @@ type TokenResponse = {
   refreshTokenExpiresAt: string;
 };
 
-export type UserRole = "Student" | "Lecturer" | "EvaluationPanel" | "TrainingDepartment" | "SystemAdministrator";
+export type UserRole = "Student" | "Lecturer" | "TrainingDepartment" | "SystemAdministrator";
 
 type AuthContextValue = {
   isAuthenticated: boolean;
@@ -79,12 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function getHomePathForRole(role: UserRole | null) {
-  if (role === "SystemAdministrator") {
+  if (role === "SystemAdministrator" || role === "TrainingDepartment") {
     return "/admin";
-  }
-
-  if (role === "TrainingDepartment") {
-    return "/training";
   }
 
   return "/";

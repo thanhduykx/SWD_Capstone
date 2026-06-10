@@ -26,6 +26,8 @@ type AvailabilitySlot = {
 type AvailabilityWeek = {
   semesterId: number;
   weekStart: string;
+  isSubmitted: boolean;
+  submittedAt?: string | null;
   slots: AvailabilitySlot[];
 };
 
@@ -219,6 +221,9 @@ export function ReviewsPage() {
         params: { semesterId: nextSemesterId, weekStart: nextWeekStart },
       });
       setAvailability(response.data.slots);
+      setStatusMessage(response.data.isSubmitted
+        ? `Availability submitted to moderator at ${formatDateTime(response.data.submittedAt ?? new Date().toISOString())}.`
+        : "Availability is draft. Save slots, then submit to moderator.");
     } catch (error) {
       setAvailability([]);
       setStatusMessage(getAvailabilityError(error));
@@ -238,7 +243,24 @@ export function ReviewsPage() {
         params: { semesterId: selectedSemesterId, weekStart },
       });
       setAvailability(response.data.slots);
-      setStatusMessage(`Availability saved for ${response.data.weekStart}`);
+      setStatusMessage(`Draft availability saved for ${response.data.weekStart}. Submit it when ready for moderator scheduling.`);
+    } catch (error) {
+      setStatusMessage(getAvailabilityError(error));
+    }
+  }
+
+  async function submitAvailability() {
+    if (!selectedSemesterId) {
+      setStatusMessage("He thong chua resolve duoc hoc ky cho tuan nay.");
+      return;
+    }
+
+    try {
+      const response = await apiClient.post<AvailabilityWeek>("/review-availability/week/submit", null, {
+        params: { semesterId: selectedSemesterId, weekStart },
+      });
+      setAvailability(response.data.slots);
+      setStatusMessage(`Submitted ${response.data.slots.length} slot(s) to moderator at ${formatDateTime(response.data.submittedAt ?? new Date().toISOString())}.`);
     } catch (error) {
       setStatusMessage(getAvailabilityError(error));
     }
@@ -338,9 +360,12 @@ export function ReviewsPage() {
           <div className="availability-toolbar">
             <div>
               <h3>Dang ky lich trong</h3>
-              <p className="muted">Chon cac slot co the tham gia review trong tuan.</p>
+              <p className="muted">Chon slot, save draft, sau do submit de Moderator thay va xep lich review.</p>
             </div>
-            <button className="primary" onClick={saveAvailability} disabled={!selectedSemesterId}>Save slots</button>
+            <div className="button-row">
+              <button className="secondary" onClick={saveAvailability} disabled={!selectedSemesterId}>Save draft</button>
+              <button className="primary" onClick={submitAvailability} disabled={!selectedSemesterId || availability.length === 0}>Submit to moderator</button>
+            </div>
           </div>
 
           <div className="schedule-picker-row">

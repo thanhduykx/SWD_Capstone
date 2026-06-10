@@ -77,6 +77,13 @@ input, select { border: 1px solid #d4dee9; border-radius: 8px; padding: 12px; }
 .language-toggle button { background: transparent; border: 0; color: #566579; cursor: pointer; font-size: 12px; font-weight: 700; padding: 8px 12px; }
 .language-toggle button.active { background: #e96f24; color: #fff; }
 .form-error { background: #fce6e9; border-left: 3px solid #ad2932; border-radius: 8px; color: #8f1f2a; padding: 11px 13px; }
+.modal-backdrop { align-items: center; background: rgba(9, 34, 62, .36); display: flex; inset: 0; justify-content: center; padding: 24px; position: fixed; z-index: 30; }
+.modal { background: #fff; border: 1px solid #dbe4ee; border-radius: 12px; box-shadow: 0 18px 48px rgba(15, 34, 58, .22); display: grid; gap: 14px; max-width: 460px; padding: 22px; width: min(100%, 460px); }
+.modal h3 { margin: 0; }
+.generated-account { background: #eef3f7; border: 1px solid #d4dee9; border-radius: 8px; display: grid; gap: 6px; padding: 14px; }
+.generated-account small { color: #68778a; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.generated-account strong { color: #10233c; font-size: 22px; overflow-wrap: anywhere; }
+.generated-account span { color: #566579; }
 .event-feed { color: #41536b; display: grid; gap: 10px; margin: 0; padding-left: 18px; }
 .defense-page { align-items: start; }
 .defense-code-panel { justify-self: start; min-width: 320px; }

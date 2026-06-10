@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.Api.Hubs;
 
-[Authorize(Roles = "Lecturer,EvaluationPanel")]
+[Authorize(Roles = "Lecturer")]
 public sealed class DefenseScoringHub(CpmsDbContext dbContext, AssignmentRules rules) : Hub
 {
     public const string SessionStarted = "defenseSessionStarted";

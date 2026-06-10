@@ -40,8 +40,18 @@ public sealed class ReviewAvailabilityController(
             .ThenBy(x => x.Slot)
             .Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
+        var submission = await dbContext.ReviewAvailabilitySubmissions
+            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .Select(x => new { x.SubmittedAt })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        return Ok(new ReviewAvailabilityWeekResponse(semester.Id, lecturerId.Value, weekStart, slots));
+        return Ok(new ReviewAvailabilityWeekResponse(
+            semester.Id,
+            lecturerId.Value,
+            weekStart,
+            submission?.SubmittedAt is not null,
+            submission?.SubmittedAt,
+            slots));
     }
 
     [HttpPut("week")]
@@ -82,6 +92,7 @@ public sealed class ReviewAvailabilityController(
             .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
             .ToListAsync(cancellationToken);
         dbContext.ReviewAvailabilities.RemoveRange(existing);
+        await UpsertSubmissionDraftAsync(semester.Id, lecturerId.Value, weekStart, cancellationToken);
 
         foreach (var slot in distinctSlots)
         {
@@ -101,7 +112,66 @@ public sealed class ReviewAvailabilityController(
             semester.Id,
             lecturerId.Value,
             weekStart,
+            false,
+            null,
             distinctSlots.Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot)).ToArray()));
+    }
+
+    [HttpPost("week/submit")]
+    [Authorize(Roles = "Lecturer")]
+    public async Task<ActionResult<ReviewAvailabilityWeekResponse>> SubmitWeek(
+        int semesterId,
+        DateOnly weekStart,
+        CancellationToken cancellationToken)
+    {
+        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+        if (lecturerId is null)
+        {
+            return Forbid();
+        }
+
+        weekStart = NormalizeWeekStart(weekStart);
+        var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
+        var slots = await dbContext.ReviewAvailabilities
+            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .OrderBy(x => x.DayOfWeek)
+            .ThenBy(x => x.Slot)
+            .Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot))
+            .ToListAsync(cancellationToken);
+        if (slots.Count == 0)
+        {
+            return BadRequest(new { error = "At least one availability slot is required before submitting to moderator." });
+        }
+
+        var submittedAt = DateTime.UtcNow;
+        var submission = await dbContext.ReviewAvailabilitySubmissions
+            .SingleOrDefaultAsync(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart, cancellationToken);
+        if (submission is null)
+        {
+            dbContext.ReviewAvailabilitySubmissions.Add(new ReviewAvailabilitySubmission
+            {
+                SemesterId = semester.Id,
+                LecturerId = lecturerId.Value,
+                WeekStartDate = weekStart,
+                UpdatedAt = submittedAt,
+                SubmittedAt = submittedAt
+            });
+        }
+        else
+        {
+            submission.UpdatedAt = submittedAt;
+            submission.SubmittedAt = submittedAt;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new ReviewAvailabilityWeekResponse(
+            semester.Id,
+            lecturerId.Value,
+            weekStart,
+            true,
+            submittedAt,
+            slots));
     }
 
     private async Task<int?> CurrentLecturerIdAsync(CancellationToken cancellationToken)
@@ -119,6 +189,31 @@ public sealed class ReviewAvailabilityController(
                 ?? throw new UnauthorizedAccessException("Missing user identifier."),
             CultureInfo.InvariantCulture);
 
+    private async Task UpsertSubmissionDraftAsync(
+        int semesterId,
+        int lecturerId,
+        DateOnly weekStart,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var submission = await dbContext.ReviewAvailabilitySubmissions
+            .SingleOrDefaultAsync(x => x.SemesterId == semesterId && x.LecturerId == lecturerId && x.WeekStartDate == weekStart, cancellationToken);
+        if (submission is null)
+        {
+            dbContext.ReviewAvailabilitySubmissions.Add(new ReviewAvailabilitySubmission
+            {
+                SemesterId = semesterId,
+                LecturerId = lecturerId,
+                WeekStartDate = weekStart,
+                UpdatedAt = now
+            });
+            return;
+        }
+
+        submission.UpdatedAt = now;
+        submission.SubmittedAt = null;
+    }
+
     private static DateOnly NormalizeWeekStart(DateOnly date)
     {
         var day = (int)date.DayOfWeek;
@@ -134,4 +229,6 @@ public sealed record ReviewAvailabilityWeekResponse(
     int SemesterId,
     int LecturerId,
     DateOnly WeekStart,
+    bool IsSubmitted,
+    DateTime? SubmittedAt,
     IReadOnlyCollection<ReviewAvailabilitySlotResponse> Slots);
