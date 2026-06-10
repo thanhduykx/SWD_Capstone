@@ -14,25 +14,33 @@ type Account = {
   lastLoginAt?: string | null;
 };
 
+type AccountCreated = Account & {
+  identityCode: string;
+  emailDeliveryStatus: "Sent" | "Skipped" | "Failed";
+  emailDeliveryError?: string | null;
+};
+
 export function AdminPage() {
   const { t } = useLanguage();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [role, setRole] = useState<UserRole>("Lecturer");
-  const [username, setUsername] = useState("");
+  const [identityCode, setIdentityCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("123456");
   const [fullName, setFullName] = useState("");
-  const [department, setDepartment] = useState("SE");
+  const [department, setDepartment] = useState("");
   const [position, setPosition] = useState("");
   const [classCode, setClassCode] = useState("");
   const [batch, setBatch] = useState("");
   const [major, setMajor] = useState("SE");
   const [message, setMessage] = useState<string | null>(null);
+  const [createdAccount, setCreatedAccount] = useState<AccountCreated | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const accountRoles: Array<{ label: string; value: UserRole; note: string }> = [
     { label: t.student, value: "Student", note: t.studentNote },
     { label: t.lecturer, value: "Lecturer", note: t.lecturerNote },
+    { label: t.council, value: "EvaluationPanel", note: t.councilNote },
     { label: t.moderator, value: "TrainingDepartment", note: t.moderatorNote },
   ];
   const selectedRoleNote = accountRoles.find((item) => item.value === role)?.note;
@@ -50,7 +58,7 @@ export function AdminPage() {
     event.preventDefault();
     setMessage(null);
 
-    const validationMessage = validateAccountForm(role, username, email, password, fullName, department, classCode);
+    const validationMessage = validateAccountForm(role, identityCode, email, password, fullName, department, classCode);
     if (validationMessage) {
       setMessage(validationMessage);
       return;
@@ -59,13 +67,14 @@ export function AdminPage() {
     setIsLoading(true);
 
     try {
-      await apiClient.post("/accounts", {
-        username: username.trim(),
+      const response = await apiClient.post<AccountCreated>("/accounts", {
+        username: null,
+        identityCode: identityCode.trim(),
         email: email.trim(),
         password,
         role,
         fullName: fullName.trim(),
-        department: department.trim(),
+        department: role === "TrainingDepartment" || role === "EvaluationPanel" ? department.trim() : null,
         position: position.trim(),
         permissionScope: "System",
         isPartTime: false,
@@ -73,10 +82,12 @@ export function AdminPage() {
         batch: batch.trim(),
         major: major.trim(),
       });
-      setMessage(t.accountCreated);
-      setUsername("");
+      setCreatedAccount(response.data);
+      setMessage(`${t.accountCreated} ${t.generatedUsername}: ${response.data.username}. ${emailDeliveryText(response.data, t)}`);
+      setIdentityCode("");
       setEmail("");
       setFullName("");
+      setDepartment("");
       setPosition("");
       setClassCode("");
       setBatch("");
@@ -97,6 +108,25 @@ export function AdminPage() {
           <p>{t.adminSubtitle}</p>
         </div>
       </div>
+      {createdAccount && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="account-created-title">
+          <article className="modal">
+            <h3 id="account-created-title">{t.accountCreatedTitle}</h3>
+            <div className="generated-account">
+              <small>{t.generatedUsername}</small>
+              <strong>{createdAccount.username}</strong>
+              <span>{createdAccount.role} - {createdAccount.email}</span>
+            </div>
+            <p className={createdAccount.emailDeliveryStatus === "Sent" ? "alert success" : "alert warning"}>
+              {emailDeliveryText(createdAccount, t)}
+            </p>
+            {createdAccount.emailDeliveryError && <p className="muted">{createdAccount.emailDeliveryError}</p>}
+            <div className="button-row">
+              <button className="primary" type="button" onClick={() => setCreatedAccount(null)}>{t.close}</button>
+            </div>
+          </article>
+        </div>
+      )}
       <div className="dashboard-grid">
         <article className="panel">
           <h3>{t.createOfficialAccount}</h3>
@@ -108,13 +138,11 @@ export function AdminPage() {
               </select>
             </label>
             <p className="muted">{selectedRoleNote}</p>
-            <label>{t.loginCode}<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t.loginCodePlaceholder} required /></label>
+            <label>{t.identityCode}<input value={identityCode} onChange={(event) => setIdentityCode(event.target.value)} placeholder="SE194673" required /></label>
             <label>{t.email}<input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@fpt.edu.vn" type="email" required /></label>
             <label>{t.initialPassword}<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={6} required /></label>
-            {(role === "Student" || role === "Lecturer") && (
-              <label>{t.fullName}<input value={fullName} onChange={(event) => setFullName(event.target.value)} required /></label>
-            )}
-            {(role === "Lecturer" || role === "TrainingDepartment") && (
+            <label>{t.fullName}<input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Duong Thanh Thanh Duy" required /></label>
+            {(role === "TrainingDepartment" || role === "EvaluationPanel") && (
               <label>{t.department}<input value={department} onChange={(event) => setDepartment(event.target.value)} required /></label>
             )}
             {role === "Student" && (
@@ -162,7 +190,7 @@ function roleLabel(role: UserRole, t: ReturnType<typeof useLanguage>["t"]) {
     return t.lecturer;
   }
 
-  if (role === "TrainingDepartment") {
+  if (role === "TrainingDepartment" || role === "SystemAdministrator") {
     return t.moderator;
   }
 
@@ -180,14 +208,14 @@ type ApiErrorBody = {
 
 function validateAccountForm(
   role: UserRole,
-  username: string,
+  identityCode: string,
   email: string,
   password: string,
   fullName: string,
   department: string,
   classCode: string,
 ) {
-  if (!username.trim() || !email.trim() || !password) {
+  if (!identityCode.trim() || !email.trim() || !password) {
     return "Thiếu mã đăng nhập, email hoặc mật khẩu.";
   }
 
@@ -195,11 +223,11 @@ function validateAccountForm(
     return "Mật khẩu phải có ít nhất 6 ký tự.";
   }
 
-  if ((role === "Student" || role === "Lecturer") && !fullName.trim()) {
+  if (!fullName.trim()) {
     return "Thiếu họ tên.";
   }
 
-  if ((role === "Lecturer" || role === "TrainingDepartment") && !department.trim()) {
+  if ((role === "TrainingDepartment" || role === "EvaluationPanel") && !department.trim()) {
     return "Thiếu bộ môn.";
   }
 
@@ -222,13 +250,30 @@ function getAccountCreateError(error: unknown, fallback: string) {
 
   const knownMessages: Record<string, string> = {
     "Username, email and password are required.": "Thiếu mã đăng nhập, email hoặc mật khẩu.",
+    "Email and password are required.": "Thiếu email hoặc mật khẩu.",
+    "Identity code is required.": "Thiếu mã số.",
+    "Full name is required for generated account usernames.": "Thiếu họ tên để tự tạo username.",
     "Password must contain at least 6 characters.": "Mật khẩu phải có ít nhất 6 ký tự.",
     "Username or email already exists.": "Mã đăng nhập hoặc email đã tồn tại.",
     "Full name is required for lecturers.": "Giảng viên bắt buộc nhập họ tên.",
     "Department is required for lecturers.": "Giảng viên bắt buộc nhập bộ môn.",
+    "Full name is required for panel accounts.": "Hội đồng bắt buộc nhập họ tên.",
+    "Department is required for panel accounts.": "Hội đồng bắt buộc nhập bộ môn.",
     "Full name is required for students.": "Sinh viên bắt buộc nhập họ tên.",
     "Class code is required for students.": "Sinh viên bắt buộc nhập mã lớp.",
   };
 
   return knownMessages[apiError] ?? apiError;
+}
+
+function emailDeliveryText(account: AccountCreated, t: ReturnType<typeof useLanguage>["t"]) {
+  if (account.emailDeliveryStatus === "Sent") {
+    return t.accountEmailSent;
+  }
+
+  if (account.emailDeliveryStatus === "Skipped") {
+    return t.accountEmailSkipped;
+  }
+
+  return t.accountEmailFailed;
 }
