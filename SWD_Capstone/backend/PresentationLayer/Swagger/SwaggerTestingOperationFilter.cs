@@ -66,13 +66,13 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Moderator view. Returns lecturers, submitted availability, groups, and sessions needed by FE scheduling screens. Legacy SystemAdministrator tokens are still accepted."),
         ["POST /api/review-scheduling/random-assign"] = new(
             "Random assign groups to submitted lecturer slots",
-            "Moderator view. Randomly assigns active unscheduled groups to lecturers using only submitted availability, avoiding supervisor/self-review, repeated Review1 reviewers for Review2, and reviewer slot conflicts."),
+            "Moderator view. Randomly assigns active unscheduled groups to lecturers using only submitted availability, avoiding supervisor/self-review, repeated Review1 reviewers for Review2, and reviewer slot conflicts. Sends lecturer notification email after a successful assignment and returns delivery counts."),
         ["POST /api/review-sessions"] = new(
             "Create one review session",
-            "Assigns one group to one or two reviewers. Reviewers must have submitted availability for the selected date and slot."),
+            "Assigns one group to one or two reviewers. Reviewers must have submitted availability for the selected date and slot. Sends lecturer notification email after the assignment is created."),
         ["POST /api/review-sessions/bulk-assign"] = new(
             "Bulk assign review sessions",
-            "Assigns multiple sessions in one transaction. Reviewers must have submitted availability for each selected date and slot. If one assignment violates a business rule, the whole batch is rejected."),
+            "Assigns multiple sessions in one transaction. Reviewers must have submitted availability for each selected date and slot. If one assignment violates a business rule, the whole batch is rejected. Sends lecturer notification email after commit and returns delivery counts."),
         ["PATCH /api/review-sessions/{sessionId}"] = new(
             "Update review session",
             "Changes reviewer/date/slot/room/status and keeps checklist submissions aligned with assigned reviewers. New reviewers must have submitted availability for the target date and slot."),

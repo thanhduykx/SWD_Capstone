@@ -267,6 +267,7 @@ Response:
   "isActive": true,
   "lastLoginAt": null,
   "lockedUntil": null,
+  "initialPassword": "Test@123456",
   "identityCode": "SE194673",
   "emailDeliveryStatus": "Sent",
   "emailDeliveryError": null
@@ -308,7 +309,11 @@ const response = await apiClient.post("/accounts", {
   major: null,
 });
 
-showCreatedAccountPopup(response.data.username, response.data.emailDeliveryStatus);
+showCreatedAccountPopup(
+  response.data.username,
+  response.data.initialPassword,
+  response.data.emailDeliveryStatus,
+);
 ```
 
 Lỗi cần xử lý:
@@ -543,6 +548,8 @@ Response:
 {
   "totalCandidateGroups": 12,
   "assignedCount": 10,
+  "sentEmailCount": 3,
+  "failedEmailCount": 0,
   "unassignedGroups": [
     {
       "groupId": 5,
@@ -555,6 +562,8 @@ Response:
 ```
 
 FE sau khi gọi xong nên reload `GET /api/review-scheduling/board`.
+
+Backend sends lecturer notification emails after random assign succeeds. FE should display `sentEmailCount` and `failedEmailCount`.
 
 ### POST `/api/review-sessions`
 
@@ -613,6 +622,33 @@ Rules backend kiểm tra:
 | Supervisor không được tự review nhóm của mình | backend chặn |
 | Review2 cần `previousReviewerIds` | dùng để tránh sai quy tắc phân công |
 | Reviewer phải submit availability đúng ngày/slot | backend chặn cả manual assign và random assign |
+
+Response:
+
+```json
+{
+  "sentEmailCount": 2,
+  "failedEmailCount": 0,
+  "sessions": [
+    {
+      "id": 100,
+      "code": "RV1-G01-20260615-S1",
+      "semesterId": 1,
+      "groupId": 1,
+      "groupCode": "G01",
+      "groupPosition": 1,
+      "type": "Review1",
+      "status": "Draft",
+      "reviewerIds": [3, 4],
+      "sessionDate": "2026-06-15T00:00:00Z",
+      "slot": 1,
+      "room": "B101"
+    }
+  ]
+}
+```
+
+Backend sends lecturer notification emails after the assignment transaction commits. Email failure does not roll back the created schedule; FE should display `failedEmailCount`.
 
 ### PATCH `/api/review-sessions/{sessionId}`
 
