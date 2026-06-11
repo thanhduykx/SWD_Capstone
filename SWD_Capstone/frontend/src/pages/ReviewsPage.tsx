@@ -115,8 +115,10 @@ export function ReviewsPage() {
   const [dirty, setDirty] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [isSaving, setIsSaving] = useState(false);
+  const [availabilityAction, setAvailabilityAction] = useState<"saving" | "submitting" | null>(null);
 
   const selectedSemesterId = resolvedSemester?.id ?? 0;
+  const isAvailabilityBusy = availabilityAction !== null;
   const selectedSlotKeys = useMemo(
     () => new Set(availability.map((item) => slotKey(item.dayOfWeek, item.slot))),
     [availability],
@@ -230,22 +232,30 @@ export function ReviewsPage() {
     }
   }
 
+  async function persistAvailabilityDraft() {
+    const response = await apiClient.put<AvailabilityWeek>("/review-availability/week", {
+      slots: availability,
+    }, {
+      params: { semesterId: selectedSemesterId, weekStart },
+    });
+    setAvailability(response.data.slots);
+    return response.data;
+  }
+
   async function saveAvailability() {
     if (!selectedSemesterId) {
       setStatusMessage("He thong chua resolve duoc hoc ky cho tuan nay.");
       return;
     }
 
+    setAvailabilityAction("saving");
     try {
-      const response = await apiClient.put<AvailabilityWeek>("/review-availability/week", {
-        slots: availability,
-      }, {
-        params: { semesterId: selectedSemesterId, weekStart },
-      });
-      setAvailability(response.data.slots);
-      setStatusMessage(`Draft availability saved for ${response.data.weekStart}. Submit it when ready for moderator scheduling.`);
+      const draft = await persistAvailabilityDraft();
+      setStatusMessage(`Draft availability saved for ${draft.weekStart}. Submit it when ready for moderator scheduling.`);
     } catch (error) {
       setStatusMessage(getAvailabilityError(error));
+    } finally {
+      setAvailabilityAction(null);
     }
   }
 
@@ -255,7 +265,9 @@ export function ReviewsPage() {
       return;
     }
 
+    setAvailabilityAction("submitting");
     try {
+      await persistAvailabilityDraft();
       const response = await apiClient.post<AvailabilityWeek>("/review-availability/week/submit", null, {
         params: { semesterId: selectedSemesterId, weekStart },
       });
@@ -263,6 +275,8 @@ export function ReviewsPage() {
       setStatusMessage(`Submitted ${response.data.slots.length} slot(s) to moderator at ${formatDateTime(response.data.submittedAt ?? new Date().toISOString())}.`);
     } catch (error) {
       setStatusMessage(getAvailabilityError(error));
+    } finally {
+      setAvailabilityAction(null);
     }
   }
 
@@ -363,8 +377,8 @@ export function ReviewsPage() {
               <p className="muted">Chon slot, save draft, sau do submit de Moderator thay va xep lich review.</p>
             </div>
             <div className="button-row">
-              <button className="secondary" onClick={saveAvailability} disabled={!selectedSemesterId}>Save draft</button>
-              <button className="primary" onClick={submitAvailability} disabled={!selectedSemesterId || availability.length === 0}>Submit to moderator</button>
+              <button className="secondary" onClick={saveAvailability} disabled={!selectedSemesterId || isAvailabilityBusy}>{availabilityAction === "saving" ? "Saving..." : "Save draft"}</button>
+              <button className="primary" onClick={submitAvailability} disabled={!selectedSemesterId || availability.length === 0 || isAvailabilityBusy}>{availabilityAction === "submitting" ? "Submitting..." : "Submit to moderator"}</button>
             </div>
           </div>
 
