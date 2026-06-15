@@ -190,6 +190,8 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         await Program.SeedAdminAccountAsync(app.Configuration, dbContext);
         await Program.SeedModeratorAccountAsync(dbContext);
 
+
+
         // Business data must come from official import/admin flows. Admin seeding is opt-in for deployments.
     }
     catch (Npgsql.NpgsqlException exception)
