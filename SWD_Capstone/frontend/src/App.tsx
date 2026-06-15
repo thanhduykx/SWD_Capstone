@@ -8,6 +8,9 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { SemestersPage } from "./pages/SemestersPage";
+import { StudentDashboardPage } from "./pages/StudentDashboardPage";
+import { StudentSchedulePage } from "./pages/StudentSchedulePage";
+import { StudentSlotRegistrationPage } from "./pages/StudentSlotRegistrationPage";
 import { TrainingDepartmentPage } from "./pages/TrainingDepartmentPage";
 
 export function App() {
@@ -24,6 +27,13 @@ export function App() {
           <Route path="/training" element={<TrainingDepartmentPage />} />
         </Route>
       </Route>
+      <Route element={<RequireAuth allowedRoles={["Student"]} />}>
+        <Route element={<AppLayout />}>
+          <Route path="/student" element={<StudentDashboardPage />} />
+          <Route path="/student/register" element={<StudentSlotRegistrationPage />} />
+          <Route path="/student/schedule" element={<StudentSchedulePage />} />
+        </Route>
+      </Route>
       <Route element={<RequireAuth allowedRoles={["Lecturer"]} />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
@@ -37,3 +47,4 @@ export function App() {
     </Routes>
   );
 }
+

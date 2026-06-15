@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type Language = "vi" | "en";
@@ -128,6 +128,10 @@ const dictionaries = {
     eventClosed: "Chủ tịch đã kết thúc và khóa điểm.",
     eventMemberJoined: "đã vào phòng chấm.",
     eventEvidence: "Đã ghi nhận ảnh minh chứng hội đồng.",
+
+    studentDashboard: "Bảng điều khiển",
+    studentRegister: "Đăng ký slot",
+    studentSchedule: "Lịch review",
   },
   en: {
     dashboard: "Dashboard",
@@ -253,6 +257,10 @@ const dictionaries = {
     eventClosed: "Chairman ended and locked the session.",
     eventMemberJoined: "joined the scoring room.",
     eventEvidence: "Council evidence photo recorded.",
+
+    studentDashboard: "Dashboard",
+    studentRegister: "Register slot",
+    studentSchedule: "Review schedule",
   },
 } as const;
 
