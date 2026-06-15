@@ -221,3 +221,50 @@ public sealed class GroupResult
     public FinalResult? Defense2Result { get; set; }
     public FinalResult FinalResult { get; set; } = FinalResult.Pending;
 }
+
+public sealed class ReviewRound
+{
+    public int Id { get; set; }
+    public int SemesterId { get; set; }
+    public ReviewType Type { get; set; }
+    public DateOnly WeekStartDate { get; set; }
+    public DateOnly WeekEndDate { get; set; }
+    public ReviewRoundStatus Status { get; set; } = ReviewRoundStatus.Draft;
+    public int CreatedByModeratorId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? OpenedAt { get; set; }
+    public DateTime? ClosedAt { get; set; }
+}
+
+public sealed class StudentSlotRegistration
+{
+    public int Id { get; set; }
+    public int ReviewRoundId { get; set; }
+    public int GroupId { get; set; }
+    public int RegisteredByStudentId { get; set; }
+    public int DayOfWeek { get; set; }
+    public int Slot { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class ReviewAttendance
+{
+    public int Id { get; set; }
+    public int SessionId { get; set; }
+    public int StudentId { get; set; }
+    public bool IsPresent { get; set; }
+    public string? Note { get; set; }
+    public int MarkedByLecturerId { get; set; }
+    public DateTime MarkedAt { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class ReviewComment
+{
+    public int Id { get; set; }
+    public int SessionId { get; set; }
+    public int GroupId { get; set; }
+    public int AuthorUserId { get; set; }
+    public required string Content { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+}

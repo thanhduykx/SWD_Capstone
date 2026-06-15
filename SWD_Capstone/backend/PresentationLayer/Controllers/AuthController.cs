@@ -31,7 +31,16 @@ public sealed class AuthController(
             return BadRequest(new { error = "Username or examinerCode is required." });
         }
 
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Username == loginCode, cancellationToken);
+#pragma warning disable CA1862 // ToLower is required for EF Core translation
+#pragma warning disable CA1304
+#pragma warning disable CA1311
+        var user = await dbContext.Users.SingleOrDefaultAsync(
+            x => x.Username.ToLower() == loginCode.ToLower() ||
+                 x.Email.ToLower() == loginCode.ToLower(),
+            cancellationToken);
+#pragma warning restore CA1311
+#pragma warning restore CA1304
+#pragma warning restore CA1862
         if (user is null || !user.IsActive || user.LockedUntil > DateTime.UtcNow)
         {
             return Unauthorized();

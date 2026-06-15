@@ -31,12 +31,17 @@ export function AdminPage() {
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
   const [position, setPosition] = useState("");
-  const [classCode, setClassCode] = useState("");
   const [batch, setBatch] = useState("");
   const [major, setMajor] = useState("SE");
   const [message, setMessage] = useState<string | null>(null);
   const [createdAccount, setCreatedAccount] = useState<AccountCreated | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // States for inline editing
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editRole, setEditRole] = useState<UserRole>("Lecturer");
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const accountRoles: Array<{ label: string; value: UserRole; note: string }> = [
     { label: t.student, value: "Student", note: t.studentNote },
@@ -58,7 +63,7 @@ export function AdminPage() {
     event.preventDefault();
     setMessage(null);
 
-    const validationMessage = validateAccountForm(role, identityCode, email, password, fullName, department, classCode);
+    const validationMessage = validateAccountForm(role, identityCode, email, password, fullName, department);
     if (validationMessage) {
       setMessage(validationMessage);
       return;
@@ -78,7 +83,7 @@ export function AdminPage() {
         position: position.trim(),
         permissionScope: "System",
         isPartTime: false,
-        classCode: classCode.trim(),
+        classCode: null,
         batch: batch.trim(),
         major: major.trim(),
       });
@@ -89,7 +94,6 @@ export function AdminPage() {
       setFullName("");
       setDepartment("");
       setPosition("");
-      setClassCode("");
       setBatch("");
       setMajor("SE");
       await loadAccounts();
@@ -97,6 +101,21 @@ export function AdminPage() {
       setMessage(getAccountCreateError(error, t.accountCreateFailed));
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSaveEdit(id: number) {
+    setIsSavingEdit(true);
+    try {
+      await apiClient.patch(`/accounts/${id}/role`, { role: editRole });
+      await apiClient.patch(`/accounts/${id}/status`, { isActive: editIsActive, unlock: true });
+      setEditingId(null);
+      await loadAccounts();
+    } catch (error) {
+      console.error("Failed to update account", error);
+      alert("Cập nhật tài khoản thất bại.");
+    } finally {
+      setIsSavingEdit(false);
     }
   }
 
@@ -114,8 +133,10 @@ export function AdminPage() {
             <h3 id="account-created-title">{t.accountCreatedTitle}</h3>
             <div className="generated-account">
               <small>{t.generatedUsername}</small>
+              // @ts-ignore
               <strong>{createdAccount.username}</strong>
               <small>{t.initialPassword}</small>
+              // @ts-ignore
               <strong>{createdAccount.initialPassword}</strong>
               <span>{createdAccount.role} - {createdAccount.email}</span>
             </div>
@@ -149,7 +170,6 @@ export function AdminPage() {
             )}
             {role === "Student" && (
               <>
-                <label>{t.classCode}<input value={classCode} onChange={(event) => setClassCode(event.target.value)} placeholder="SE1901" required /></label>
                 <label>{t.batchName}<input value={batch} onChange={(event) => setBatch(event.target.value)} placeholder="K19" /></label>
                 <label>{t.major}<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="SE" /></label>
               </>
@@ -164,17 +184,86 @@ export function AdminPage() {
         <article className="panel table-panel">
           <div className="panel-header"><h3>{t.accounts}</h3><button className="secondary" onClick={loadAccounts}>{t.refresh}</button></div>
           <table>
-            <thead><tr><th>{t.code}</th><th>{t.role}</th><th>{t.status}</th><th>{t.lastLogin}</th></tr></thead>
+            <thead><tr><th>{t.code}</th><th>{t.role}</th><th>{t.status}</th><th>{t.lastLogin}</th><th>{t.actions}</th></tr></thead>
             <tbody>
-              {accounts.length === 0 && <tr><td colSpan={4} className="muted">{t.noAccounts}</td></tr>}
-              {accounts.map((account) => (
-                <tr key={account.id}>
-                  <td>{account.username}<br /><small className="muted">{account.email}</small></td>
-                  <td>{roleLabel(account.role, t)}</td>
-                  <td><span className="tag">{account.isActive ? t.active : t.inactive}</span></td>
-                  <td>{account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleString() : "-"}</td>
-                </tr>
-              ))}
+              {accounts.length === 0 && <tr><td colSpan={5} className="muted">{t.noAccounts}</td></tr>}
+              {accounts.map((account) => {
+                const isEditing = editingId === account.id;
+                return (
+                  <tr key={account.id}>
+                    <td>{account.username}<br /><small className="muted">{account.email}</small></td>
+                    <td>
+                      {isEditing ? (
+                        <select
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value as UserRole)}
+                          disabled={isSavingEdit}
+                          style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "14px" }}
+                        >
+                          {accountRoles.map((item) => (
+                            <option key={item.value} value={item.value}>{item.label}</option>
+                          ))}
+                          {editRole === "SystemAdministrator" && (
+                            <option value="SystemAdministrator">SystemAdministrator</option>
+                          )}
+                        </select>
+                      ) : (
+                        roleLabel(account.role, t)
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <select
+                          value={editIsActive ? "active" : "inactive"}
+                          onChange={(e) => setEditIsActive(e.target.value === "active")}
+                          disabled={isSavingEdit}
+                          style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "14px" }}
+                        >
+                          <option value="active">{t.active}</option>
+                          <option value="inactive">{t.inactive}</option>
+                        </select>
+                      ) : (
+                        <span className="tag">{account.isActive ? t.active : t.inactive}</span>
+                      )}
+                    </td>
+                    <td>{account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleString() : "-"}</td>
+                    <td>
+                      {isEditing ? (
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            className="primary small"
+                            onClick={() => handleSaveEdit(account.id)}
+                            disabled={isSavingEdit}
+                            style={{ padding: "4px 8px", minWidth: "50px" }}
+                          >
+                            {isSavingEdit ? "..." : t.save}
+                          </button>
+                          <button
+                            className="secondary small"
+                            onClick={() => setEditingId(null)}
+                            disabled={isSavingEdit}
+                            style={{ padding: "4px 8px" }}
+                          >
+                            {t.cancel}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="secondary small"
+                          onClick={() => {
+                            setEditingId(account.id);
+                            setEditRole(account.role);
+                            setEditIsActive(account.isActive);
+                          }}
+                          style={{ padding: "4px 8px" }}
+                        >
+                          {t.edit}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </article>
@@ -211,7 +300,6 @@ function validateAccountForm(
   password: string,
   fullName: string,
   department: string,
-  classCode: string,
 ) {
   if (!identityCode.trim() || !email.trim() || !password) {
     return "Thiếu mã đăng nhập, email hoặc mật khẩu.";
@@ -227,10 +315,6 @@ function validateAccountForm(
 
   if (role === "TrainingDepartment" && !department.trim()) {
     return "Thiếu bộ môn.";
-  }
-
-  if (role === "Student" && !classCode.trim()) {
-    return "Sinh viên bắt buộc nhập mã lớp.";
   }
 
   return null;
@@ -256,7 +340,6 @@ function getAccountCreateError(error: unknown, fallback: string) {
     "Full name is required for lecturers.": "Giảng viên bắt buộc nhập họ tên.",
     "Department is required for lecturers.": "Giảng viên bắt buộc nhập bộ môn.",
     "Full name is required for students.": "Sinh viên bắt buộc nhập họ tên.",
-    "Class code is required for students.": "Sinh viên bắt buộc nhập mã lớp.",
   };
 
   return knownMessages[apiError] ?? apiError;

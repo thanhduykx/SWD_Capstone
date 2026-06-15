@@ -121,6 +121,89 @@ public sealed class ReviewSchedulesController(
             }
         }
 
+        var sessionIds = sessions.Select(x => x.Id).ToArray();
+        var scheduledGroups = await dbContext.GroupReviewSlots
+            .Where(x => sessionIds.Contains(x.SessionId))
+            .Select(x => x.GroupId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var groupId in scheduledGroups)
+        {
+            var leader = await dbContext.Students
+                .Where(x => x.GroupId == groupId && x.IsLeader)
+                .Select(x => new { x.FullName, x.UserId, x.Code })
+                .FirstOrDefaultAsync(cancellationToken)
+                ?? await dbContext.Students
+                .Where(x => x.GroupId == groupId)
+                .OrderBy(x => x.Code)
+                .Select(x => new { x.FullName, x.UserId, x.Code })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (leader != null)
+            {
+                var email = await dbContext.Users
+                    .Where(x => x.Id == leader.UserId)
+                    .Select(x => x.Email)
+                    .SingleOrDefaultAsync(cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(email))
+                {
+                    var group = await dbContext.CapstoneGroups
+                        .Where(x => x.Id == groupId)
+                        .Select(x => new { x.Code, x.TopicId })
+                        .SingleAsync(cancellationToken);
+
+                    var topicName = await dbContext.Topics
+                        .Where(x => x.Id == group.TopicId)
+                        .Select(x => x.NameVn)
+                        .SingleOrDefaultAsync(cancellationToken) ?? "Capstone Project";
+
+                    var groupSessions = await dbContext.GroupReviewSlots
+                        .Where(x => x.GroupId == groupId && sessionIds.Contains(x.SessionId))
+                        .Join(
+                            dbContext.ReviewSessions,
+                            slot => slot.SessionId,
+                            sess => sess.Id,
+                            (slot, sess) => sess)
+                        .ToListAsync(cancellationToken);
+
+                    var leaderBody = BuildLeaderEmailBody(request.Message, leader.FullName, group.Code, topicName, groupSessions);
+                    var leaderSubject = $"[CPMS] Review Schedule Notification for Group {group.Code}";
+
+                    var log = new EmailDeliveryLog
+                    {
+                        PublicationId = publication.Id,
+                        RecipientUserId = leader.UserId,
+                        RecipientEmail = email,
+                        Subject = leaderSubject,
+                        Status = EmailDeliveryStatus.Pending
+                    };
+                    dbContext.EmailDeliveryLogs.Add(log);
+
+                    try
+                    {
+                        await emailSender.SendAsync(email, leaderSubject, leaderBody, cancellationToken);
+                        log.Status = EmailDeliveryStatus.Sent;
+                        log.SentAt = DateTime.UtcNow;
+                        sent++;
+                    }
+                    catch (SmtpException exception)
+                    {
+                        log.Status = EmailDeliveryStatus.Failed;
+                        log.ErrorMessage = exception.Message;
+                        failed++;
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        log.Status = EmailDeliveryStatus.Failed;
+                        log.ErrorMessage = exception.Message;
+                        failed++;
+                    }
+                }
+            }
+        }
+
         foreach (var session in sessions)
         {
             session.Status = ReviewSessionStatus.Published;
@@ -218,6 +301,38 @@ public sealed class ReviewSchedulesController(
         var day = (int)date.DayOfWeek;
         var daysFromMonday = day == 0 ? 6 : day - 1;
         return date.AddDays(-daysFromMonday);
+    }
+
+    private static string BuildLeaderEmailBody(
+        string? moderatorMessage,
+        string leaderName,
+        string groupCode,
+        string projectName,
+        IReadOnlyCollection<ReviewSession> sessions)
+    {
+        var lines = new List<string>
+        {
+            $"Dear {leaderName} (Leader of Group {groupCode} - {projectName}),",
+            string.Empty,
+            "Your group's capstone review schedule has been published.",
+            "As the group leader, you are automatically notified. Please inform all team members of this schedule.",
+        };
+
+        if (!string.IsNullOrWhiteSpace(moderatorMessage))
+        {
+            lines.Add(string.Empty);
+            lines.Add(moderatorMessage.Trim());
+        }
+
+        lines.Add(string.Empty);
+        foreach (var session in sessions.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot))
+        {
+            lines.Add($"- {session.Type} | {session.Code} | {session.SessionDate:yyyy-MM-dd} | {SlotTimeLabel(session.Slot)} | Room {session.Room}");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("Please sign in to CPMS to view the details.");
+        return string.Join(Environment.NewLine, lines);
     }
 }
 

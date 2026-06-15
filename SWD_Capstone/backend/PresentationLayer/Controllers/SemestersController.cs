@@ -1,5 +1,6 @@
 using CPMS.Api.Services;
 using CPMS.Core.Entities;
+using CPMS.Core.Enums;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,39 @@ public sealed class SemestersController(
         await dbContext.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(GetAll), new { semester.Id }, semester);
     }
+
+    [HttpGet("{semesterId:int}/groups")]
+    public async Task<ActionResult<IReadOnlyList<SemesterGroupResponse>>> GetGroups(
+        int semesterId,
+        CancellationToken cancellationToken)
+    {
+        var groups = await dbContext.CapstoneGroups
+            .Where(x => x.SemesterId == semesterId)
+            .OrderBy(x => x.Code)
+            .Select(x => new SemesterGroupResponse(
+                x.Id,
+                x.Code,
+                dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn).SingleOrDefault() ?? "No Topic",
+                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.LecturerId).Select(lecturer => lecturer.FullName).SingleOrDefault() ?? "No Supervisor",
+                x.Status,
+                dbContext.Students
+                    .Where(student => student.GroupId == x.Id)
+                    .OrderBy(student => student.Code)
+                    .Select(student => new GroupMemberResponse(
+                        student.Id,
+                        student.Code,
+                        student.FullName,
+                        student.ClassCode,
+                        student.Major,
+                        dbContext.Users.Where(u => u.Id == student.UserId).Select(u => u.Email).FirstOrDefault() ?? "")
+                    {
+                        IsLeader = student.IsLeader
+                    })
+                    .ToList()))
+            .ToListAsync(cancellationToken);
+
+        return Ok(groups);
+    }
 }
 
 public sealed record CreateSemesterRequest(
@@ -64,3 +98,22 @@ public sealed record CreateSemesterRequest(
     DateOnly StartDate,
     DateOnly EndDate,
     bool IsActive);
+
+public sealed record SemesterGroupResponse(
+    int Id,
+    string Code,
+    string TopicName,
+    string SupervisorName,
+    GroupStatus Status,
+    IReadOnlyList<GroupMemberResponse> Members);
+
+public sealed record GroupMemberResponse(
+    int Id,
+    string Code,
+    string FullName,
+    string ClassCode,
+    string Major,
+    string Email)
+{
+    public bool IsLeader { get; set; }
+}
