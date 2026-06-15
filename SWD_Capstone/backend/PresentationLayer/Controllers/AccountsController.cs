@@ -190,7 +190,7 @@ public sealed class AccountsController(
                     UserId = userId,
                     Code = Required(request.IdentityCode, "Identity code is required for students."),
                     FullName = Required(request.FullName, "Full name is required for students."),
-                    ClassCode = Required(request.ClassCode, "Class code is required for students."),
+                    ClassCode = OptionalOrDefault(request.ClassCode, string.Empty),
                     Batch = request.Batch,
                     Major = request.Major ?? "SE"
                 });

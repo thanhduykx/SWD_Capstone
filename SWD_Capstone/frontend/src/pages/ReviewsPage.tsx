@@ -50,6 +50,58 @@ type ReviewSubmissionItem = {
   label: string;
   description?: string | null;
   priority?: string | null;
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
+import { apiClient } from "../api/client";
+import type { ChangeEvent } from "react";
+
+type ReviewType = "Review1" | "Review2" | "Review3";
+type ReviewSessionStatus = "Draft" | "Published" | "Cancelled";
+type ReviewSubmissionStatus = "Draft" | "Submitted";
+type ReviewChecklistAnswer = "Yes" | "No" | "NotApplicable";
+
+type Semester = {
+  id: number;
+  code: string;
+  name: string;
+  academicYear: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+};
+
+type AvailabilitySlot = {
+  dayOfWeek: number;
+  slot: number;
+};
+
+type AvailabilityWeek = {
+  semesterId: number;
+  weekStart: string;
+  isSubmitted: boolean;
+  submittedAt?: string | null;
+  slots: AvailabilitySlot[];
+};
+
+type MyReviewSession = {
+  sessionId: number;
+  submissionId: number;
+  code: string;
+  type: ReviewType;
+  sessionStatus: ReviewSessionStatus;
+  groupCode: string;
+  sessionDate: string;
+  slot: number;
+  room: string;
+  submissionStatus: ReviewSubmissionStatus;
+  lastSavedAt: string;
+};
+
+type ReviewSubmissionItem = {
+  itemKey: string;
+  label: string;
+  description?: string | null;
+  priority?: string | null;
   isSection: boolean;
   criteriaCode?: string | null;
   answer?: ReviewChecklistAnswer | null;
@@ -80,6 +132,34 @@ type ReviewSubmission = {
   items: ReviewSubmissionItem[];
 };
 
+type AttendanceStudent = {
+  studentId: number;
+  studentCode: string;
+  fullName: string;
+  isPresent: boolean | null;
+  note: string | null;
+};
+
+type AttendanceResponse = {
+  sessionId: number;
+  sessionCode: string;
+  groupId: number;
+  groupCode: string;
+  sessionDate: string;
+  slot: number;
+  room: string;
+  students: AttendanceStudent[];
+};
+
+type CommentItem = {
+  id: number;
+  authorUserId: number;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string | null;
+};
+
 const days = [
   { label: "Mon", value: 1 },
   { label: "Tue", value: 2 },
@@ -104,7 +184,7 @@ const currentYear = new Date().getFullYear();
 const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
 export function ReviewsPage() {
-  const [tab, setTab] = useState<"availability" | "schedule" | "form">("availability");
+  const [tab, setTab] = useState<"availability" | "schedule" | "form" | "attendance">("availability");
   const [resolvedSemester, setResolvedSemester] = useState<Semester | null>(null);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [weekStart, setWeekStart] = useState(toDateInput(getMonday(new Date())));
@@ -116,6 +196,12 @@ export function ReviewsPage() {
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [isSaving, setIsSaving] = useState(false);
   const [availabilityAction, setAvailabilityAction] = useState<"saving" | "submitting" | null>(null);
+  const [attendanceSessionId, setAttendanceSessionId] = useState<number | null>(null);
+  const [attendanceData, setAttendanceData] = useState<AttendanceResponse | null>(null);
+  const [attendanceEdits, setAttendanceEdits] = useState<Map<number, { isPresent: boolean; note: string }>>(new Map());
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
 
   const selectedSemesterId = resolvedSemester?.id ?? 0;
   const isAvailabilityBusy = availabilityAction !== null;
@@ -363,10 +449,11 @@ export function ReviewsPage() {
         <span className="badge">{statusMessage}</span>
       </div>
 
-      <div className="segmented-tabs">
+      <div className="segmented-tabs" style={{ gridTemplateColumns: "repeat(4, minmax(130px, 1fr))" }}>
         <button className={tab === "availability" ? "active" : ""} onClick={() => setTab("availability")}>Dang ky slot</button>
         <button className={tab === "schedule" ? "active" : ""} onClick={() => setTab("schedule")}>Lich cua toi</button>
         <button className={tab === "form" ? "active" : ""} onClick={() => setTab("form")}>Form review</button>
+        <button className={tab === "attendance" ? "active" : ""} onClick={() => setTab("attendance")}>Điểm danh</button>
       </div>
 
       {tab === "availability" && (
@@ -412,14 +499,9 @@ export function ReviewsPage() {
           </div>
 
           <div className="availability-table" aria-label="Review availability slots">
-            <span className="slot-corner">
-              <small>Slot</small>
-            </span>
+            <span className="slot-corner"><small>Slot</small></span>
             {weekDays.map((day) => (
-              <strong key={day.value}>
-                <span>{day.label}</span>
-                <small>{day.dateLabel}</small>
-              </strong>
+              <strong key={day.value}><span>{day.label}</span><small>{day.dateLabel}</small></strong>
             ))}
             {slots.map((slot) => (
               <div className="slot-row-fragment" key={slot.value}>
@@ -427,12 +509,7 @@ export function ReviewsPage() {
                 {weekDays.map((day) => {
                   const checked = selectedSlotKeys.has(slotKey(day.value, slot.value));
                   return (
-                    <button
-                      key={day.value}
-                      className={checked ? "slot-cell selected" : "slot-cell"}
-                      onClick={() => toggleAvailability(day.value, slot.value)}
-                      type="button"
-                    >
+                    <button key={day.value} className={checked ? "slot-cell selected" : "slot-cell"} onClick={() => toggleAvailability(day.value, slot.value)} type="button">
                       {checked ? "Available" : "-"}
                     </button>
                   );
@@ -521,12 +598,7 @@ export function ReviewsPage() {
                       <div className="answer-group">
                         {(["Yes", "No", "NotApplicable"] as ReviewChecklistAnswer[]).map((answer) => (
                           <label key={answer} className="radio-chip">
-                            <input
-                              type="radio"
-                              name={item.itemKey}
-                              checked={item.answer === answer}
-                              onChange={() => updateItem(item.itemKey, { answer })}
-                            />
+                            <input type="radio" name={item.itemKey} checked={item.answer === answer} onChange={() => updateItem(item.itemKey, { answer })} />
                             {answer === "NotApplicable" ? "N/A" : answer}
                           </label>
                         ))}
@@ -556,8 +628,154 @@ export function ReviewsPage() {
           )}
         </article>
       )}
+
+      {tab === "attendance" && (
+        <article className="panel review-form-panel">
+          {!attendanceSessionId && (
+            <>
+              <h3>Chọn session để điểm danh</h3>
+              {publishedSessions.length === 0 && <p className="muted">Chưa có session nào.</p>}
+              {publishedSessions.map((item) => (
+                <div key={item.submissionId} className="checklist-item" style={{ cursor: "pointer", marginBottom: 8 }}
+                  onClick={() => { setAttendanceSessionId(item.sessionId); void loadAttendance(item.sessionId); }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong>{item.code} - {item.groupCode}</strong>
+                    <span className="badge">{formatDate(item.sessionDate)} Slot {item.slot}</span>
+                  </div>
+                  <small className="muted">Phòng {item.room}</small>
+                </div>
+              ))}
+            </>
+          )}
+
+          {attendanceData && (
+            <>
+              <div className="panel-header">
+                <div>
+                  <h3>Điểm danh - {attendanceData.groupCode}</h3>
+                  <p className="muted">{attendanceData.sessionCode} | {formatDate(attendanceData.sessionDate)} | Slot {attendanceData.slot} | {attendanceData.room}</p>
+                </div>
+                <div className="button-row">
+                  <button className="secondary" onClick={() => { setAttendanceSessionId(null); setAttendanceData(null); }}>← Quay lại</button>
+                  <button className="primary" onClick={submitAttendance} disabled={isSubmittingAttendance}>
+                    {isSubmittingAttendance ? "Đang lưu..." : "Lưu điểm danh"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="attendance-list">
+                {attendanceData.students.map((student) => {
+                  const edit = attendanceEdits.get(student.studentId);
+                  const isPresent = edit?.isPresent ?? student.isPresent ?? false;
+                  const note = edit?.note ?? student.note ?? "";
+                  return (
+                    <div className="attendance-row" key={student.studentId}>
+                      <div className="student-info">
+                        <strong>{student.fullName}</strong>
+                        <small>{student.studentCode}</small>
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, color: isPresent ? "var(--success)" : "var(--danger)" }}>
+                        <input type="checkbox" className="attendance-checkbox" checked={isPresent}
+                          onChange={(e) => updateAttendanceEdit(student.studentId, e.target.checked, note)} />
+                        {isPresent ? "Có mặt" : "Vắng"}
+                      </label>
+                      <span className={isPresent ? "tag" : "live"}>{isPresent ? "✅" : "❌"}</span>
+                      <input className="attendance-note" value={note}
+                        onChange={(e) => updateAttendanceEdit(student.studentId, isPresent, e.target.value)}
+                        placeholder="Ghi chú..." />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 24 }}>
+                <h4>Comments cho nhóm</h4>
+                <div className="comment-thread">
+                  {comments.length === 0 && <p className="muted">Chưa có comment nào.</p>}
+                  {comments.map((c) => (
+                    <div className="comment-bubble" key={c.id}>
+                      <div className="comment-meta">
+                        <strong>{c.authorName}</strong>
+                        <small>{new Date(c.createdAt).toLocaleString()}</small>
+                      </div>
+                      <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{c.content}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="comment-input-row">
+                  <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Nhập comment cho nhóm..." rows={2} />
+                  <button className="primary" onClick={addComment} disabled={!newComment.trim()}>Gửi</button>
+                </div>
+              </div>
+            </>
+          )}
+        </article>
+      )}
     </section>
   );
+
+  async function loadAttendance(sessionId: number) {
+    try {
+      const [attRes, commentsRes] = await Promise.all([
+        apiClient.get<AttendanceResponse>(`/review-attendance/${sessionId}`),
+        apiClient.get<CommentItem[]>(`/review-attendance/${sessionId}/comments`),
+      ]);
+      setAttendanceData(attRes.data);
+      setComments(commentsRes.data);
+      setAttendanceEdits(new Map());
+      setStatusMessage(`Loaded attendance for ${attRes.data.groupCode}`);
+    } catch {
+      setStatusMessage("Cannot load attendance.");
+    }
+  }
+
+  function updateAttendanceEdit(studentId: number, isPresent: boolean, note: string) {
+    setAttendanceEdits((prev) => {
+      const next = new Map(prev);
+      next.set(studentId, { isPresent, note });
+      return next;
+    });
+  }
+
+  async function submitAttendance() {
+    if (!attendanceData) return;
+    setIsSubmittingAttendance(true);
+    try {
+      const entries = attendanceData.students.map((s) => {
+        const edit = attendanceEdits.get(s.studentId);
+        return {
+          studentId: s.studentId,
+          isPresent: edit?.isPresent ?? s.isPresent ?? false,
+          note: edit?.note ?? s.note ?? "",
+        };
+      });
+      const response = await apiClient.post<AttendanceResponse>(
+        `/review-attendance/${attendanceData.sessionId}`,
+        { entries },
+      );
+      setAttendanceData(response.data);
+      setAttendanceEdits(new Map());
+      setStatusMessage(`Attendance saved for ${response.data.groupCode}`);
+    } catch {
+      setStatusMessage("Error saving attendance.");
+    } finally {
+      setIsSubmittingAttendance(false);
+    }
+  }
+
+  async function addComment() {
+    if (!attendanceData || !newComment.trim()) return;
+    try {
+      const response = await apiClient.post<CommentItem>(
+        `/review-attendance/${attendanceData.sessionId}/comments`,
+        { content: newComment.trim() },
+      );
+      setComments((prev) => [...prev, response.data]);
+      setNewComment("");
+    } catch {
+      setStatusMessage("Error adding comment.");
+    }
+  }
 }
 
 function slotKey(dayOfWeek: number, slot: number) {

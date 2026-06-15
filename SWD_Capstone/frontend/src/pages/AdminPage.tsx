@@ -31,7 +31,6 @@ export function AdminPage() {
   const [fullName, setFullName] = useState("");
   const [department, setDepartment] = useState("");
   const [position, setPosition] = useState("");
-  const [classCode, setClassCode] = useState("");
   const [batch, setBatch] = useState("");
   const [major, setMajor] = useState("SE");
   const [message, setMessage] = useState<string | null>(null);
@@ -58,7 +57,7 @@ export function AdminPage() {
     event.preventDefault();
     setMessage(null);
 
-    const validationMessage = validateAccountForm(role, identityCode, email, password, fullName, department, classCode);
+    const validationMessage = validateAccountForm(role, identityCode, email, password, fullName, department);
     if (validationMessage) {
       setMessage(validationMessage);
       return;
@@ -78,7 +77,7 @@ export function AdminPage() {
         position: position.trim(),
         permissionScope: "System",
         isPartTime: false,
-        classCode: classCode.trim(),
+        classCode: null,
         batch: batch.trim(),
         major: major.trim(),
       });
@@ -89,7 +88,6 @@ export function AdminPage() {
       setFullName("");
       setDepartment("");
       setPosition("");
-      setClassCode("");
       setBatch("");
       setMajor("SE");
       await loadAccounts();
@@ -149,7 +147,6 @@ export function AdminPage() {
             )}
             {role === "Student" && (
               <>
-                <label>{t.classCode}<input value={classCode} onChange={(event) => setClassCode(event.target.value)} placeholder="SE1901" required /></label>
                 <label>{t.batchName}<input value={batch} onChange={(event) => setBatch(event.target.value)} placeholder="K19" /></label>
                 <label>{t.major}<input value={major} onChange={(event) => setMajor(event.target.value)} placeholder="SE" /></label>
               </>
@@ -211,7 +208,6 @@ function validateAccountForm(
   password: string,
   fullName: string,
   department: string,
-  classCode: string,
 ) {
   if (!identityCode.trim() || !email.trim() || !password) {
     return "Thiếu mã đăng nhập, email hoặc mật khẩu.";
@@ -227,10 +223,6 @@ function validateAccountForm(
 
   if (role === "TrainingDepartment" && !department.trim()) {
     return "Thiếu bộ môn.";
-  }
-
-  if (role === "Student" && !classCode.trim()) {
-    return "Sinh viên bắt buộc nhập mã lớp.";
   }
 
   return null;
@@ -256,7 +248,6 @@ function getAccountCreateError(error: unknown, fallback: string) {
     "Full name is required for lecturers.": "Giảng viên bắt buộc nhập họ tên.",
     "Department is required for lecturers.": "Giảng viên bắt buộc nhập bộ môn.",
     "Full name is required for students.": "Sinh viên bắt buộc nhập họ tên.",
-    "Class code is required for students.": "Sinh viên bắt buộc nhập mã lớp.",
   };
 
   return knownMessages[apiError] ?? apiError;

@@ -4,6 +4,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 
 type ReviewType = "Review1" | "Review2" | "Review3";
 type ReviewSessionStatus = "Draft" | "Published" | "Cancelled";
+type ReviewRoundStatus = "Draft" | "Open" | "Closed" | "Published";
 
 type Semester = {
   id: number;
@@ -70,6 +71,19 @@ type SchedulingBoard = {
   sessions: BoardSession[];
 };
 
+type ReviewRound = {
+  id: number;
+  semesterId: number;
+  type: ReviewType;
+  status: ReviewRoundStatus;
+  weekStartDate: string;
+  weekEndDate: string;
+  createdAt: string;
+  openedAt: string | null;
+  closedAt: string | null;
+  registrationCount: number;
+};
+
 type RandomAssignResponse = {
   totalCandidateGroups: number;
   assignedCount: number;
@@ -117,6 +131,7 @@ export function TrainingDepartmentPage() {
   const [weekStart, setWeekStart] = useState(toDateInput(getMonday(new Date())));
   const [board, setBoard] = useState<SchedulingBoard | null>(null);
   const [message, setMessage] = useState("Ready");
+  const [rounds, setRounds] = useState<ReviewRound[]>([]);
   const [code, setCode] = useState("");
   const [groupId, setGroupId] = useState<number | "">("");
   const [reviewer1Id, setReviewer1Id] = useState<number | "">("");
@@ -165,6 +180,48 @@ export function TrainingDepartmentPage() {
 
     void loadBoard();
   }, [loadBoard, selectedSemesterId]);
+
+  useEffect(() => {
+    if (selectedSemesterId) {
+      void loadRounds();
+    }
+  }, [selectedSemesterId]);
+
+  async function loadRounds() {
+    try {
+      const response = await apiClient.get<ReviewRound[]>("/review-scheduling/rounds", {
+        params: { semesterId: selectedSemesterId },
+      });
+      setRounds(response.data);
+    } catch {
+      setRounds([]);
+    }
+  }
+
+  async function createRound() {
+    if (!selectedSemesterId) return;
+    try {
+      await apiClient.post("/review-scheduling/rounds", {
+        semesterId: selectedSemesterId,
+        reviewType: reviewType,
+        weekStartDate: weekStart,
+      });
+      setMessage("Review round created.");
+      await loadRounds();
+    } catch {
+      setMessage("Failed to create review round.");
+    }
+  }
+
+  async function updateRoundStatus(roundId: number, status: ReviewRoundStatus) {
+    try {
+      await apiClient.patch(`/review-scheduling/rounds/${roundId}/status`, { status });
+      setMessage(`Round updated to ${status}.`);
+      await loadRounds();
+    } catch {
+      setMessage("Failed to update round status.");
+    }
+  }
 
   async function resolveSemester(nextWeekStart: string) {
     try {
@@ -292,6 +349,47 @@ export function TrainingDepartmentPage() {
           </label>
           <button className="secondary align-end" onClick={loadBoard} disabled={!selectedSemesterId}>Refresh board</button>
         </div>
+      </article>
+
+      {/* Review Rounds Management */}
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Review Rounds</h3>
+          <button className="primary" onClick={createRound} disabled={!selectedSemesterId}>
+            + Tạo đợt review {reviewType}
+          </button>
+        </div>
+        {rounds.length === 0 && <p className="muted">Chưa có đợt review nào cho semester này.</p>}
+        {rounds.map((round) => (
+          <div className="round-card" key={round.id}>
+            <div className="round-card-header">
+              <div className="round-info">
+                <strong>{round.type} | {round.weekStartDate} – {round.weekEndDate}</strong>
+                <small className="muted">
+                  {round.registrationCount} nhóm đã đăng ký
+                  {round.openedAt && ` | Mở: ${new Date(round.openedAt).toLocaleDateString()}`}
+                  {round.closedAt && ` | Đóng: ${new Date(round.closedAt).toLocaleDateString()}`}
+                </small>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span className={round.status === "Open" ? "tag" : round.status === "Closed" ? "live" : "badge"}>
+                  {round.status}
+                </span>
+                <div className="round-card-actions">
+                  {round.status === "Draft" && (
+                    <button className="primary" onClick={() => updateRoundStatus(round.id, "Open" as ReviewRoundStatus)}>Mở đăng ký</button>
+                  )}
+                  {round.status === "Open" && (
+                    <button className="danger" onClick={() => updateRoundStatus(round.id, "Closed" as ReviewRoundStatus)}>Đóng đăng ký</button>
+                  )}
+                  {round.status === "Closed" && (
+                    <button className="secondary" onClick={() => updateRoundStatus(round.id, "Published" as ReviewRoundStatus)}>Publish</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </article>
 
       <div className="dashboard-grid">
