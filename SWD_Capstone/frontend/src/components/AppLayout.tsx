@@ -85,6 +85,7 @@ function getNavigation(role: string | null, t: ReturnType<typeof useLanguage>["t
     return [
       { to: "/admin", label: t.admin, icon: "users" },
       { to: "/training", label: t.training, icon: "calendar" },
+      { to: "/semesters", label: t.semesters, icon: "semester" },
     ];
   }
 
