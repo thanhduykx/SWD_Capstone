@@ -50,58 +50,6 @@ type ReviewSubmissionItem = {
   label: string;
   description?: string | null;
   priority?: string | null;
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { isAxiosError } from "axios";
-import { apiClient } from "../api/client";
-import type { ChangeEvent } from "react";
-
-type ReviewType = "Review1" | "Review2" | "Review3";
-type ReviewSessionStatus = "Draft" | "Published" | "Cancelled";
-type ReviewSubmissionStatus = "Draft" | "Submitted";
-type ReviewChecklistAnswer = "Yes" | "No" | "NotApplicable";
-
-type Semester = {
-  id: number;
-  code: string;
-  name: string;
-  academicYear: string;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-};
-
-type AvailabilitySlot = {
-  dayOfWeek: number;
-  slot: number;
-};
-
-type AvailabilityWeek = {
-  semesterId: number;
-  weekStart: string;
-  isSubmitted: boolean;
-  submittedAt?: string | null;
-  slots: AvailabilitySlot[];
-};
-
-type MyReviewSession = {
-  sessionId: number;
-  submissionId: number;
-  code: string;
-  type: ReviewType;
-  sessionStatus: ReviewSessionStatus;
-  groupCode: string;
-  sessionDate: string;
-  slot: number;
-  room: string;
-  submissionStatus: ReviewSubmissionStatus;
-  lastSavedAt: string;
-};
-
-type ReviewSubmissionItem = {
-  itemKey: string;
-  label: string;
-  description?: string | null;
-  priority?: string | null;
   isSection: boolean;
   criteriaCode?: string | null;
   answer?: ReviewChecklistAnswer | null;
