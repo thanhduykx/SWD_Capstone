@@ -83,6 +83,10 @@ export function getHomePathForRole(role: UserRole | null) {
     return "/admin";
   }
 
+  if (role === "Student") {
+    return "/student";
+  }
+
   return "/";
 }
 

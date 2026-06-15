@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
@@ -406,6 +407,152 @@ public sealed class ReviewSchedulingController(
 
         return items;
     }
+
+    [HttpGet("rounds")]
+    public async Task<IReadOnlyList<ReviewRoundManagementResponse>> GetRounds(
+        int semesterId,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.ReviewRounds
+            .Where(x => x.SemesterId == semesterId)
+            .OrderByDescending(x => x.WeekStartDate)
+            .Select(x => new ReviewRoundManagementResponse(
+                x.Id,
+                x.SemesterId,
+                x.Type,
+                x.Status,
+                x.WeekStartDate,
+                x.WeekEndDate,
+                x.CreatedAt,
+                x.OpenedAt,
+                x.ClosedAt,
+                dbContext.StudentSlotRegistrations.Count(r => r.ReviewRoundId == x.Id)))
+            .ToListAsync(cancellationToken);
+    }
+
+    [HttpPost("rounds")]
+    public async Task<ActionResult<ReviewRoundManagementResponse>> CreateRound(
+        CreateReviewRoundRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var semester = await dbContext.Semesters.SingleOrDefaultAsync(x => x.Id == request.SemesterId, cancellationToken);
+        if (semester is null)
+        {
+            return BadRequest(new { error = "Semester does not exist." });
+        }
+
+        var moderatorId = await CurrentModeratorIdAsync(cancellationToken);
+        if (moderatorId is null)
+        {
+            return Forbid();
+        }
+
+        var weekStart = NormalizeWeekStart(request.WeekStartDate);
+        var weekEnd = weekStart.AddDays(5); // Mon-Sat
+
+        var exists = await dbContext.ReviewRounds.AnyAsync(x =>
+            x.SemesterId == request.SemesterId &&
+            x.Type == request.ReviewType &&
+            x.WeekStartDate == weekStart, cancellationToken);
+        if (exists)
+        {
+            return BadRequest(new { error = "A review round already exists for this semester, type, and week." });
+        }
+
+        var round = new ReviewRound
+        {
+            SemesterId = request.SemesterId,
+            Type = request.ReviewType,
+            WeekStartDate = weekStart,
+            WeekEndDate = weekEnd,
+            Status = ReviewRoundStatus.Draft,
+            CreatedByModeratorId = moderatorId.Value
+        };
+
+        dbContext.ReviewRounds.Add(round);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new ReviewRoundManagementResponse(
+            round.Id, round.SemesterId, round.Type, round.Status,
+            round.WeekStartDate, round.WeekEndDate,
+            round.CreatedAt, round.OpenedAt, round.ClosedAt, 0));
+    }
+
+    [HttpPatch("rounds/{roundId:int}/status")]
+    public async Task<ActionResult<ReviewRoundManagementResponse>> UpdateRoundStatus(
+        int roundId,
+        UpdateRoundStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x => x.Id == roundId, cancellationToken);
+        if (round is null)
+        {
+            return NotFound(new { error = "Review round not found." });
+        }
+
+        round.Status = request.Status;
+        if (request.Status == ReviewRoundStatus.Open && round.OpenedAt is null)
+        {
+            round.OpenedAt = DateTime.UtcNow;
+        }
+
+        if (request.Status == ReviewRoundStatus.Closed)
+        {
+            round.ClosedAt = DateTime.UtcNow;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var registrationCount = await dbContext.StudentSlotRegistrations
+            .CountAsync(r => r.ReviewRoundId == roundId, cancellationToken);
+
+        return Ok(new ReviewRoundManagementResponse(
+            round.Id, round.SemesterId, round.Type, round.Status,
+            round.WeekStartDate, round.WeekEndDate,
+            round.CreatedAt, round.OpenedAt, round.ClosedAt,
+            registrationCount));
+    }
+
+    [HttpGet("student-registrations")]
+    public async Task<IReadOnlyList<StudentSlotRegistrationResponse>> GetStudentRegistrations(
+        int roundId,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == roundId)
+            .OrderBy(x => x.DayOfWeek)
+            .ThenBy(x => x.Slot)
+            .Select(x => new StudentSlotRegistrationResponse(
+                x.Id,
+                x.GroupId,
+                dbContext.CapstoneGroups.Where(g => g.Id == x.GroupId).Select(g => g.Code).Single(),
+                x.DayOfWeek,
+                x.Slot))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<int?> CurrentModeratorIdAsync(CancellationToken cancellationToken)
+    {
+        var userId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0",
+            CultureInfo.InvariantCulture);
+        var moderatorId = await dbContext.TrainingDepartments
+            .Where(x => x.UserId == userId)
+            .Select(x => (int?)x.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (moderatorId is null && User.IsInRole(nameof(UserRole.SystemAdministrator)))
+        {
+            moderatorId = await dbContext.TrainingDepartments
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        return moderatorId;
+    }
 }
 
 public sealed record ReviewSchedulingBoardResponse(
@@ -478,3 +625,22 @@ public sealed record RandomAssignUnassignedGroupResponse(
 internal sealed record AvailabilityCandidate(int LecturerId, int DayOfWeek, int Slot);
 
 internal sealed record RandomAssignGroupCandidate(int Id, string Code, int SupervisorId);
+
+public sealed record ReviewRoundManagementResponse(
+    int Id,
+    int SemesterId,
+    ReviewType Type,
+    ReviewRoundStatus Status,
+    DateOnly WeekStartDate,
+    DateOnly WeekEndDate,
+    DateTime CreatedAt,
+    DateTime? OpenedAt,
+    DateTime? ClosedAt,
+    int RegistrationCount);
+
+public sealed record CreateReviewRoundRequest(
+    int SemesterId,
+    ReviewType ReviewType,
+    DateOnly WeekStartDate);
+
+public sealed record UpdateRoundStatusRequest(ReviewRoundStatus Status);

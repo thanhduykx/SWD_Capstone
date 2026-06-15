@@ -288,7 +288,7 @@ Field bắt buộc theo role:
 | --- | --- | --- |
 | `Lecturer` | `identityCode`, `email`, `password`, `fullName` | `department`, `isPartTime` |
 | `TrainingDepartment` | `identityCode`, `email`, `password`, `fullName` | `department`, `position` |
-| `Student` | `identityCode`, `email`, `password`, `fullName`, `classCode` | `batch`, `major` |
+| `Student` | `identityCode`, `email`, `password`, `fullName` | `batch`, `major`, `classCode` |
 
 Ví dụ tạo Lecturer không bộ môn:
 

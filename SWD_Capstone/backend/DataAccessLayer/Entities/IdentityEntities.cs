@@ -47,6 +47,7 @@ public sealed class Student
     public string? Batch { get; set; }
     public required string Major { get; set; }
     public int? GroupId { get; set; }
+    public bool IsLeader { get; set; }
 }
 
 public sealed class TrainingDepartment

@@ -42,6 +42,10 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<GroupResult> GroupResults => Set<GroupResult>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<ReviewRound> ReviewRounds => Set<ReviewRound>();
+    public DbSet<StudentSlotRegistration> StudentSlotRegistrations => Set<StudentSlotRegistration>();
+    public DbSet<ReviewAttendance> ReviewAttendances => Set<ReviewAttendance>();
+    public DbSet<ReviewComment> ReviewComments => Set<ReviewComment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -372,6 +376,45 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.FinalResult).HasConversion<string>();
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReviewRound>(entity =>
+        {
+            entity.ToTable("review_rounds");
+            entity.HasIndex(x => new { x.SemesterId, x.Type, x.WeekStartDate }).IsUnique();
+            entity.Property(x => x.Type).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewRoundStatus.Draft);
+            entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.CreatedByModeratorId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<StudentSlotRegistration>(entity =>
+        {
+            entity.ToTable("student_slot_registrations", table =>
+            {
+                table.HasCheckConstraint("ck_student_slot_registrations_day_of_week", "day_of_week BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_student_slot_registrations_slot", "slot BETWEEN 1 AND 5");
+            });
+            entity.HasIndex(x => new { x.ReviewRoundId, x.GroupId }).IsUnique();
+            entity.HasIndex(x => new { x.ReviewRoundId, x.DayOfWeek, x.Slot });
+            entity.HasOne<ReviewRound>().WithMany().HasForeignKey(x => x.ReviewRoundId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Student>().WithMany().HasForeignKey(x => x.RegisteredByStudentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewAttendance>(entity =>
+        {
+            entity.ToTable("review_attendances");
+            entity.HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.MarkedByLecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewComment>(entity =>
+        {
+            entity.ToTable("review_comments");
+            entity.HasIndex(x => new { x.SessionId, x.GroupId });
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

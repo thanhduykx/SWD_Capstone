@@ -1121,6 +1121,55 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewAttendance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsPresent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_present");
+
+                    b.Property<DateTime>("MarkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("marked_at");
+
+                    b.Property<int>("MarkedByLecturerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("marked_by_lecturer_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("session_id");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("student_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_attendances");
+
+                    b.HasIndex("MarkedByLecturerId")
+                        .HasDatabaseName("ix_review_attendances_marked_by_lecturer_id");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("ix_review_attendances_student_id");
+
+                    b.HasIndex("SessionId", "StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_review_attendances_session_id_student_id");
+
+                    b.ToTable("review_attendances", (string)null);
+                });
+
             modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailability", b =>
                 {
                     b.Property<int>("Id")
@@ -1337,6 +1386,117 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasDatabaseName("ix_review_checklist_submissions_session_id_reviewer_id");
 
                     b.ToTable("review_checklist_submissions", (string)null);
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("author_user_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_comments");
+
+                    b.HasIndex("AuthorUserId")
+                        .HasDatabaseName("ix_review_comments_author_user_id");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_review_comments_group_id");
+
+                    b.HasIndex("SessionId", "GroupId")
+                        .HasDatabaseName("ix_review_comments_session_id_group_id");
+
+                    b.ToTable("review_comments", (string)null);
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewRound", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CreatedByModeratorId")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by_moderator_id");
+
+                    b.Property<DateTime?>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
+                    b.Property<int>("SemesterId")
+                        .HasColumnType("integer")
+                        .HasColumnName("semester_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("week_end_date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("week_start_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_rounds");
+
+                    b.HasIndex("CreatedByModeratorId")
+                        .HasDatabaseName("ix_review_rounds_created_by_moderator_id");
+
+                    b.HasIndex("SemesterId", "Type", "WeekStartDate")
+                        .IsUnique()
+                        .HasDatabaseName("ix_review_rounds_semester_id_type_week_start_date");
+
+                    b.ToTable("review_rounds", (string)null);
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.ReviewSchedulePublication", b =>
@@ -1756,6 +1916,10 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("group_id");
 
+                    b.Property<bool>("IsLeader")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_leader");
+
                     b.Property<string>("Major")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1780,6 +1944,63 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasDatabaseName("ix_students_user_id");
 
                     b.ToTable("students", (string)null);
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.StudentSlotRegistration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("day_of_week");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
+                    b.Property<int>("RegisteredByStudentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("registered_by_student_id");
+
+                    b.Property<int>("ReviewRoundId")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_round_id");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("integer")
+                        .HasColumnName("slot");
+
+                    b.HasKey("Id")
+                        .HasName("pk_student_slot_registrations");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_student_slot_registrations_group_id");
+
+                    b.HasIndex("RegisteredByStudentId")
+                        .HasDatabaseName("ix_student_slot_registrations_registered_by_student_id");
+
+                    b.HasIndex("ReviewRoundId", "GroupId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_student_slot_registrations_review_round_id_group_id");
+
+                    b.HasIndex("ReviewRoundId", "DayOfWeek", "Slot")
+                        .HasDatabaseName("ix_student_slot_registrations_review_round_id_day_of_week_slot");
+
+                    b.ToTable("student_slot_registrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_student_slot_registrations_day_of_week", "day_of_week BETWEEN 1 AND 6");
+
+                            t.HasCheckConstraint("ck_student_slot_registrations_slot", "slot BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.Syllabus", b =>
@@ -2381,6 +2602,30 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasConstraintName("fk_refresh_tokens_users_user_id");
                 });
 
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewAttendance", b =>
+                {
+                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("MarkedByLecturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_attendances_lecturers_marked_by_lecturer_id");
+
+                    b.HasOne("CPMS.Core.Entities.ReviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_attendances_review_sessions_session_id");
+
+                    b.HasOne("CPMS.Core.Entities.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_attendances_students_student_id");
+                });
+
             modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailability", b =>
                 {
                     b.HasOne("CPMS.Core.Entities.Lecturer", null)
@@ -2447,6 +2692,47 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_review_checklist_submissions_review_sessions_session_id");
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewComment", b =>
+                {
+                    b.HasOne("CPMS.Core.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_comments_users_author_user_id");
+
+                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_comments_capstone_groups_group_id");
+
+                    b.HasOne("CPMS.Core.Entities.ReviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_comments_review_sessions_session_id");
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.ReviewRound", b =>
+                {
+                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByModeratorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_rounds_training_departments_created_by_moderator_id");
+
+                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                        .WithMany()
+                        .HasForeignKey("SemesterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_rounds_semesters_semester_id");
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.ReviewSchedulePublication", b =>
@@ -2586,6 +2872,30 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_students_users_user_id");
+                });
+
+            modelBuilder.Entity("CPMS.Core.Entities.StudentSlotRegistration", b =>
+                {
+                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_student_slot_registrations_capstone_groups_group_id");
+
+                    b.HasOne("CPMS.Core.Entities.Student", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredByStudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_student_slot_registrations_students_registered_by_student_id");
+
+                    b.HasOne("CPMS.Core.Entities.ReviewRound", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewRoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_student_slot_registrations_review_rounds_review_round_id");
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.Syllabus", b =>
