@@ -81,6 +81,10 @@ const dictionaries = {
     active: "Hoạt động",
     inactive: "Khóa",
     noAccounts: "Chưa có tài khoản.",
+    edit: "Sửa",
+    save: "Lưu",
+    cancel: "Hủy",
+    actions: "Hành động",
 
     trainingTitle: "Phòng đào tạo",
     trainingSubtitle: "Quản lý học kỳ, import Excel chính thức, lịch review và chuẩn bị hội đồng bảo vệ.",
@@ -210,6 +214,10 @@ const dictionaries = {
     active: "Active",
     inactive: "Inactive",
     noAccounts: "No accounts found.",
+    edit: "Edit",
+    save: "Save",
+    cancel: "Cancel",
+    actions: "Actions",
 
     trainingTitle: "Training Department",
     trainingSubtitle: "Operate semester setup, official Excel import, review scheduling and defense preparation.",

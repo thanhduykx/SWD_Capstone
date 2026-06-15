@@ -540,10 +540,18 @@ public sealed class ReviewSchedulingController(
         var userId = int.Parse(
             User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0",
             CultureInfo.InvariantCulture);
-        return await dbContext.TrainingDepartments
+        var moderatorId = await dbContext.TrainingDepartments
             .Where(x => x.UserId == userId)
             .Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(cancellationToken);
+
+        if (moderatorId is null && User.IsInRole(nameof(UserRole.SystemAdministrator)))
+        {
+            moderatorId = await dbContext.TrainingDepartments
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        return moderatorId;
     }
 }
 

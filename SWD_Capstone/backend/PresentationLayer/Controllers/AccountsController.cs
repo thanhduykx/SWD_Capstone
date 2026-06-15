@@ -153,6 +153,131 @@ public sealed class AccountsController(
             user.LockedUntil));
     }
 
+    [HttpPatch("{userId:int}/role")]
+    public async Task<ActionResult<AccountResponse>> UpdateRole(
+        int userId,
+        UpdateAccountRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var oldRole = user.Role;
+        var newRole = request.Role;
+
+        if (oldRole != newRole)
+        {
+            user.Role = newRole;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            // Resolve name and identity code from existing profiles to populate the new profile if needed
+            string fullName = user.Username;
+            string identityCode = user.Username;
+
+            var student = await dbContext.Students.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (student != null)
+            {
+                fullName = student.FullName;
+                identityCode = student.Code;
+            }
+            else
+            {
+                var lecturer = await dbContext.Lecturers.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+                if (lecturer != null)
+                {
+                    fullName = lecturer.FullName;
+                    identityCode = lecturer.Code;
+                }
+            }
+
+            if (newRole == UserRole.Student)
+            {
+                var exists = await dbContext.Students.AnyAsync(x => x.UserId == userId, cancellationToken);
+                if (!exists)
+                {
+                    dbContext.Students.Add(new Student
+                    {
+                        UserId = userId,
+                        Code = identityCode,
+                        FullName = fullName,
+                        ClassCode = "SE",
+                        Major = "SE"
+                    });
+                }
+            }
+            else if (newRole == UserRole.Lecturer)
+            {
+                var exists = await dbContext.Lecturers.AnyAsync(x => x.UserId == userId, cancellationToken);
+                if (!exists)
+                {
+                    dbContext.Lecturers.Add(new Lecturer
+                    {
+                        UserId = userId,
+                        Code = identityCode,
+                        FullName = fullName,
+                        Department = "General",
+                        IsPartTime = false
+                    });
+                }
+            }
+            else if (newRole == UserRole.TrainingDepartment)
+            {
+                var exists = await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == userId, cancellationToken);
+                if (!exists)
+                {
+                    dbContext.TrainingDepartments.Add(new TrainingDepartment
+                    {
+                        UserId = userId,
+                        DepartmentName = "Training Department",
+                        StaffCode = identityCode,
+                        Position = "Moderator"
+                    });
+                }
+            }
+            else if (newRole == UserRole.SystemAdministrator)
+            {
+                var exists = await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == userId, cancellationToken);
+                if (!exists)
+                {
+                    dbContext.SystemAdministrators.Add(new SystemAdministrator
+                    {
+                        UserId = userId,
+                        AdminLevel = "Admin",
+                        PermissionScope = "System"
+                    });
+                }
+            }
+
+            dbContext.AuditLogs.Add(new AuditLog
+            {
+                UserId = CurrentUserId(),
+                Action = "UPDATE_ACCOUNT_ROLE",
+                EntityType = nameof(User),
+                EntityId = user.Id,
+                OldValue = oldRole.ToString(),
+                NewValue = newRole.ToString(),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new AccountResponse(
+            user.Id,
+            user.Username,
+            user.Email,
+            user.Role,
+            user.IsActive,
+            user.LastLoginAt,
+            user.LockedUntil));
+    }
+
     private void AddRoleProfile(int userId, CreateAccountRequest request)
     {
         switch (request.Role)
@@ -368,6 +493,8 @@ public sealed record CreateAccountRequest(
     string? Major);
 
 public sealed record UpdateAccountStatusRequest(bool IsActive, bool Unlock);
+
+public sealed record UpdateAccountRoleRequest(UserRole Role);
 
 public sealed record AccountCreatedResponse(
     int Id,
