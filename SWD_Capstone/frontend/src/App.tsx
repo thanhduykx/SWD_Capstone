@@ -34,10 +34,14 @@ export function App() {
           <Route path="/student/schedule" element={<StudentSchedulePage />} />
         </Route>
       </Route>
+      <Route element={<RequireAuth allowedRoles={["Lecturer", "TrainingDepartment", "SystemAdministrator"]} />}>
+        <Route element={<AppLayout />}>
+          <Route path="/semesters" element={<SemestersPage />} />
+        </Route>
+      </Route>
       <Route element={<RequireAuth allowedRoles={["Lecturer"]} />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
-          <Route path="/semesters" element={<SemestersPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/defense" element={<DefensePage />} />
           <Route path="/documents" element={<DocumentsPage />} />

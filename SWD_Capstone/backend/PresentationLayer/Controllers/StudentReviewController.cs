@@ -297,21 +297,10 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                 ?? throw new UnauthorizedAccessException("Missing user identifier."),
             CultureInfo.InvariantCulture);
 
-    private async Task<bool> IsGroupLeaderAsync(Student student, CancellationToken cancellationToken)
+    private static async Task<bool> IsGroupLeaderAsync(Student student, CancellationToken cancellationToken)
     {
-        if (!student.GroupId.HasValue)
-        {
-            return false;
-        }
-
-        // Group leader is the first student (by code) in the group
-        var firstStudentId = await dbContext.Students
-            .Where(x => x.GroupId == student.GroupId.Value)
-            .OrderBy(x => x.Code)
-            .Select(x => x.Id)
-            .FirstAsync(cancellationToken);
-
-        return firstStudentId == student.Id;
+        await Task.CompletedTask;
+        return student.IsLeader;
     }
 }
 

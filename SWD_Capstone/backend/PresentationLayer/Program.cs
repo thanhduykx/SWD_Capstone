@@ -28,6 +28,7 @@ builder.Services.AddDbContext<CpmsDbContext>(options =>
 builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddScoped<DefenseScoringService>();
 builder.Services.AddScoped<SemesterResolverService>();
+builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddSingleton<ReviewChecklistTemplateService>();
 builder.Services.AddScoped<IReviewEmailSender, SmtpReviewEmailSender>();
 builder.Services.AddScoped<ReviewAssignmentEmailNotifier>();
@@ -186,7 +187,8 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
         await dbContext.Database.MigrateAsync();
-        await SeedAdminAccountAsync(app, dbContext);
+        await Program.SeedAdminAccountAsync(app.Configuration, dbContext);
+        await Program.SeedModeratorAccountAsync(dbContext);
 
         // Business data must come from official import/admin flows. Admin seeding is opt-in for deployments.
     }
@@ -198,77 +200,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     }
 }
 
-static async Task SeedAdminAccountAsync(WebApplication app, CpmsDbContext dbContext)
-{
-    var configuration = app.Configuration;
-    if (!configuration.GetValue<bool>("AdminSeed:Enabled"))
-    {
-        return;
-    }
 
-    var username = configuration["AdminSeed:Username"]?.Trim();
-    var email = configuration["AdminSeed:Email"]?.Trim();
-    var password = configuration["AdminSeed:Password"];
-    if (string.IsNullOrWhiteSpace(username) ||
-        string.IsNullOrWhiteSpace(email) ||
-        string.IsNullOrWhiteSpace(password))
-    {
-        throw new InvalidOperationException(
-            "Admin seed is enabled, but AdminSeed:Username, AdminSeed:Email, or AdminSeed:Password is missing.");
-    }
-
-    await using var transaction = await dbContext.Database.BeginTransactionAsync();
-    var user = await dbContext.Users
-        .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
-
-    if (user is null)
-    {
-        user = new User
-        {
-            Username = username,
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
-            Role = UserRole.SystemAdministrator,
-            IsActive = true
-        };
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync();
-    }
-    else
-    {
-        user.Username = username;
-        user.Email = email;
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
-        user.Role = UserRole.SystemAdministrator;
-        user.IsActive = true;
-        user.LockedUntil = null;
-        user.FailedLoginAttempts = 0;
-        user.UpdatedAt = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync();
-    }
-
-    if (!await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == user.Id))
-    {
-        dbContext.SystemAdministrators.Add(new SystemAdministrator
-        {
-            UserId = user.Id,
-            AdminLevel = "Root",
-            PermissionScope = "System"
-        });
-    }
-
-    dbContext.AuditLogs.Add(new AuditLog
-    {
-        UserId = user.Id,
-        Action = "SEED_ADMIN_ACCOUNT",
-        EntityType = nameof(User),
-        EntityId = user.Id,
-        NewValue = user.Username,
-        UserAgent = "ApplicationStartup"
-    });
-    await dbContext.SaveChangesAsync();
-    await transaction.CommitAsync();
-}
 
 static string GetCpmsConnectionString(IConfiguration configuration)
 {
@@ -345,4 +277,138 @@ static string SwaggerOrderFor(ApiDescription apiDescription)
     return $"{tag}_{methodOrder}_{apiDescription.RelativePath}";
 }
 
-public partial class Program;
+
+
+public partial class Program
+{
+    public static async Task SeedAdminAccountAsync(IConfiguration configuration, CpmsDbContext dbContext)
+    {
+        if (!configuration.GetValue<bool>("AdminSeed:Enabled"))
+        {
+            return;
+        }
+
+        var username = configuration["AdminSeed:Username"]?.Trim();
+        var email = configuration["AdminSeed:Email"]?.Trim();
+        var password = configuration["AdminSeed:Password"];
+        if (string.IsNullOrWhiteSpace(username) ||
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(
+                "Admin seed is enabled, but AdminSeed:Username, AdminSeed:Email, or AdminSeed:Password is missing.");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var user = await dbContext.Users
+            .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Username = username,
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+                Role = UserRole.SystemAdministrator,
+                IsActive = true
+            };
+            dbContext.Users.Add(user);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            user.Username = username;
+            user.Email = email;
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+            user.Role = UserRole.SystemAdministrator;
+            user.IsActive = true;
+            user.LockedUntil = null;
+            user.FailedLoginAttempts = 0;
+            user.UpdatedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+        }
+
+        if (!await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == user.Id))
+        {
+            dbContext.SystemAdministrators.Add(new SystemAdministrator
+            {
+                UserId = user.Id,
+                AdminLevel = "Root",
+                PermissionScope = "System"
+            });
+        }
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id,
+            Action = "SEED_ADMIN_ACCOUNT",
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            NewValue = user.Username,
+            UserAgent = "ApplicationStartup"
+        });
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+    }
+
+    public static async Task SeedModeratorAccountAsync(CpmsDbContext dbContext)
+    {
+        var username = "Admin@gmail.com";
+        var email = "Admin@gmail.com";
+        var password = "12345";
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var user = await dbContext.Users
+            .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Username = username,
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+                Role = UserRole.TrainingDepartment,
+                IsActive = true
+            };
+            dbContext.Users.Add(user);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            user.Username = username;
+            user.Email = email;
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+            user.Role = UserRole.TrainingDepartment;
+            user.IsActive = true;
+            user.LockedUntil = null;
+            user.FailedLoginAttempts = 0;
+            user.UpdatedAt = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+        }
+
+        if (!await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == user.Id))
+        {
+            dbContext.TrainingDepartments.Add(new TrainingDepartment
+            {
+                UserId = user.Id,
+                DepartmentName = "Training Department",
+                StaffCode = "TD001",
+                Position = "Moderator"
+            });
+        }
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            UserId = user.Id,
+            Action = "SEED_MODERATOR_ACCOUNT",
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            NewValue = user.Username,
+            UserAgent = "ApplicationStartup"
+        });
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+    }
+}

@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 const controls = [
   "Import official group, student, supervisor and council lists before operating a semester.",
   "Run server-side conflict checks before assigning reviewers or defense councils.",
@@ -6,6 +8,8 @@ const controls = [
 ];
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+
   return (
     <section className="page">
       <div className="page-title">
@@ -13,7 +17,7 @@ export function DashboardPage() {
           <h2>Operations overview</h2>
           <p>Central control for review rounds, defense panels and syllabus evidence.</p>
         </div>
-        <button className="primary">Import official data</button>
+        <button className="primary" onClick={() => navigate("/semesters")}>Import official data</button>
       </div>
       <div className="metric-grid">
         <article className="metric">
