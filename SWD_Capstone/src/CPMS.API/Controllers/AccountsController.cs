@@ -7,6 +7,7 @@ using CPMS.Core.Enums;
 using CPMS.Core.Exceptions;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
+using CPMS.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,11 +22,43 @@ public sealed class AccountsController(
     IReviewEmailSender emailSender) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<AccountResponse>> GetAll(CancellationToken cancellationToken)
+    public async Task<PagedResult<AccountResponse>> GetAll(
+        [FromQuery] PagedRequest request,
+        CancellationToken cancellationToken)
     {
-        var users = await dbContext.Users
-            .OrderBy(x => x.Role)
-            .ThenBy(x => x.Username)
+        var query = dbContext.Users.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLowerInvariant();
+            query = query.Where(x =>
+                x.Username.ToLower().Contains(search) ||
+                x.Email.ToLower().Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
+        {
+            var filterBy = request.FilterBy.Trim().ToLowerInvariant();
+            var filterValue = request.FilterValue.Trim();
+            query = filterBy switch
+            {
+                "role" when Enum.TryParse<UserRole>(filterValue, true, out var role) => query.Where(x => x.Role == role),
+                "isactive" when bool.TryParse(filterValue, out var isActive) => query.Where(x => x.IsActive == isActive),
+                _ => query
+            };
+        }
+
+        query = request.SortBy?.ToLowerInvariant() switch
+        {
+            "email" => request.Desc ? query.OrderByDescending(x => x.Email) : query.OrderBy(x => x.Email),
+            "role" => request.Desc ? query.OrderByDescending(x => x.Role) : query.OrderBy(x => x.Role),
+            "isactive" => request.Desc ? query.OrderByDescending(x => x.IsActive) : query.OrderBy(x => x.IsActive),
+            _ => request.Desc ? query.OrderByDescending(x => x.Username) : query.OrderBy(x => x.Username)
+        };
+
+        var total = await query.CountAsync(cancellationToken);
+        var users = await query
+            .Skip((request.SafePage - 1) * request.SafePageSize)
+            .Take(request.SafePageSize)
             .Select(x => new AccountResponse(
                 x.Id,
                 x.Username,
@@ -36,7 +69,7 @@ public sealed class AccountsController(
                 x.LockedUntil))
             .ToListAsync(cancellationToken);
 
-        return users;
+        return new PagedResult<AccountResponse>(users, request.SafePage, request.SafePageSize, total);
     }
 
     [HttpPost]
