@@ -14,6 +14,7 @@ primary_region = "sin"
   AdminSeed__Enabled = "true"
   AdminSeed__Username = "admin@gmail.com"
   AdminSeed__Email = "admin@gmail.com"
+  DATABASE_URL = "postgres://postgres:EXE101%40gmail.com@db.abvfaooyxmpufzzanuya.supabase.co:5432/postgres"
 
 [http_service]
   internal_port = 8080
