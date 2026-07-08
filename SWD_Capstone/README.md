@@ -77,6 +77,12 @@ Google login is account-bound: the Google email must already exist in `users.ema
 
 Configure the Google OAuth Client ID in `Authentication:Google:ClientId`.
 
+SMTP uses the shared non-secret settings in `src/CPMS.API/appsettings.json`:
+host `smtp.gmail.com`, port `587`, SSL enabled, and sender account
+`duongduy12314@gmail.com`. The Gmail app password must not be committed to
+GitHub; production deploy sets it as the Fly secret `Smtp__Password` from the
+GitHub Actions secret `SMTP_PASSWORD`.
+
 ## Quality Gates
 
 ```powershell
