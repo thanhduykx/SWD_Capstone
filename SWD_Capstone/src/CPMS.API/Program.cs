@@ -240,26 +240,12 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 
 static string GetCpmsConnectionString(IConfiguration configuration)
 {
-    var databaseUrl = configuration["DATABASE_URL"];
-    if (!string.IsNullOrWhiteSpace(databaseUrl))
-    {
-        var uri = new Uri(databaseUrl);
-        var credentials = uri.UserInfo.Split(':', 2);
+    var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    var appsettings = new ConfigurationBuilder()
+        .AddJsonFile(appsettingsPath, optional: false, reloadOnChange: false)
+        .Build();
 
-        var builder = new NpgsqlConnectionStringBuilder
-        {
-            Host = uri.Host,
-            Port = uri.Port > 0 ? uri.Port : 5432,
-            Database = uri.AbsolutePath.TrimStart('/'),
-            Username = Uri.UnescapeDataString(credentials.ElementAtOrDefault(0) ?? string.Empty),
-            Password = Uri.UnescapeDataString(credentials.ElementAtOrDefault(1) ?? string.Empty),
-            SslMode = SslMode.Require
-        };
-
-        return builder.ConnectionString;
-    }
-
-    return configuration.GetConnectionString("CpmsDatabase")
+    return appsettings.GetConnectionString("CpmsDatabase")
         ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
 }
 
