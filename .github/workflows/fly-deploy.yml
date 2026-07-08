@@ -46,10 +46,12 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           JWT_KEY: ${{ secrets.JWT_KEY }}
           ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: |
           test -n "$FLY_API_TOKEN"
           test -n "$JWT_KEY"
           test -n "$ADMIN_SEED_PASSWORD"
+          test -n "$SMTP_PASSWORD"
 
       - name: Ensure Fly app exists
         env:
@@ -80,10 +82,12 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           JWT_KEY: ${{ secrets.JWT_KEY }}
           ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: |
           flyctl secrets set \
             Jwt__Key="$JWT_KEY" \
             AdminSeed__Password="$ADMIN_SEED_PASSWORD" \
+            Smtp__Password="$SMTP_PASSWORD" \
             --app "$FLY_APP_NAME"
 
       - name: Deploy API
