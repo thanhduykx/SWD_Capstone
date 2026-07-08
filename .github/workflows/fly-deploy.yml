@@ -16,6 +16,10 @@ jobs:
     name: Build, Test, Provision Database, Deploy
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: SWD_Capstone
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
