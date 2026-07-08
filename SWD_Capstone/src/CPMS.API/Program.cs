@@ -16,14 +16,12 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 using Serilog;
-using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
@@ -107,7 +105,7 @@ builder.Services.AddRateLimiter(options =>
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
     policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services
     .AddApiVersioning(options =>
@@ -148,9 +146,6 @@ builder.Services.AddSwaggerGen(options =>
                       4. Use ids returned from GET endpoints instead of guessing ids.
                       """
     });
-    options.CustomOperationIds(SwaggerOperationId);
-    options.TagActionsBy(api => [SwaggerTagFor(api)]);
-    options.OrderActionsBy(SwaggerOrderFor);
     options.OperationFilter<SwaggerTestingOperationFilter>();
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -174,13 +169,7 @@ if (app.Environment.IsDevelopment() || swaggerEnabled)
     app.UseSwaggerUI(options =>
     {
         options.DocumentTitle = "CPMS Enterprise API";
-        options.DisplayRequestDuration();
-        options.EnableDeepLinking();
         options.EnablePersistAuthorization();
-        options.DisplayOperationId();
-        options.DocExpansion(DocExpansion.None);
-        options.DefaultModelExpandDepth(2);
-        options.DefaultModelsExpandDepth(1);
     });
 }
 
@@ -221,9 +210,7 @@ app.MapGet("/health/database", async (CpmsDbContext dbContext) =>
     }
 });
 app.MapHub<DefenseScoringHub>("/hubs/defense");
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
 
@@ -275,58 +262,6 @@ static string GetCpmsConnectionString(IConfiguration configuration)
     return configuration.GetConnectionString("CpmsDatabase")
         ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
 }
-
-static string SwaggerOperationId(ApiDescription apiDescription)
-{
-    apiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller);
-    apiDescription.ActionDescriptor.RouteValues.TryGetValue("action", out var action);
-    controller ??= "Api";
-    action ??= apiDescription.HttpMethod ?? "Action";
-    return $"{controller}_{action}";
-}
-
-static string SwaggerTagFor(ApiDescription apiDescription)
-{
-    apiDescription.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller);
-    if (apiDescription.RelativePath?.StartsWith("health/", StringComparison.OrdinalIgnoreCase) == true)
-    {
-        return "99 - Health";
-    }
-
-    return controller switch
-    {
-        "TestSupport" => "00 - FE Test Guide",
-        "Auth" => "01 - Auth",
-        "Accounts" => "02 - Accounts",
-        "Semesters" => "03 - Semesters",
-        "ReviewAvailability" => "04 - Review Availability",
-        "ReviewScheduling" => "05 - Review Scheduling",
-        "ReviewSessions" => "06 - Review Sessions",
-        "ReviewSchedules" => "07 - Review Publish",
-        "ReviewSubmissions" => "08 - Review Submissions",
-        "DefenseManagement" => "09 - Defense Management",
-        "DefenseSessions" => "10 - Defense Sessions",
-        _ => controller ?? "API"
-    };
-}
-
-static string SwaggerOrderFor(ApiDescription apiDescription)
-{
-    var tag = SwaggerTagFor(apiDescription);
-    var methodOrder = apiDescription.HttpMethod?.ToUpperInvariant() switch
-    {
-        "GET" => "1",
-        "POST" => "2",
-        "PUT" => "3",
-        "PATCH" => "4",
-        "DELETE" => "5",
-        _ => "9"
-    };
-
-    return $"{tag}_{methodOrder}_{apiDescription.RelativePath}";
-}
-
-
 
 public partial class Program
 {
