@@ -4,6 +4,7 @@ using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Core.Exceptions;
 using CPMS.Infrastructure.Data;
+using CPMS.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +17,50 @@ public sealed class DefenseManagementController(CpmsDbContext dbContext) : Contr
 {
     [HttpGet("rounds")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-    public async Task<IReadOnlyList<DefenseRoundResponse>> GetRounds(CancellationToken cancellationToken) =>
-        await dbContext.DefenseRounds
-            .OrderByDescending(x => x.StartDate)
+    public async Task<PagedResult<DefenseRoundResponse>> GetRounds(
+        [FromQuery] PagedRequest request,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.DefenseRounds.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLowerInvariant();
+            query = query.Where(x =>
+                x.Code.ToLower().Contains(search) ||
+                x.Name.ToLower().Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
+        {
+            var filterBy = request.FilterBy.Trim().ToLowerInvariant();
+            var filterValue = request.FilterValue.Trim();
+            query = filterBy switch
+            {
+                "semesterid" when int.TryParse(filterValue, CultureInfo.InvariantCulture, out var semesterId) =>
+                    query.Where(x => x.SemesterId == semesterId),
+                "type" when Enum.TryParse<CouncilType>(filterValue, true, out var type) =>
+                    query.Where(x => x.Type == type),
+                "status" when Enum.TryParse<DefenseRoundStatus>(filterValue, true, out var status) =>
+                    query.Where(x => x.Status == status),
+                _ => query
+            };
+        }
+
+        query = request.SortBy?.ToLowerInvariant() switch
+        {
+            "code" => request.Desc ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
+            "name" => request.Desc ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
+            "semesterid" => request.Desc ? query.OrderByDescending(x => x.SemesterId) : query.OrderBy(x => x.SemesterId),
+            "type" => request.Desc ? query.OrderByDescending(x => x.Type) : query.OrderBy(x => x.Type),
+            "status" => request.Desc ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
+            "enddate" => request.Desc ? query.OrderByDescending(x => x.EndDate) : query.OrderBy(x => x.EndDate),
+            _ => request.Desc ? query.OrderByDescending(x => x.StartDate) : query.OrderBy(x => x.StartDate)
+        };
+
+        var total = await query.CountAsync(cancellationToken);
+        var rounds = await query
+            .Skip((request.SafePage - 1) * request.SafePageSize)
+            .Take(request.SafePageSize)
             .Select(x => new DefenseRoundResponse(
                 x.Id,
                 x.Code,
@@ -29,6 +71,9 @@ public sealed class DefenseManagementController(CpmsDbContext dbContext) : Contr
                 x.EndDate,
                 x.Status))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<DefenseRoundResponse>(rounds, request.SafePage, request.SafePageSize, total);
+    }
 
     [HttpPost("rounds")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]

@@ -1,6 +1,7 @@
 using CPMS.Application.Abstractions.Identity;
 using CPMS.Application.DTOs.Accounts;
 using CPMS.Core.Entities;
+using CPMS.Core.Enums;
 using CPMS.Infrastructure.Data;
 using CPMS.Shared.Models;
 using Microsoft.EntityFrameworkCore;
@@ -22,10 +23,23 @@ public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountReposit
                 x.Email.ToLower().Contains(search));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
+        {
+            var filterBy = request.FilterBy.Trim().ToLowerInvariant();
+            var filterValue = request.FilterValue.Trim();
+            query = filterBy switch
+            {
+                "role" when Enum.TryParse<UserRole>(filterValue, true, out var role) => query.Where(x => x.Role == role),
+                "isactive" when bool.TryParse(filterValue, out var isActive) => query.Where(x => x.IsActive == isActive),
+                _ => query
+            };
+        }
+
         query = request.SortBy?.ToLowerInvariant() switch
         {
             "email" => request.Desc ? query.OrderByDescending(x => x.Email) : query.OrderBy(x => x.Email),
             "role" => request.Desc ? query.OrderByDescending(x => x.Role) : query.OrderBy(x => x.Role),
+            "isactive" => request.Desc ? query.OrderByDescending(x => x.IsActive) : query.OrderBy(x => x.IsActive),
             _ => request.Desc ? query.OrderByDescending(x => x.Username) : query.OrderBy(x => x.Username)
         };
 

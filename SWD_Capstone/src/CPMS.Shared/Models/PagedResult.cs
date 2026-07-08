@@ -1,6 +1,13 @@
 namespace CPMS.Shared.Models;
 
-public sealed record PagedRequest(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, bool Desc = false)
+public sealed record PagedRequest(
+    int Page = 1,
+    int PageSize = 20,
+    string? Search = null,
+    string? SortBy = null,
+    bool Desc = false,
+    string? FilterBy = null,
+    string? FilterValue = null)
 {
     public int SafePage => Page < 1 ? 1 : Page;
     public int SafePageSize => PageSize is < 1 or > 100 ? 20 : PageSize;

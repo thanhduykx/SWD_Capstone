@@ -2,6 +2,7 @@ using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Infrastructure.Data;
+using CPMS.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +17,58 @@ public sealed class SemestersController(
     SemesterResolverService semesterResolver) : ControllerBase
 {
     [HttpGet]
-    public async Task<IReadOnlyList<Semester>> GetAll(CancellationToken cancellationToken)
+    public async Task<PagedResult<SemesterResponse>> GetAll(
+        [FromQuery] PagedRequest request,
+        CancellationToken cancellationToken)
     {
         await semesterResolver.ResolveForDateAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
-        return await dbContext.Semesters.OrderByDescending(x => x.StartDate).ToListAsync(cancellationToken);
+        var query = dbContext.Semesters.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLowerInvariant();
+            query = query.Where(x =>
+                x.Code.ToLower().Contains(search) ||
+                x.Name.ToLower().Contains(search) ||
+                x.AcademicYear.ToLower().Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
+        {
+            var filterBy = request.FilterBy.Trim().ToLowerInvariant();
+            var filterValue = request.FilterValue.Trim();
+            query = filterBy switch
+            {
+                "isactive" when bool.TryParse(filterValue, out var isActive) => query.Where(x => x.IsActive == isActive),
+                "academicyear" => query.Where(x => x.AcademicYear == filterValue),
+                _ => query
+            };
+        }
+
+        query = request.SortBy?.ToLowerInvariant() switch
+        {
+            "code" => request.Desc ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
+            "name" => request.Desc ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
+            "academicyear" => request.Desc ? query.OrderByDescending(x => x.AcademicYear) : query.OrderBy(x => x.AcademicYear),
+            "enddate" => request.Desc ? query.OrderByDescending(x => x.EndDate) : query.OrderBy(x => x.EndDate),
+            "isactive" => request.Desc ? query.OrderByDescending(x => x.IsActive) : query.OrderBy(x => x.IsActive),
+            _ => request.Desc ? query.OrderByDescending(x => x.StartDate) : query.OrderBy(x => x.StartDate)
+        };
+
+        var total = await query.CountAsync(cancellationToken);
+        var semesters = await query
+            .Skip((request.SafePage - 1) * request.SafePageSize)
+            .Take(request.SafePageSize)
+            .Select(x => new SemesterResponse(
+                x.Id,
+                x.Code,
+                x.Name,
+                x.AcademicYear,
+                x.StartDate,
+                x.EndDate,
+                x.IsActive))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<SemesterResponse>(semesters, request.SafePage, request.SafePageSize, total);
     }
 
     [HttpGet("resolve")]
@@ -92,6 +141,15 @@ public sealed class SemestersController(
 }
 
 public sealed record CreateSemesterRequest(
+    string Code,
+    string Name,
+    string AcademicYear,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    bool IsActive);
+
+public sealed record SemesterResponse(
+    int Id,
     string Code,
     string Name,
     string AcademicYear,
