@@ -1,0 +1,79 @@
+name: Deploy CPMS API to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FLY_APP_NAME: cpms-api-duongduy
+  FLY_POSTGRES_APP_NAME: cpms-api-duongduy-db
+  FLY_REGION: sin
+
+jobs:
+  deploy:
+    name: Build, Test, Provision Database, Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore CPMS.sln
+
+      - name: Build
+        run: dotnet build CPMS.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test CPMS.sln --configuration Release --no-build
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure Fly app exists
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl apps create "$FLY_APP_NAME" --org personal || true
+
+      - name: Ensure Fly Postgres exists
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl postgres create \
+            --name "$FLY_POSTGRES_APP_NAME" \
+            --region "$FLY_REGION" \
+            --initial-cluster-size 1 \
+            --vm-size shared-cpu-1x \
+            --volume-size 1 \
+            --org personal \
+            --detach || true
+
+      - name: Attach Postgres to API
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl postgres attach "$FLY_POSTGRES_APP_NAME" --app "$FLY_APP_NAME" || true
+
+      - name: Set runtime secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+        run: |
+          flyctl secrets set \
+            Jwt__Key="$JWT_KEY" \
+            AdminSeed__Password="$ADMIN_SEED_PASSWORD" \
+            --app "$FLY_APP_NAME"
+
+      - name: Deploy API
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --config fly.toml --app "$FLY_APP_NAME"

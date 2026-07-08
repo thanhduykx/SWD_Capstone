@@ -113,13 +113,13 @@ Rules:
 
 ## Layer Responsibilities
 
-### PresentationLayer
+### CPMS.API
 
-Contains MVC/API controllers, SignalR hubs, request/response mapping, authentication middleware and static assets.
+Contains MVC/API controllers, SignalR hubs, request/response mapping, authentication middleware, Swagger and backend static assets.
 
-PresentationLayer must not own business decisions such as conflict rules, score lock rules or import validation. It coordinates transport concerns only.
+CPMS.API must not own business decisions such as conflict rules, score lock rules or import validation. It coordinates transport concerns only.
 
-### ServiceLayer
+### CPMS.Application
 
 Contains application services and business workflows.
 
@@ -132,34 +132,34 @@ Examples:
 - `ExcelImportService`: parse official Excel files into validated import commands.
 - `TefExportService`: generate TEF files from locked scores.
 
-### DataAccessLayer
+### CPMS.Domain
 
-Contains EF Core entities, enums, migrations and database constraints.
+Contains entities, enums, domain rules, interfaces and pure business concepts.
 
-DataAccessLayer must enforce low-level integrity such as unique indexes, FK constraints, append-only audit protection and locked score immutability.
+CPMS.Domain must stay free of EF Core, ASP.NET and external infrastructure dependencies.
 
-### Frontend
+### CPMS.Infrastructure
 
-React SPA consumes APIs and SignalR.
+Contains EF Core persistence, repositories, unit of work, migrations, cache, messaging and external services.
 
-Frontend must not fake business data. It shows empty states until official data is imported and persisted.
+CPMS.Infrastructure must enforce low-level integrity such as unique indexes, FK constraints, append-only audit protection and locked score immutability.
 
 ## Current Architecture Gaps
 
-- Most controllers still access `CpmsDbContext` directly; business workflows must move into ServiceLayer.
+- Some legacy controllers still access `CpmsDbContext` directly; business workflows should continue moving into CPMS.Application feature handlers.
 - Import Excel is not implemented yet.
 - TEF writer/export history is not implemented yet.
-- Council creation and project-scoped defense assignment APIs exist, but need UI screens and broader integration tests.
+- Council creation and project-scoped defense assignment APIs exist, but need broader integration tests.
 - Review result lifecycle is not fully connected to group final result.
-- Dashboard/workload must be derived from database queries, not static frontend values.
+- Dashboard/workload APIs must be derived from database queries, not static values.
 - Audit immutability is enforced by EF but still needs database trigger protection.
 
 ## Implementation Order
 
-1. Move business workflows from controllers into ServiceLayer.
+1. Move business workflows from controllers into CPMS.Application feature handlers.
 2. Implement official account/import flow for lecturers, students, groups and topics.
 3. Complete review scheduling and result lifecycle.
-4. Complete council management before expanding realtime scoring UI.
+4. Complete council management before expanding realtime scoring APIs.
 5. Implement TEF export history and format validation.
 6. Build dashboard/workload from database projections.
 7. Add integration tests for critical workflows.

@@ -9,10 +9,12 @@ services:
       Swagger__Enabled: "true"
       Swagger__ExposeTestSupport: "true"
       ConnectionStrings__CpmsDatabase: Host=postgres;Port=5432;Database=cpms;Username=postgres;Password=123456
-      Jwt__Issuer: PresentationLayer
+      ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__RabbitMQ: amqp://guest:guest@rabbitmq:5672/
+      Jwt__Issuer: CPMS.API
       Jwt__Audience: CPMS.Frontend
       Jwt__Key: LOCAL_DOCKER_SECRET_KEY_AT_LEAST_32_CHARS
-      Cors__AllowedOrigins__0: http://localhost:5173
+      Hangfire__Enabled: "true"
       AdminSeed__Enabled: "true"
       AdminSeed__Username: admin@gmail.com
       AdminSeed__Email: admin@gmail.com
@@ -21,6 +23,10 @@ services:
       - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
 
@@ -40,6 +46,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cpms-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cpms-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   cpms_postgres_data:
