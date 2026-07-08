@@ -1,0 +1,115 @@
+@CPMS_API_HostAddress = http://localhost:5122
+@AccessToken = paste-access-token-here
+
+### FE Swagger/testing guide
+GET {{CPMS_API_HostAddress}}/api/test-support/swagger-guide
+Accept: application/json
+
+### Local test accounts
+GET {{CPMS_API_HostAddress}}/api/test-support/test-accounts
+Accept: application/json
+
+### Login: moderator for account management
+POST {{CPMS_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "",
+  "password": ""
+}
+
+### Login: lecturer
+POST {{CPMS_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "",
+  "password": ""
+}
+
+### Login: legacy local admin
+POST {{CPMS_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "",
+  "password": ""
+}
+
+###
+
+### Bootstrap first admin: Development only and only when users table is empty
+POST {{CPMS_API_HostAddress}}/api/auth/bootstrap-admin
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "",
+  "email": "admin@cpms.local",
+  "password": ""
+}
+
+###
+
+### List accounts
+GET {{CPMS_API_HostAddress}}/api/accounts
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+### Create lecturer without department
+POST {{CPMS_API_HostAddress}}/api/accounts
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": null,
+  "identityCode": "SE194673",
+  "email": "gv001@cpms.local",
+  "password": "",
+  "role": "Lecturer",
+  "fullName": "Duong Thanh Thanh Duy",
+  "department": null,
+  "position": null,
+  "permissionScope": null,
+  "isPartTime": false,
+  "classCode": null,
+  "batch": null,
+  "major": null
+}
+
+### Save lecturer weekly availability
+PUT {{CPMS_API_HostAddress}}/api/review-availability/week?semesterId=1&weekStart=2026-06-15
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "slots": [
+    { "dayOfWeek": 1, "slot": 1 },
+    { "dayOfWeek": 3, "slot": 2 }
+  ]
+}
+
+### Submit lecturer weekly availability to moderator
+POST {{CPMS_API_HostAddress}}/api/review-availability/week/submit?semesterId=1&weekStart=2026-06-15
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+### Random assign submitted availability to review groups
+POST {{CPMS_API_HostAddress}}/api/review-scheduling/random-assign
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "semesterId": 1,
+  "reviewType": "Review1",
+  "weekStart": "2026-06-15",
+  "reviewersPerSession": 2,
+  "roomPrefix": "AUTO",
+  "seed": null
+}

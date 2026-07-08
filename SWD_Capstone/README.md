@@ -4,12 +4,12 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 
 ## Current Implementation
 
-- Layered ASP.NET Core MVC solution: `PresentationLayer`, `ServiceLayer`, `DataAccessLayer`.
+- Clean Architecture ASP.NET Core solution under `src/`: `CPMS.API`, `CPMS.Application`, `CPMS.Domain`, `CPMS.Infrastructure`, `CPMS.Shared`.
 - PostgreSQL 16 with EF Core/Npgsql covering the production reference entities: authentication, academic structure, documents/evaluation, review/defense, audit and notifications.
 - JWT access token and rotating refresh token endpoints, BCrypt password verification and login lockout handling.
 - API foundation for semesters, review-session assignment and defense score submission/locking.
 - SignalR defense scoring room: council members join a live session, the chairman starts/closes scoring, and score submissions are broadcast to the council.
-- React 18/Vite frontend shell for Dashboard, Semesters, Reviews, Defense Scoring and Documents/CLO evaluation.
+- Swagger is the primary API testing surface; the repository is backend-only.
 - Unit tests for supervisor conflicts, repeated reviewers, council membership, chairman-only session control, council capacity and score locking rules.
 - Repository quality gates based on ISO/IEC 9126, ISO/IEC 25010, ISO/IEC/IEEE 12207 and ISO/IEC/IEEE 29119 are documented in `docs/QUALITY_STANDARDS.md`.
 - Business architecture and implementation boundaries are documented in `docs/BUSINESS_ARCHITECTURE.md`.
@@ -30,17 +30,19 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 
 ## Stack
 
-- Frontend: React 18, TypeScript, Vite and React Router.
-- Backend: ASP.NET Core 8 MVC/Web API hybrid and EF Core 8.
+- Backend: ASP.NET Core 9 MVC/Web API hybrid and EF Core 9.
+- Architecture: Clean Architecture / N-Layer with Domain, Application, Infrastructure and API boundaries.
 - Real-time: ASP.NET Core SignalR over `/hubs/defense`.
 - Database: PostgreSQL 16 through `Npgsql.EntityFrameworkCore.PostgreSQL`.
+- Cache / messaging: Redis and RabbitMQ adapters are available through Application abstractions.
+- Logging / jobs: Serilog and optional Hangfire.
 
 ## Run Database
 
 ```powershell
 docker compose up -d postgres
 dotnet tool restore
-dotnet tool run dotnet-ef database update --project .\backend\DataAccessLayer\DataAccessLayer.csproj --startup-project .\backend\PresentationLayer\PresentationLayer.csproj
+dotnet tool run dotnet-ef database update --project .\src\CPMS.Infrastructure\CPMS.Infrastructure.csproj --startup-project .\src\CPMS.API\CPMS.API.csproj
 ```
 
 The Docker development connection string targets PostgreSQL at `localhost:5433`, database `cpms`, username `postgres`, password `123456`. Port `5433` avoids colliding with an existing local PostgreSQL installation on the default port.
@@ -64,38 +66,22 @@ This endpoint is available only in `Development` and only when the `users` table
 dotnet restore .\CPMS.sln
 dotnet build .\CPMS.sln
 dotnet test .\CPMS.sln
-dotnet run --project .\backend\PresentationLayer\PresentationLayer.csproj
+dotnet run --project .\src\CPMS.API\CPMS.API.csproj
 ```
 
 Before running outside local development, replace `Jwt:Key` and the PostgreSQL password using environment variables or a secret store.
-
-## Run Frontend
-
-```powershell
-cd .\frontend
-npm install
-npm run dev
-```
 
 ## Gmail / Google Login
 
 Google login is account-bound: the Google email must already exist in `users.email`.
 
-Configure the same Google OAuth Client ID in:
-
-- Backend: `Authentication:Google:ClientId`
-- Frontend: `frontend/.env.local` as `VITE_GOOGLE_CLIENT_ID`
-
-Use `frontend/.env.example` as the template.
+Configure the Google OAuth Client ID in `Authentication:Google:ClientId`.
 
 ## Quality Gates
 
 ```powershell
 dotnet build .\CPMS.sln
 dotnet test .\CPMS.sln
-cd .\frontend
-npm run lint
-npm run build
 ```
 
 ## Planned Modules From The Specification
