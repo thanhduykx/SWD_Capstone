@@ -4,18 +4,6 @@ primary_region = "sin"
 [build]
   dockerfile = "backend/Dockerfile"
 
-[env]
-  ASPNETCORE_ENVIRONMENT = "Production"
-  Swagger__Enabled = "true"
-  Swagger__ExposeTestSupport = "true"
-  Hangfire__Enabled = "false"
-  Jwt__Issuer = "CPMS.API"
-  Jwt__Audience = "CPMS.Swagger"
-  AdminSeed__Enabled = "true"
-  AdminSeed__Username = "admin@gmail.com"
-  AdminSeed__Email = "admin@gmail.com"
-  DATABASE_URL = "postgres://postgres:EXE101%40gmail.com@db.abvfaooyxmpufzzanuya.supabase.co:5432/postgres"
-
 [http_service]
   internal_port = 8080
   force_https = true

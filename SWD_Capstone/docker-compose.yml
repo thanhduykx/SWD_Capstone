@@ -4,21 +4,6 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: cpms-backend
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      Swagger__Enabled: "true"
-      Swagger__ExposeTestSupport: "true"
-      ConnectionStrings__CpmsDatabase: Host=postgres;Port=5432;Database=cpms;Username=postgres;Password=123456
-      ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__RabbitMQ: amqp://guest:guest@rabbitmq:5672/
-      Jwt__Issuer: CPMS.API
-      Jwt__Audience: CPMS.Frontend
-      Jwt__Key: LOCAL_DOCKER_SECRET_KEY_AT_LEAST_32_CHARS
-      Hangfire__Enabled: "true"
-      AdminSeed__Enabled: "true"
-      AdminSeed__Username: admin@gmail.com
-      AdminSeed__Email: admin@gmail.com
-      AdminSeed__Password: "12345"
     ports:
       - "8080:8080"
     depends_on:
