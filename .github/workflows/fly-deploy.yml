@@ -41,6 +41,16 @@ jobs:
       - name: Setup Flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Validate deployment secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+        run: |
+          test -n "$FLY_API_TOKEN"
+          test -n "$JWT_KEY"
+          test -n "$ADMIN_SEED_PASSWORD"
+
       - name: Ensure Fly app exists
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -57,8 +67,7 @@ jobs:
             --initial-cluster-size 1 \
             --vm-size shared-cpu-1x \
             --volume-size 1 \
-            --org personal \
-            --detach || true
+            --org personal || true
 
       - name: Attach Postgres to API
         env:
