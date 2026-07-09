@@ -104,7 +104,10 @@ builder.Services.AddRateLimiter(options =>
 
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
-    policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+    policy.SetIsOriginAllowed(origin => origins.Length == 0 || origins.Contains(origin) || origin.StartsWith("http://localhost:") || origin.StartsWith("http://127.0.0.1:"))
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services
@@ -223,6 +226,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         await dbContext.Database.MigrateAsync();
         await Program.SeedAdminAccountAsync(app.Configuration, dbContext);
         await Program.SeedModeratorAccountAsync(dbContext);
+        await Program.SeedTestAccountsAsync(dbContext);
 
 
 
@@ -271,7 +275,7 @@ public partial class Program
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
         var user = await dbContext.Users
-            .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
+            .FirstOrDefaultAsync(x => x.Username == username || x.Email == email);
 
         if (user is null)
         {
@@ -330,7 +334,7 @@ public partial class Program
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync();
         var user = await dbContext.Users
-            .SingleOrDefaultAsync(x => x.Username == username || x.Email == email);
+            .FirstOrDefaultAsync(x => x.Username == username || x.Email == email);
 
         if (user is null)
         {
@@ -380,5 +384,62 @@ public partial class Program
         });
         await dbContext.SaveChangesAsync();
         await transaction.CommitAsync();
+    }
+
+    public static async Task SeedTestAccountsAsync(CpmsDbContext dbContext)
+    {
+        var testAccounts = new[]
+        {
+            ("test.training", "test.training@cpms.local", "Test@123456", UserRole.TrainingDepartment),
+            ("test.lecturer", "test.lecturer@cpms.local", "Test@123456", UserRole.Lecturer),
+            ("test.student", "test.student@cpms.local", "Test@123456", UserRole.Student)
+        };
+
+        foreach (var (username, email, password, role) in testAccounts)
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Username == username || x.Email == email);
+            if (user is null)
+            {
+                user = new User
+                {
+                    Username = username,
+                    Email = email,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
+                    Role = role,
+                    IsActive = true
+                };
+                dbContext.Users.Add(user);
+                await dbContext.SaveChangesAsync();
+            }
+            else
+            {
+                user.Username = username;
+                user.Email = email;
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
+                user.Role = role;
+                user.IsActive = true;
+                user.LockedUntil = null;
+                user.FailedLoginAttempts = 0;
+                user.UpdatedAt = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+            }
+
+            if (role == UserRole.TrainingDepartment && !await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == user.Id))
+            {
+                dbContext.TrainingDepartments.Add(new TrainingDepartment { UserId = user.Id, DepartmentName = "Training Dept", StaffCode = "TD_TEST", Position = "Officer" });
+            }
+            else if (role == UserRole.Lecturer && !await dbContext.Lecturers.AnyAsync(x => x.UserId == user.Id))
+            {
+                dbContext.Lecturers.Add(new Lecturer { UserId = user.Id, Code = "LEC_TEST", FullName = "Dr. Test Lecturer", Department = "SWD" });
+            }
+            else if (role == UserRole.Student && !await dbContext.Students.AnyAsync(x => x.UserId == user.Id))
+            {
+                dbContext.Students.Add(new Student { UserId = user.Id, Code = "SE190000", FullName = "Test Student", ClassCode = "SE1901", Major = "SWD", GroupId = null, IsLeader = false });
+            }
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
     }
 }
