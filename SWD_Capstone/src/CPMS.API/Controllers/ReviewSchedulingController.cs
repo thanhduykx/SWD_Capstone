@@ -43,7 +43,7 @@ public sealed class ReviewSchedulingController(
                 x.Code,
                 x.FullName,
                 x.Department,
-                dbContext.Users.Where(user => user.Id == x.UserId).Select(user => user.Email).Single()))
+                dbContext.Users.Where(user => user.Id == x.UserId).Select(user => user.Email).FirstOrDefault() ?? "unknown@fpt.edu.vn"))
             .ToListAsync(cancellationToken);
 
         var availability = await dbContext.ReviewAvailabilities
@@ -78,34 +78,56 @@ public sealed class ReviewSchedulingController(
             .Select(x => new ReviewSchedulingGroupResponse(
                 x.Id,
                 x.Code,
-                dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn).Single(),
+                dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn).FirstOrDefault() ?? "Chưa đăng ký đề tài",
                 x.LecturerId,
-                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.LecturerId).Select(lecturer => lecturer.Code).Single(),
+                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.LecturerId).Select(lecturer => lecturer.Code).FirstOrDefault() ?? "Chưa có GVHD",
                 dbContext.Students.Count(student => student.GroupId == x.Id)))
             .ToListAsync(cancellationToken);
 
-        var sessions = await dbContext.ReviewSessions
+        var dbSessions = await dbContext.ReviewSessions
             .Where(x => x.SemesterId == semesterId &&
                         x.Type == reviewType &&
                         x.SessionDate >= weekStartDate &&
                         x.SessionDate < weekEndDate)
             .OrderBy(x => x.SessionDate)
             .ThenBy(x => x.Slot)
-            .Select(x => new ReviewSchedulingSessionResponse(
+            .Select(x => new {
                 x.Id,
                 x.Code,
-                dbContext.GroupReviewSlots.Where(slot => slot.SessionId == x.Id).Select(slot => slot.GroupId).Single(),
-                dbContext.GroupReviewSlots.Where(slot => slot.SessionId == x.Id)
-                    .Select(slot => dbContext.CapstoneGroups.Where(group => group.Id == slot.GroupId).Select(group => group.Code).Single())
-                    .Single(),
+                GroupId = dbContext.GroupReviewSlots.Where(slot => slot.SessionId == x.Id).Select(slot => slot.GroupId).FirstOrDefault(),
+                GroupCode = dbContext.GroupReviewSlots.Where(slot => slot.SessionId == x.Id)
+                    .Select(slot => dbContext.CapstoneGroups.Where(group => group.Id == slot.GroupId).Select(group => group.Code).FirstOrDefault())
+                    .FirstOrDefault() ?? "",
                 x.Type,
                 x.Status,
-                new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
+                x.Reviewer1Id,
+                x.Reviewer2Id,
                 x.SessionDate,
                 x.DayOfWeek,
                 x.Slot,
-                x.Room))
+                x.Room
+            })
             .ToListAsync(cancellationToken);
+
+        var sessions = dbSessions.Select(x => {
+            var reviewerIds = new List<int>();
+            if (x.Reviewer1Id.HasValue) reviewerIds.Add(x.Reviewer1Id.Value);
+            if (x.Reviewer2Id.HasValue) reviewerIds.Add(x.Reviewer2Id.Value);
+
+            return new ReviewSchedulingSessionResponse(
+                x.Id,
+                x.Code,
+                x.GroupId,
+                x.GroupCode,
+                x.Type,
+                x.Status,
+                reviewerIds,
+                x.SessionDate,
+                x.DayOfWeek,
+                x.Slot,
+                x.Room ?? ""
+            );
+        }).ToList();
 
         return Ok(new ReviewSchedulingBoardResponse(semesterId, reviewType, weekStart, lecturers, availability, availabilitySubmissions, groups, sessions));
     }
