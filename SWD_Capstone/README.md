@@ -69,7 +69,7 @@ dotnet test .\CPMS.sln
 dotnet run --project .\src\CPMS.API\CPMS.API.csproj
 ```
 
-Before running outside local development, set `ConnectionStrings__CpmsDatabase` and `Jwt__Key` using environment variables or a secret store.
+The deployed application reads its configuration from `src/CPMS.API/appsettings.json`.
 
 ## Gmail / Google Login
 
@@ -77,25 +77,14 @@ Google login is account-bound: the Google email must already exist in `users.ema
 
 Configure the Google OAuth Client ID in `Authentication:Google:ClientId`.
 
-Configure SMTP and Google OAuth through environment variables. In production,
-set at least `Smtp__Host`, `Smtp__Port`, `Smtp__EnableSsl`, `Smtp__FromEmail`,
-`Smtp__UserName`, `Smtp__Password`, and `Authentication__Google__ClientId`.
+Configure SMTP and Google OAuth in `src/CPMS.API/appsettings.json`.
 
 ## Deploy to Render
 
-The Render Blueprint is in the repository-root `render.yaml`. It builds the
-existing Docker image, uses the Render-provided `PORT`, and checks `/health`.
-The database remains the existing Supabase PostgreSQL instance, so no database
-is recreated or data migrated during this provider migration.
-
-Before applying the Blueprint, provide the required values marked `sync: false`:
-
-- `ConnectionStrings__CpmsDatabase` (the existing Supabase connection string)
-- `Cors__AllowedOrigins__0` (the deployed frontend origin)
-- SMTP settings and Google OAuth client ID, if those features are used
-
-Render generates `Jwt__Key`; keep it stable after the first deployment so
-existing JWTs remain valid until their normal expiry.
+Render automatically detects the repository-root `Dockerfile`. Add the GitHub
+repository as a Docker web service; no Render environment variables or Blueprint
+are required. The application uses the existing Supabase PostgreSQL instance,
+so no database is recreated or data migrated during this provider migration.
 
 ## Quality Gates
 
