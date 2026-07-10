@@ -24,12 +24,6 @@ using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Keep runtime behavior reproducible after a repository clone: configuration comes
-// exclusively from the tracked shared appsettings.json file.
-builder.Configuration.Sources.Clear();
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
 
@@ -250,12 +244,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 
 static string GetCpmsConnectionString(IConfiguration configuration)
 {
-    var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-    var appsettings = new ConfigurationBuilder()
-        .AddJsonFile(appsettingsPath, optional: false, reloadOnChange: false)
-        .Build();
-
-    return appsettings.GetConnectionString("CpmsDatabase")
+    return configuration.GetConnectionString("CpmsDatabase")
         ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
 }
 

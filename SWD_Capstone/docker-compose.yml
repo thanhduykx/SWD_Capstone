@@ -6,6 +6,11 @@ services:
     container_name: cpms-backend
     ports:
       - "8080:8080"
+    environment:
+      ConnectionStrings__CpmsDatabase: Host=postgres;Port=5432;Database=cpms;Username=postgres;Password=123456
+      Jwt__Key: local-development-only-key-must-be-at-least-32-characters
+      Jwt__Issuer: CPMS.API
+      Jwt__Audience: CPMS.Swagger
     depends_on:
       postgres:
         condition: service_healthy
