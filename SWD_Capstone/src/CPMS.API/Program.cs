@@ -24,6 +24,9 @@ using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.Sources.Clear();
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
 
