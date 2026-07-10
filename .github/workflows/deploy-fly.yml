@@ -1,0 +1,46 @@
+name: Deploy CPMS API to Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpms-api-fly-production
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: SWD_Capstone
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore CPMS.sln
+
+      - name: Build
+        run: dotnet build CPMS.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test CPMS.sln --configuration Release --no-build --no-restore
+
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --strategy immediate --app cpms-api-duongduy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
