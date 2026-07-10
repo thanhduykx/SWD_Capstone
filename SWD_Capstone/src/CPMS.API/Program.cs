@@ -24,6 +24,12 @@ using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Keep runtime behavior reproducible after a repository clone: configuration comes
+// exclusively from the tracked shared appsettings.json file.
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
 

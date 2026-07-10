@@ -18,7 +18,6 @@ RUN dotnet publish "src/CPMS.API/CPMS.API.csproj" \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080
 
 COPY --from=backend-build /app/publish ./
