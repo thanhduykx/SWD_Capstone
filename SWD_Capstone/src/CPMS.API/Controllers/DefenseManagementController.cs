@@ -16,7 +16,7 @@ namespace CPMS.Api.Controllers;
 public sealed class DefenseManagementController(CpmsDbContext dbContext) : ControllerBase
 {
     [HttpGet("rounds")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize]
     public async Task<PagedResult<DefenseRoundResponse>> GetRounds(
         [FromQuery] PagedRequest request,
         CancellationToken cancellationToken)
@@ -89,6 +89,14 @@ public sealed class DefenseManagementController(CpmsDbContext dbContext) : Contr
         if (!semesterExists)
         {
             return BadRequest(new { error = "Semester does not exist." });
+        }
+
+        var duplicateExists = await dbContext.DefenseRounds.AnyAsync(
+            x => x.SemesterId == request.SemesterId && x.Code.ToLower() == request.Code.Trim().ToLower(),
+            cancellationToken);
+        if (duplicateExists)
+        {
+            return BadRequest(new { error = "Đợt bảo vệ với mã này đã tồn tại trong học kỳ." });
         }
 
         var round = new DefenseRound
@@ -362,6 +370,11 @@ public sealed class DefenseManagementController(CpmsDbContext dbContext) : Contr
         if (endDate < startDate)
         {
             throw new BusinessRuleException("End date must not be before start date.");
+        }
+        var diffDays = endDate.DayNumber - startDate.DayNumber;
+        if (diffDays != 6)
+        {
+            throw new BusinessRuleException("Ràng buộc: 1 đợt review phải có độ dài đúng 6 ngày.");
         }
     }
 }
