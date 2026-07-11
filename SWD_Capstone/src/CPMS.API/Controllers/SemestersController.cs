@@ -17,6 +17,7 @@ public sealed class SemestersController(
     SemesterResolverService semesterResolver) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous]
     public async Task<PagedResult<SemesterResponse>> GetAll(
         [FromQuery] PagedRequest request,
         CancellationToken cancellationToken)
@@ -72,6 +73,7 @@ public sealed class SemestersController(
     }
 
     [HttpGet("resolve")]
+    [AllowAnonymous]
     public async Task<ActionResult<Semester>> Resolve(DateOnly date, CancellationToken cancellationToken) =>
         await semesterResolver.ResolveForDateAsync(date, cancellationToken);
 
