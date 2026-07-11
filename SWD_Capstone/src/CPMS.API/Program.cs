@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -63,6 +64,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.Key) || jwtOptions.Key.Length < 32)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -72,10 +74,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtOptions.Issuer,
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
-            ClockSkew = TimeSpan.FromSeconds(30)
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RoleClaimType = "role",
+            NameClaimType = "name"
         };
         options.Events = new JwtBearerEvents
         {
+            OnTokenValidated = context =>
+            {
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    var existingRoles = identity.Claims
+                        .Where(c => c.Type == "role" || c.Type == ClaimTypes.Role || c.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase))
+                        .Select(c => c.Value)
+                        .Distinct()
+                        .ToList();
+
+                    foreach (var roleVal in existingRoles)
+                    {
+                        if (!identity.HasClaim("role", roleVal))
+                        {
+                            identity.AddClaim(new Claim("role", roleVal));
+                        }
+                        if (!identity.HasClaim(ClaimTypes.Role, roleVal))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Role, roleVal));
+                        }
+                    }
+                }
+                return Task.CompletedTask;
+            },
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
