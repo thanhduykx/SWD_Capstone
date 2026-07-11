@@ -14,7 +14,7 @@ namespace CPMS.Api.Controllers;
 
 [ApiController]
 [Route("api/review-scheduling")]
-[Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+[Authorize]
 public sealed class ReviewSchedulingController(
     CpmsDbContext dbContext,
     AssignmentRules rules,
@@ -133,6 +133,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPost("random-assign")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult<RandomAssignReviewSessionsResponse>> RandomAssign(
         RandomAssignReviewSessionsRequest request,
         CancellationToken cancellationToken)
@@ -453,6 +454,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPost("rounds")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult<ReviewRoundManagementResponse>> CreateRound(
         CreateReviewRoundRequest request,
         CancellationToken cancellationToken)
@@ -503,6 +505,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPatch("rounds/{roundId:int}/status")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult<ReviewRoundManagementResponse>> UpdateRoundStatus(
         int roundId,
         UpdateRoundStatusRequest request,
