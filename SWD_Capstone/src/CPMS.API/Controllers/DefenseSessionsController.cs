@@ -23,6 +23,40 @@ public sealed class DefenseSessionsController(
     IWebHostEnvironment environment,
     IHubContext<DefenseScoringHub> hubContext) : ControllerBase
 {
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<ActionResult<IEnumerable<object>>> GetAllSessions(
+        [FromQuery] int? semesterId,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.DefenseSessions.AsNoTracking();
+        if (semesterId.HasValue && semesterId.Value > 0)
+        {
+            query = query.Where(x => dbContext.DefenseRounds.Any(r => r.Id == x.DefenseRoundId && r.SemesterId == semesterId.Value));
+        }
+
+        var sessions = await query.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot).Select(x => new
+        {
+            x.Id,
+            x.Code,
+            RoundName = dbContext.DefenseRounds.Where(r => r.Id == x.DefenseRoundId).Select(r => r.Name).FirstOrDefault() ?? "Defense",
+            GroupCode = dbContext.CapstoneGroups.Where(g => g.Id == x.GroupId).Select(g => g.Code).FirstOrDefault() ?? $"Group #{x.GroupId}",
+            ProjectTitle = dbContext.CapstoneGroups.Where(g => g.Id == x.GroupId).Join(dbContext.Topics, g => g.TopicId, t => t.Id, (g, t) => t.NameEn).FirstOrDefault() ?? "Capstone Project System",
+            SessionDate = x.SessionDate.ToString("yyyy-MM-dd"),
+            x.Slot,
+            x.Room,
+            Reviewers = dbContext.CouncilMembers.Where(m => m.CouncilId == x.CouncilId)
+                .Join(dbContext.Lecturers, m => m.LecturerId, l => l.Id, (m, l) => l.FullName)
+                .ToArray(),
+            Status = x.EndedAt != null ? "Completed" : "Scheduled",
+            Result = x.EndedAt != null ? "Pass" : (string?)null,
+            AverageScore = 8.5m,
+            Notes = ""
+        }).ToListAsync(cancellationToken);
+
+        return Ok(sessions);
+    }
+
     [HttpGet("resolve/{code}")]
     public async Task<ActionResult<DefenseSessionStateDto>> ResolveByCode(
         string code,
