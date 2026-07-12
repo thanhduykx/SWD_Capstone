@@ -10,7 +10,7 @@ namespace CPMS.Api.Controllers;
 
 [ApiController]
 [Route("api/review-attendance")]
-[Authorize(Roles = "Lecturer")]
+[Authorize]
 public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : ControllerBase
 {
     [HttpGet("{sessionId:int}")]
@@ -18,12 +18,6 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
         int sessionId,
         CancellationToken cancellationToken)
     {
-        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
-        if (lecturerId is null)
-        {
-            return Forbid();
-        }
-
         var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
         if (session is null)
         {
@@ -37,6 +31,22 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
         if (groupSlot is null)
         {
             return NotFound(new { error = "No group assigned to this session." });
+        }
+
+        if (User.IsInRole("Lecturer"))
+        {
+            var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+            if (lecturerId is null) return Forbid();
+        }
+        else if (User.IsInRole("Student"))
+        {
+            var userId = CurrentUserId();
+            var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (student is null || student.GroupId != groupSlot.GroupId) return Forbid();
+        }
+        else
+        {
+            return Forbid();
         }
 
         var students = await dbContext.Students
@@ -161,6 +171,12 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
         if (groupId == 0)
         {
             return NotFound(new { error = "No group assigned to this session." });
+        }
+
+        if (User.IsInRole("Student"))
+        {
+            var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (student is null || student.GroupId != groupId) return Forbid();
         }
 
         var comment = new ReviewComment
