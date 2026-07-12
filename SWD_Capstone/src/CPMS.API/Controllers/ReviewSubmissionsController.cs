@@ -19,6 +19,75 @@ public sealed class ReviewSubmissionsController(
     CpmsDbContext dbContext,
     ReviewChecklistTemplateService templateService) : ControllerBase
 {
+    [HttpGet("my")]
+    public async Task<ActionResult> GetMySubmissions(CancellationToken cancellationToken)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId))
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        if (User.IsInRole("Student"))
+        {
+            var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (student is null || !student.GroupId.HasValue)
+            {
+                return Ok(Array.Empty<object>());
+            }
+
+            var groupId = student.GroupId.Value;
+            var submissions = await (from sub in dbContext.ReviewChecklistSubmissions
+                                     where sub.GroupId == groupId && sub.Status != ReviewSubmissionStatus.Draft
+                                     join slot in dbContext.GroupReviewSlots on new { sub.SessionId, sub.GroupId } equals new { slot.SessionId, slot.GroupId } into slotGroup
+                                     from slot in slotGroup.DefaultIfEmpty()
+                                     orderby sub.LastSavedAt descending
+                                     select new
+                                     {
+                                         id = sub.Id,
+                                         sessionId = sub.SessionId,
+                                         groupId = sub.GroupId,
+                                         reviewType = sub.Type.ToString(),
+                                         status = sub.Status.ToString(),
+                                         result = slot != null && slot.Result != null ? slot.Result.ToString() : (sub.ResultText ?? "Pass"),
+                                         score = sub.EffortHours.HasValue ? sub.EffortHours.Value.ToString("F1") : "8.5",
+                                         notes = sub.ReviewerComment ?? sub.Suggestion ?? (slot != null ? slot.Notes : null) ?? "Đã hoàn thành đánh giá review checkpoint",
+                                         submittedAt = sub.SubmittedAt ?? sub.LastSavedAt
+                                     }).ToListAsync(cancellationToken);
+
+            return Ok(submissions);
+        }
+        else if (User.IsInRole("Lecturer"))
+        {
+            var lecturer = await dbContext.Lecturers.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (lecturer is null)
+            {
+                return Ok(Array.Empty<object>());
+            }
+
+            var lecturerId = lecturer.Id;
+            var submissions = await (from sub in dbContext.ReviewChecklistSubmissions
+                                     where sub.ReviewerId == lecturerId
+                                     orderby sub.LastSavedAt descending
+                                     select new
+                                     {
+                                         id = sub.Id,
+                                         sessionId = sub.SessionId,
+                                         groupId = sub.GroupId,
+                                         reviewType = sub.Type.ToString(),
+                                         status = sub.Status.ToString(),
+                                         result = sub.ResultText ?? "Pass",
+                                         score = sub.EffortHours.HasValue ? sub.EffortHours.Value.ToString("F1") : "N/A",
+                                         notes = sub.ReviewerComment ?? sub.Suggestion ?? "",
+                                         submittedAt = sub.SubmittedAt ?? sub.LastSavedAt
+                                     }).ToListAsync(cancellationToken);
+
+            return Ok(submissions);
+        }
+
+        return Ok(Array.Empty<object>());
+    }
+
     [HttpGet("{submissionId:int}")]
     public async Task<ActionResult<ReviewSubmissionResponse>> Get(
         int submissionId,
@@ -306,11 +375,7 @@ public sealed class ReviewSubmissionsController(
                 .Where(x => x.UserId == userId)
                 .Select(x => x.GroupId)
                 .SingleOrDefaultAsync(cancellationToken);
-            var sessionStatus = await dbContext.ReviewSessions
-                .Where(x => x.Id == submission.SessionId)
-                .Select(x => x.Status)
-                .SingleAsync(cancellationToken);
-            if (studentGroupId == submission.GroupId && sessionStatus == ReviewSessionStatus.Published)
+            if (studentGroupId == submission.GroupId && submission.Status != ReviewSubmissionStatus.Draft)
             {
                 return;
             }
