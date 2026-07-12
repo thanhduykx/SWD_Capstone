@@ -11,28 +11,35 @@ namespace CPMS.Api.Controllers;
 
 [ApiController]
 [Route("api/student-review")]
-[Authorize(Roles = "Student")]
+[Authorize]
 public sealed class StudentReviewController(CpmsDbContext dbContext) : ControllerBase
 {
     private const int MaxGroupsPerSlot = 3;
 
     [HttpGet("rounds")]
-    public async Task<IReadOnlyList<StudentReviewRoundResponse>> GetRounds(CancellationToken cancellationToken)
+    [AllowAnonymous]
+    public async Task<IReadOnlyList<StudentReviewRoundResponse>> GetRounds([FromQuery] int? semesterId, CancellationToken cancellationToken)
     {
-        var student = await CurrentStudentAsync(cancellationToken);
-        if (student is null)
+        var student = await CurrentStudentAsyncSafe(cancellationToken);
+        int groupId = student?.GroupId ?? 0;
+
+        var query = dbContext.ReviewRounds.AsQueryable();
+        if (semesterId.HasValue)
         {
-            return [];
+            query = query.Where(x => x.SemesterId == semesterId.Value);
+        }
+        else
+        {
+            var semesterIds = await dbContext.Semesters
+                .Where(x => x.IsActive)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+            query = query.Where(x => semesterIds.Contains(x.SemesterId));
         }
 
-        var semesterIds = await dbContext.Semesters
-            .Where(x => x.IsActive)
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        return await dbContext.ReviewRounds
-            .Where(x => semesterIds.Contains(x.SemesterId))
-            .OrderByDescending(x => x.WeekStartDate)
+        return await query
+            .OrderBy(x => x.Type)
+            .ThenByDescending(x => x.WeekStartDate)
             .Select(x => new StudentReviewRoundResponse(
                 x.Id,
                 x.SemesterId,
@@ -41,20 +48,17 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                 x.WeekStartDate,
                 x.WeekEndDate,
                 dbContext.StudentSlotRegistrations.Any(reg =>
-                    reg.ReviewRoundId == x.Id && reg.GroupId == (student.GroupId ?? 0))))
+                    reg.ReviewRoundId == x.Id && reg.GroupId == groupId)))
             .ToListAsync(cancellationToken);
     }
 
     [HttpGet("slots")]
+    [AllowAnonymous]
     public async Task<ActionResult<StudentSlotGridResponse>> GetSlotGrid(
         int roundId,
         CancellationToken cancellationToken)
     {
-        var student = await CurrentStudentAsync(cancellationToken);
-        if (student is null)
-        {
-            return Forbid();
-        }
+        var student = await CurrentStudentAsyncSafe(cancellationToken);
 
         var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x => x.Id == roundId, cancellationToken);
         if (round is null)
@@ -72,7 +76,7 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                 x.Slot))
             .ToListAsync(cancellationToken);
 
-        var myRegistration = student.GroupId.HasValue
+        var myRegistration = student != null && student.GroupId.HasValue
             ? registrations.FirstOrDefault(r => r.GroupId == student.GroupId.Value)
             : null;
 
@@ -212,9 +216,10 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
     }
 
     [HttpGet("schedule")]
+    [HttpGet("/api/review-schedules/my")]
     public async Task<IReadOnlyList<StudentScheduleResponse>> GetMySchedule(CancellationToken cancellationToken)
     {
-        var student = await CurrentStudentAsync(cancellationToken);
+        var student = await CurrentStudentAsyncSafe(cancellationToken);
         if (student is null || !student.GroupId.HasValue)
         {
             return [];
@@ -223,7 +228,7 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
         return await dbContext.GroupReviewSlots
             .Where(x => x.GroupId == student.GroupId.Value)
             .Join(
-                dbContext.ReviewSessions.Where(s => s.Status == ReviewSessionStatus.Published),
+                dbContext.ReviewSessions.Where(s => s.Status != ReviewSessionStatus.Cancelled),
                 slot => slot.SessionId,
                 session => session.Id,
                 (slot, session) => new StudentScheduleResponse(
@@ -242,7 +247,7 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
     [HttpGet("attendance")]
     public async Task<IReadOnlyList<StudentAttendanceResponse>> GetMyAttendance(CancellationToken cancellationToken)
     {
-        var student = await CurrentStudentAsync(cancellationToken);
+        var student = await CurrentStudentAsyncSafe(cancellationToken);
         if (student is null)
         {
             return [];
@@ -265,7 +270,7 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
         int sessionId,
         CancellationToken cancellationToken)
     {
-        var student = await CurrentStudentAsync(cancellationToken);
+        var student = await CurrentStudentAsyncSafe(cancellationToken);
         if (student is null || !student.GroupId.HasValue)
         {
             return [];
@@ -282,6 +287,21 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                 x.CreatedAt,
                 x.UpdatedAt))
             .ToListAsync(cancellationToken);
+    }
+
+    private async Task<Student?> CurrentStudentAsyncSafe(CancellationToken cancellationToken)
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId))
+        {
+            return null;
+        }
+        return await dbContext.Students
+            .SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
     }
 
     private async Task<Student?> CurrentStudentAsync(CancellationToken cancellationToken)

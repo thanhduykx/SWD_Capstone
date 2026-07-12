@@ -432,6 +432,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpGet("rounds")]
+    [AllowAnonymous]
     public async Task<IReadOnlyList<ReviewRoundManagementResponse>> GetRounds(
         int semesterId,
         CancellationToken cancellationToken)
@@ -525,7 +526,7 @@ public sealed class ReviewSchedulingController(
             round.OpenedAt = DateTime.UtcNow;
         }
 
-        if (request.Status == ReviewRoundStatus.Closed)
+        if (request.Status == ReviewRoundStatus.Closed && round.ClosedAt is null)
         {
             round.ClosedAt = DateTime.UtcNow;
         }
