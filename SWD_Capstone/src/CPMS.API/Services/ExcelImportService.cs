@@ -1,8 +1,6 @@
-using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
-using System.Net.Mail;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CPMS.Api.Services;
@@ -23,6 +21,171 @@ public sealed class ExcelImportService(
     private const string TemporaryPassword = "Abcd@1234";
     private static readonly string PrecomputedPasswordHash = BCrypt.Net.BCrypt.HashPassword(TemporaryPassword, workFactor: 12);
 
+    public async Task<ExcelImportResult> ImportSelectedGroupColumnsAsync(
+        Stream fileStream,
+        int lecturerId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fileStream);
+
+        if (lecturerId <= 0 || !await dbContext.Lecturers.AnyAsync(x => x.Id == lecturerId, cancellationToken))
+        {
+            throw new BusinessRuleException($"Lecturer {lecturerId} does not exist.");
+        }
+
+        var activeSemester = await semesterResolver.ResolveForDateAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
+        var semesterId = activeSemester.Id;
+
+        using var cleanedStream = RemoveDataValidation(fileStream);
+        using var workbook = new XLWorkbook(cleanedStream);
+        var worksheet = workbook.Worksheets.FirstOrDefault()
+            ?? throw new BusinessRuleException("The uploaded Excel workbook contains no worksheets.");
+        var importedGroups = ExcelGroupWorkbookParser.Parse(worksheet);
+
+        var groupsCreated = 0;
+        var topicsCreated = 0;
+        var studentsCreated = 0;
+        var studentAccountsCreated = 0;
+        var emailsSent = 0;
+        var emailsFailed = 0;
+        var accountNotifications = new List<(User User, string FullName)>();
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        foreach (var importedGroup in importedGroups)
+        {
+            var stableSuffix = $"{semesterId}_{importedGroup.FirstRowNumber}";
+            var topicCode = BuildCode("TOPIC", importedGroup.ProjectTitle, stableSuffix);
+            var topic = await dbContext.Topics
+                .FirstOrDefaultAsync(x => x.SemesterId == semesterId && x.Code == topicCode, cancellationToken);
+            if (topic is null)
+            {
+                topic = new Topic
+                {
+                    Code = topicCode,
+                    NameVn = importedGroup.ProjectTitle,
+                    NameEn = importedGroup.ProjectTitle,
+                    SemesterId = semesterId
+                };
+                dbContext.Topics.Add(topic);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                topicsCreated++;
+            }
+            else
+            {
+                topic.NameVn = importedGroup.ProjectTitle;
+                topic.NameEn = importedGroup.ProjectTitle;
+            }
+
+            var groupCode = BuildCode("GROUP", importedGroup.ProjectTitle, stableSuffix);
+            var group = await dbContext.CapstoneGroups
+                .FirstOrDefaultAsync(x => x.SemesterId == semesterId && x.Code == groupCode, cancellationToken);
+            if (group is null)
+            {
+                group = new CapstoneGroup
+                {
+                    Code = groupCode,
+                    TopicId = topic.Id,
+                    SemesterId = semesterId,
+                    LecturerId = lecturerId,
+                    Status = GroupStatus.Active
+                };
+                dbContext.CapstoneGroups.Add(group);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                groupsCreated++;
+            }
+            else
+            {
+                group.TopicId = topic.Id;
+                group.LecturerId = lecturerId;
+                group.Status = GroupStatus.Active;
+            }
+
+            foreach (var importedStudent in importedGroup.Students)
+            {
+                var generatedUsername = AccountUsernameGenerator.Generate(importedStudent.FullName, importedStudent.StudentCode);
+                var user = await dbContext.Users.FirstOrDefaultAsync(
+                    x => x.Username == generatedUsername || x.Email == importedStudent.Email,
+                    cancellationToken);
+                var isNewUser = false;
+
+                if (user is null)
+                {
+                    user = new User
+                    {
+                        Username = generatedUsername,
+                        Email = importedStudent.Email,
+                        PasswordHash = PrecomputedPasswordHash,
+                        Role = UserRole.Student,
+                        IsActive = true
+                    };
+                    dbContext.Users.Add(user);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    studentAccountsCreated++;
+                    isNewUser = true;
+                }
+                else if (user.Role != UserRole.Student)
+                {
+                    throw new BusinessRuleException(
+                        $"The account matching MSSV '{importedStudent.StudentCode}' or email '{importedStudent.Email}' is not a student account.");
+                }
+
+                var isLeader = importedStudent.FullName.Equals(importedGroup.LeaderName, StringComparison.OrdinalIgnoreCase);
+                var student = await dbContext.Students
+                    .FirstOrDefaultAsync(x => x.Code == importedStudent.StudentCode, cancellationToken);
+                if (student is null)
+                {
+                    student = new Student
+                    {
+                        UserId = user.Id,
+                        Code = importedStudent.StudentCode,
+                        FullName = importedStudent.FullName,
+                        ClassCode = "EXE101",
+                        Major = "Unspecified",
+                        GroupId = group.Id,
+                        IsLeader = isLeader
+                    };
+                    dbContext.Students.Add(student);
+                    studentsCreated++;
+                }
+                else
+                {
+                    if (student.UserId != user.Id)
+                    {
+                        throw new BusinessRuleException($"MSSV '{importedStudent.StudentCode}' belongs to a different user account.");
+                    }
+
+                    student.FullName = importedStudent.FullName;
+                    student.GroupId = group.Id;
+                    student.IsLeader = isLeader;
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (isNewUser)
+                {
+                    accountNotifications.Add((user, importedStudent.FullName));
+                }
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        foreach (var (user, fullName) in accountNotifications)
+        {
+            try
+            {
+                await SendAccountCreatedEmailAsync(user, fullName, TemporaryPassword, cancellationToken);
+                emailsSent++;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                emailsFailed++;
+            }
+        }
+
+        return new ExcelImportResult(groupsCreated, topicsCreated, studentsCreated, studentAccountsCreated, emailsSent, emailsFailed);
+    }
+
+    [Obsolete("Use ImportSelectedGroupColumnsAsync so lecturer assignment is explicit and only supported columns are imported.")]
     public async Task<ExcelImportResult> ImportGroupsAsync(Stream fileStream, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fileStream);
@@ -231,6 +394,18 @@ public sealed class ExcelImportService(
         }
 
         return new ExcelImportResult(groupsCreated, topicsCreated, studentsCreated, studentAccountsCreated, emailsSent, emailsFailed);
+    }
+
+    private static string BuildCode(string prefix, string projectTitle, string stableSuffix)
+    {
+        var normalizedTitle = Regex.Replace(projectTitle.ToUpperInvariant(), @"[^A-Z0-9]+", "_").Trim('_');
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            normalizedTitle = "PROJECT";
+        }
+
+        var code = $"{prefix}_{stableSuffix}_{normalizedTitle}";
+        return code.Length <= 50 ? code : code[..50].TrimEnd('_');
     }
 
     private static string GetCellString(IXLRow row, int colIndex)

@@ -62,6 +62,15 @@ If one account is missing in a fresh database, login as moderator and create it 
 5. Call `POST /api/review-availability/week/submit`.
 6. Call `GET /api/review-availability/week`.
 
+### Group Excel Import
+
+Call `POST /api/import/groups` as `TrainingDepartment` or `SystemAdministrator` using multipart form data:
+
+- `file`: `.xlsx` group list.
+- `lecturerId`: supervisor profile ID; use IDs returned by `GET /api/review-scheduling/board`.
+
+Only these Excel columns are imported: `Tên dự án (có thể trùng tên nhóm)`, `Họ & Tên`, `MSSV`, `Email (email trên FAP của SV)`, and `Họ & Tên Leader`. Other columns are ignored. Each project begins on a row containing a project title; following student rows with an empty project title belong to that project. The leader name must match exactly one student in the group.
+
 ### Review Scheduling Flow
 
 1. Login as `test.training`.
