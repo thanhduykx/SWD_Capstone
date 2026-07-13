@@ -140,7 +140,6 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     {
         ["POST /api/auth/login"] = Obj(
             ("username", Str("test.lecturer")),
-            ("examinerCode", Null()),
             ("password", Str("Test@123456"))),
         ["POST /api/auth/refresh"] = Obj(
             ("refreshToken", Str("paste-refresh-token-from-login"))),

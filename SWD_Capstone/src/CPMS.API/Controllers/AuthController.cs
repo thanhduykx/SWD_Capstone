@@ -25,10 +25,10 @@ public sealed class AuthController(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var loginCode = request.Username ?? request.ExaminerCode;
+        var loginCode = request.Username;
         if (string.IsNullOrWhiteSpace(loginCode))
         {
-            return BadRequest(new { error = "Username or examinerCode is required." });
+            return BadRequest(new { error = "Username is required." });
         }
 
 #pragma warning disable CA1862 // ToLower is required for EF Core translation
@@ -242,7 +242,7 @@ public sealed class AuthController(
     }
 }
 
-public sealed record LoginRequest(string? Username, string? ExaminerCode, string Password);
+public sealed record LoginRequest(string? Username, string Password);
 public sealed record GoogleLoginRequest(string IdToken);
 public sealed record RefreshRequest(string RefreshToken);
 public sealed record TokenResponse(string AccessToken, string RefreshToken, DateTime RefreshTokenExpiresAt);
