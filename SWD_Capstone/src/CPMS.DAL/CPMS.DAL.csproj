@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CPMS.BLL\CPMS.BLL.csproj" />
-    <ProjectReference Include="..\CPMS.Domain\CPMS.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

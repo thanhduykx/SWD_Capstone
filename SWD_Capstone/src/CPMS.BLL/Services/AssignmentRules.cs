@@ -1,7 +1,7 @@
-using CPMS.Core.Exceptions;
-using CPMS.Core.Enums;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Enums;
 
-namespace CPMS.Core.Services;
+namespace CPMS.BLL.Services;
 
 public sealed class AssignmentRules
 {

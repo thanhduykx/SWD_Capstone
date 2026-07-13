@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CPMS.BLL.Academic.Import;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 
 namespace CPMS.DAL.ExternalServices;
 

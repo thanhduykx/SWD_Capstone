@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 
-namespace CPMS.Core.Services;
+namespace CPMS.BLL.Services;
 
 public static partial class AccountUsernameGenerator
 {

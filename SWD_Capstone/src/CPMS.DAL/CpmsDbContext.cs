@@ -1,5 +1,5 @@
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.DAL.Data;

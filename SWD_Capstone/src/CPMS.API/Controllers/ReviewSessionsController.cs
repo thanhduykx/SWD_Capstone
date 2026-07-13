@@ -3,7 +3,7 @@ using System.Security.Claims;
 using CPMS.API.Contracts.Reviews;
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Sessions;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

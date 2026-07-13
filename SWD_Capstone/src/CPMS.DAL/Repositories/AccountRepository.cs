@@ -1,20 +1,18 @@
 using CPMS.BLL.Abstractions.Identity;
 using CPMS.BLL.DTOs.Accounts;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
-using CPMS.Shared.Models;
+using CPMS.BLL.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.DAL.Repositories;
 
 public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountRepository
 {
-    public IQueryable<User> QueryUsers() => dbContext.Users.AsNoTracking();
-
     public async Task<PagedResult<AccountResponse>> GetPagedAsync(PagedRequest request, CancellationToken cancellationToken)
     {
-        var query = QueryUsers();
+        var query = dbContext.Users.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLowerInvariant();
@@ -63,26 +61,73 @@ public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountReposit
     public async Task<bool> UsernameOrEmailExistsAsync(string username, string email, CancellationToken cancellationToken) =>
         await dbContext.Users.AnyAsync(x => x.Username == username || x.Email == email, cancellationToken);
 
-    public async Task AddUserWithProfileAsync(
-        User user,
-        object profile,
-        AuditLog auditLog,
+    public async Task<CreatedAccountState> AddUserWithProfileAsync(
+        CreateAccountPersistenceData account,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(account);
+        var user = new User
+        {
+            Username = account.Username,
+            Email = account.Email,
+            PasswordHash = account.PasswordHash,
+            Role = account.Role,
+            IsActive = true,
+            CreatedById = account.CreatedByUserId
+        };
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        SetUserId(profile, user.Id);
-        auditLog.EntityId = user.Id;
-
+        var profile = CreateRoleProfile(user.Id, account);
         dbContext.Add(profile);
-        dbContext.AuditLogs.Add(auditLog);
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            UserId = account.CreatedByUserId,
+            Action = "CREATE_ACCOUNT",
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            NewValue = account.Username,
+            IpAddress = account.IpAddress,
+            UserAgent = account.UserAgent
+        });
+        return new CreatedAccountState(
+            user.Id, user.Username, user.Email, user.Role, user.IsActive,
+            user.LastLoginAt, user.LockedUntil);
     }
 
-    private static void SetUserId(object profile, int userId)
-    {
-        var property = profile.GetType().GetProperty(nameof(Lecturer.UserId))
-            ?? throw new InvalidOperationException("Account role profile must expose UserId.");
-        property.SetValue(profile, userId);
-    }
+    private static object CreateRoleProfile(int userId, CreateAccountPersistenceData account) =>
+        account.Role switch
+        {
+            UserRole.Lecturer => new Lecturer
+            {
+                UserId = userId,
+                Code = account.IdentityCode,
+                FullName = account.FullName,
+                Department = account.Department,
+                IsPartTime = account.IsPartTime
+            },
+            UserRole.TrainingDepartment => new TrainingDepartment
+            {
+                UserId = userId,
+                DepartmentName = account.Department,
+                StaffCode = account.IdentityCode,
+                Position = account.Position
+            },
+            UserRole.SystemAdministrator => new SystemAdministrator
+            {
+                UserId = userId,
+                AdminLevel = account.Position,
+                PermissionScope = account.PermissionScope
+            },
+            UserRole.Student => new Student
+            {
+                UserId = userId,
+                Code = account.IdentityCode,
+                FullName = account.FullName,
+                ClassCode = account.ClassCode,
+                Batch = account.Batch,
+                Major = account.Major
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(account), "Unsupported account role.")
+        };
 }

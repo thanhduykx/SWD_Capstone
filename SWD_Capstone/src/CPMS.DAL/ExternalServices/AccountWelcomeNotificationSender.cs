@@ -1,6 +1,6 @@
 using CPMS.BLL.Abstractions.Messaging;
 using CPMS.BLL.Accounts;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 
 namespace CPMS.DAL.ExternalServices;
 

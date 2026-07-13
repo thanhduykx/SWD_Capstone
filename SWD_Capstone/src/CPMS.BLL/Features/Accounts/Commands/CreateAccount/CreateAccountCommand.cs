@@ -1,4 +1,4 @@
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 
 namespace CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 

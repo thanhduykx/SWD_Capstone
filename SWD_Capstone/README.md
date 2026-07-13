@@ -4,7 +4,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 
 ## Current Implementation
 
-- Clean Architecture ASP.NET Core solution under `src/`: `CPMS.API`, `CPMS.BLL`, `CPMS.Domain`, `CPMS.DAL`, `CPMS.Shared`.
+- Three-layer ASP.NET Core solution under `src/`: `CPMS.API`, `CPMS.BLL`, `CPMS.DAL`.
 - PostgreSQL 16 with EF Core/Npgsql covering the production reference entities: authentication, academic structure, documents/evaluation, review/defense, audit and notifications.
 - JWT access token and rotating refresh token endpoints, BCrypt password verification and login lockout handling.
 - API foundation for semesters, review-session assignment and defense score submission/locking.
@@ -31,7 +31,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 ## Stack
 
 - Backend: ASP.NET Core 9 MVC/Web API hybrid and EF Core 9.
-- Architecture: three-layer backend with API, BLL and DAL projects, supported by Domain and Shared projects.
+- Architecture: three-layer backend with API, BLL and DAL projects.
 - Real-time: ASP.NET Core SignalR over `/hubs/defense`.
 - Database: PostgreSQL 16 through `Npgsql.EntityFrameworkCore.PostgreSQL`.
 - Cache / messaging: Redis and RabbitMQ adapters are available through BLL abstractions.

@@ -1,8 +1,8 @@
 using CPMS.BLL.Defense.Management;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
-using CPMS.Shared.Models;
+using CPMS.BLL.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.DAL.Repositories.Defense;

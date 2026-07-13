@@ -1,10 +1,11 @@
 using System.Globalization;
 using System.Security.Claims;
 using Asp.Versioning;
+using CPMS.API.Contracts.Common;
 using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 using CPMS.BLL.Features.Accounts.Queries.GetAccounts;
-using CPMS.Core.Enums;
-using CPMS.Shared.Models;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Models;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

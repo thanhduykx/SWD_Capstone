@@ -1,7 +1,7 @@
-using CPMS.Core.Common;
-using CPMS.Core.Enums;
+using CPMS.DAL.Common;
+using CPMS.BLL.Enums;
 
-namespace CPMS.Core.Entities;
+namespace CPMS.DAL.Entities;
 
 public sealed class User : AuditableEntity
 {

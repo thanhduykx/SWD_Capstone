@@ -5,7 +5,7 @@ using CPMS.API.Contracts.Reviews;
 using CPMS.API.Services;
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Assessment;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

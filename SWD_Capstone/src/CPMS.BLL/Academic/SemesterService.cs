@@ -1,6 +1,6 @@
 using System.Globalization;
-using CPMS.Core.Exceptions;
-using CPMS.Shared.Models;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Models;
 
 namespace CPMS.BLL.Academic;
 

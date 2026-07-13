@@ -1,6 +1,6 @@
 using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Accounts;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 
 namespace CPMS.UnitTests.Services;
 

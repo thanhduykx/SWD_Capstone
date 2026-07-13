@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 using CPMS.BLL.Reviews.Assessment;
 
 namespace CPMS.API.Services;

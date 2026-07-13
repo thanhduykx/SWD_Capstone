@@ -1,4 +1,4 @@
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 using Microsoft.AspNetCore.Http;
 
 namespace CPMS.API.Contracts.Defense;

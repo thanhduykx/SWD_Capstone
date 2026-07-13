@@ -1,6 +1,6 @@
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 
-namespace CPMS.Core.Entities;
+namespace CPMS.DAL.Entities;
 
 public sealed class AuditLog
 {

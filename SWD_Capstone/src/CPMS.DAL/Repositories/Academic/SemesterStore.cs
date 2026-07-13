@@ -1,5 +1,5 @@
 using CPMS.BLL.Academic;
-using CPMS.Core.Entities;
+using CPMS.DAL.Entities;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 

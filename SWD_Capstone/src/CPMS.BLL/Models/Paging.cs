@@ -1,4 +1,4 @@
-namespace CPMS.Shared.Models;
+namespace CPMS.BLL.Models;
 
 public sealed record PagedRequest(
     int Page = 1,

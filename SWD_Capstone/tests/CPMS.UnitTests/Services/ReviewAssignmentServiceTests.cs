@@ -1,7 +1,7 @@
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Scheduling;
-using CPMS.Core.Enums;
-using CPMS.Core.Services;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Services;
 
 namespace CPMS.UnitTests.Services;
 

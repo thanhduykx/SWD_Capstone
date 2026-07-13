@@ -1,4 +1,4 @@
-namespace CPMS.Core.Common;
+namespace CPMS.DAL.Common;
 
 public abstract class AuditableEntity
 {

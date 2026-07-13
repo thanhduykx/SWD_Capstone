@@ -4,35 +4,46 @@ namespace CPMS.IntegrationTests;
 
 public sealed class DependencyRulesTests
 {
-    [Theory]
-    [InlineData("src/CPMS.Domain/CPMS.Domain.csproj")]
-    [InlineData("src/CPMS.Shared/CPMS.Shared.csproj")]
-    public void InnerProjects_DoNotReferenceOtherProjects(string projectPath)
+    [Fact]
+    public void SourceTree_ContainsExactlyApiBllAndDalProjects()
     {
-        var references = ProjectReferences(projectPath);
+        var root = FindRepositoryRoot();
+        var projects = Directory.GetFiles(
+                Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Select(Path.GetFileNameWithoutExtension)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(["CPMS.API", "CPMS.BLL", "CPMS.DAL"], projects);
+    }
+
+    [Fact]
+    public void BLL_HasNoProjectReferences()
+    {
+        var references = ProjectReferences("src/CPMS.BLL/CPMS.BLL.csproj");
 
         Assert.Empty(references);
     }
 
     [Fact]
-    public void BLL_ReferencesOnlyDomainAndShared()
-    {
-        var references = ProjectReferences("src/CPMS.BLL/CPMS.BLL.csproj");
-
-        Assert.Equal(
-            ["../CPMS.Domain/CPMS.Domain.csproj", "../CPMS.Shared/CPMS.Shared.csproj"],
-            references.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Select(Normalize));
-    }
-
-    [Fact]
-    public void DAL_ReferencesBLLAndDomain()
+    public void DAL_ReferencesOnlyBLL()
     {
         var references = ProjectReferences("src/CPMS.DAL/CPMS.DAL.csproj")
             .Select(Normalize)
             .ToArray();
 
-        Assert.Contains("../CPMS.BLL/CPMS.BLL.csproj", references);
-        Assert.Contains("../CPMS.Domain/CPMS.Domain.csproj", references);
+        Assert.Equal(["../CPMS.BLL/CPMS.BLL.csproj"], references);
+    }
+
+    [Fact]
+    public void API_ReferencesBLLAndDAL()
+    {
+        var references = ProjectReferences("src/CPMS.API/CPMS.API.csproj")
+            .Select(Normalize)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(
+            ["../CPMS.BLL/CPMS.BLL.csproj", "../CPMS.DAL/CPMS.DAL.csproj"],
+            references);
     }
 
     [Fact]

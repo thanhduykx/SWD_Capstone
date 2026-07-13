@@ -1,6 +1,6 @@
 using CPMS.BLL.Common.Exceptions;
-using CPMS.Core.Enums;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Exceptions;
 
 namespace CPMS.BLL.Reviews.Assessment;
 

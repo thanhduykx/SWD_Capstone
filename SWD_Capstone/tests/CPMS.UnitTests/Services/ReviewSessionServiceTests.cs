@@ -1,8 +1,8 @@
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Sessions;
-using CPMS.Core.Enums;
-using CPMS.Core.Exceptions;
-using CPMS.Core.Services;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Services;
 
 namespace CPMS.UnitTests.Services;
 
