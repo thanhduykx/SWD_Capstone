@@ -2,10 +2,8 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend-build
 WORKDIR /src
 
 COPY SWD_Capstone/Directory.Build.props ./
-COPY SWD_Capstone/src/CPMS.Domain/*.csproj src/CPMS.Domain/
-COPY SWD_Capstone/src/CPMS.Shared/*.csproj src/CPMS.Shared/
-COPY SWD_Capstone/src/CPMS.Application/*.csproj src/CPMS.Application/
-COPY SWD_Capstone/src/CPMS.Infrastructure/*.csproj src/CPMS.Infrastructure/
+COPY SWD_Capstone/src/CPMS.BLL/*.csproj src/CPMS.BLL/
+COPY SWD_Capstone/src/CPMS.DAL/*.csproj src/CPMS.DAL/
 COPY SWD_Capstone/src/CPMS.API/*.csproj src/CPMS.API/
 RUN dotnet restore "src/CPMS.API/CPMS.API.csproj"
 
