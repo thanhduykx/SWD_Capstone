@@ -55,7 +55,6 @@ builder.Services.AddScoped<SemesterResolverService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddSingleton<ReviewChecklistTemplateService>();
 builder.Services.AddScoped<IReviewEmailSender, SmtpReviewEmailSender>();
-builder.Services.AddScoped<ReviewAssignmentEmailNotifier>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddScoped<JwtTokenService>();
 

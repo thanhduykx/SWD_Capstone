@@ -49,6 +49,9 @@ public sealed class GroupReviewSlot
     public ReviewResult? Result { get; set; }
     public string? Notes { get; set; }
     public bool ConflictFlag { get; set; }
+    public ReviewGroupStatus Status { get; set; } = ReviewGroupStatus.Scheduled;
+    public DateTime? CompletedAt { get; set; }
+    public int? CompletedByLecturerId { get; set; }
 }
 
 public sealed class ReviewChecklistSubmission

@@ -80,6 +80,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.ToTable("students");
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasIndex(x => x.UserId).IsUnique();
+            entity.HasIndex(x => x.GroupId).IsUnique().HasFilter("\"is_leader\" = TRUE");
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -194,8 +195,8 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("review_availabilities", table =>
             {
-                table.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 7");
-                table.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 8");
+                table.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 5");
             });
             entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate, x.DayOfWeek, x.Slot }).IsUnique();
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
@@ -213,7 +214,8 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("review_sessions", table =>
             {
-                table.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 8");
+                table.HasCheckConstraint("ck_review_sessions_day_of_week", "day_of_week BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 5");
             });
             entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
             entity.HasIndex(x => new { x.SemesterId, x.Type, x.SessionDate, x.Slot });
@@ -226,16 +228,22 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         });
         modelBuilder.Entity<GroupReviewSlot>(entity =>
         {
-            entity.ToTable("group_review_slots");
+            entity.ToTable("group_review_slots", table =>
+            {
+                table.HasCheckConstraint("ck_group_review_slots_position", "group_position BETWEEN 1 AND 3");
+            });
             entity.HasIndex(x => new { x.SessionId, x.GroupId }).IsUnique();
+            entity.HasIndex(x => new { x.SessionId, x.GroupPosition }).IsUnique();
             entity.Property(x => x.Result).HasConversion<string>();
+            entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewGroupStatus.Scheduled);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.CompletedByLecturerId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ReviewChecklistSubmission>(entity =>
         {
             entity.ToTable("review_checklist_submissions");
-            entity.HasIndex(x => new { x.SessionId, x.ReviewerId }).IsUnique();
+            entity.HasIndex(x => new { x.SessionId, x.GroupId, x.ReviewerId }).IsUnique();
             entity.HasIndex(x => new { x.GroupId, x.Type });
             entity.Property(x => x.Type).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewSubmissionStatus.Draft);
@@ -257,7 +265,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         modelBuilder.Entity<ReviewSchedulePublication>(entity =>
         {
             entity.ToTable("review_schedule_publications");
-            entity.HasIndex(x => new { x.SemesterId, x.ReviewType, x.WeekStartDate });
+            entity.HasIndex(x => new { x.SemesterId, x.ReviewType, x.WeekStartDate }).IsUnique();
             entity.Property(x => x.ReviewType).HasConversion<string>();
             entity.Property(x => x.Subject).HasMaxLength(250);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
@@ -394,7 +402,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
                 table.HasCheckConstraint("ck_student_slot_registrations_day_of_week", "day_of_week BETWEEN 1 AND 6");
                 table.HasCheckConstraint("ck_student_slot_registrations_slot", "slot BETWEEN 1 AND 5");
             });
-            entity.HasIndex(x => new { x.ReviewRoundId, x.GroupId }).IsUnique();
+            entity.HasIndex(x => new { x.ReviewRoundId, x.GroupId, x.DayOfWeek, x.Slot }).IsUnique();
             entity.HasIndex(x => new { x.ReviewRoundId, x.DayOfWeek, x.Slot });
             entity.HasOne<ReviewRound>().WithMany().HasForeignKey(x => x.ReviewRoundId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
@@ -404,6 +412,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("review_attendances");
             entity.HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
+            entity.Property(x => x.Note).HasMaxLength(1000);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.MarkedByLecturerId).OnDelete(DeleteBehavior.Restrict);
@@ -412,6 +421,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("review_comments");
             entity.HasIndex(x => new { x.SessionId, x.GroupId });
+            entity.Property(x => x.Content).HasMaxLength(2000);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);

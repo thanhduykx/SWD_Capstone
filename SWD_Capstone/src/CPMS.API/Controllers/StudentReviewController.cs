@@ -3,6 +3,7 @@ using System.Security.Claims;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Infrastructure.Data;
+using CPMS.Core.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +13,12 @@ namespace CPMS.Api.Controllers;
 [ApiController]
 [Route("api/student-review")]
 [Authorize]
-public sealed class StudentReviewController(CpmsDbContext dbContext) : ControllerBase
+public sealed class StudentReviewController(CpmsDbContext dbContext, AssignmentRules rules) : ControllerBase
 {
-    private const int MaxGroupsPerSlot = 3;
+    private const int RequiredAvailabilityCount = AssignmentRules.RequiredStudentAvailabilityCount;
 
     [HttpGet("rounds")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Student")]
     public async Task<IReadOnlyList<StudentReviewRoundResponse>> GetRounds([FromQuery] int? semesterId, CancellationToken cancellationToken)
     {
         var student = await CurrentStudentAsyncSafe(cancellationToken);
@@ -47,13 +48,13 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                 x.Status,
                 x.WeekStartDate,
                 x.WeekEndDate,
-                dbContext.StudentSlotRegistrations.Any(reg =>
-                    reg.ReviewRoundId == x.Id && reg.GroupId == groupId)))
+                dbContext.StudentSlotRegistrations.Count(reg =>
+                    reg.ReviewRoundId == x.Id && reg.GroupId == groupId) == RequiredAvailabilityCount))
             .ToListAsync(cancellationToken);
     }
 
     [HttpGet("slots")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Student")]
     public async Task<ActionResult<StudentSlotGridResponse>> GetSlotGrid(
         int roundId,
         CancellationToken cancellationToken)
@@ -66,19 +67,19 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
             return NotFound(new { error = "Review round not found." });
         }
 
-        var registrations = await dbContext.StudentSlotRegistrations
-            .Where(x => x.ReviewRoundId == roundId)
+        var registrations = student?.GroupId is int groupId
+            ? await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == roundId && x.GroupId == groupId)
+            .OrderBy(x => x.DayOfWeek)
+            .ThenBy(x => x.Slot)
             .Select(x => new StudentSlotRegistrationResponse(
                 x.Id,
                 x.GroupId,
                 dbContext.CapstoneGroups.Where(g => g.Id == x.GroupId).Select(g => g.Code).Single(),
                 x.DayOfWeek,
                 x.Slot))
-            .ToListAsync(cancellationToken);
-
-        var myRegistration = student != null && student.GroupId.HasValue
-            ? registrations.FirstOrDefault(r => r.GroupId == student.GroupId.Value)
-            : null;
+            .ToListAsync(cancellationToken)
+            : [];
 
         return Ok(new StudentSlotGridResponse(
             round.Id,
@@ -86,13 +87,14 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
             round.Status,
             round.WeekStartDate,
             round.WeekEndDate,
-            registrations,
-            myRegistration));
+            RequiredAvailabilityCount,
+            registrations));
     }
 
-    [HttpPost("register")]
-    public async Task<ActionResult<StudentSlotRegistrationResponse>> RegisterSlot(
-        RegisterSlotRequest request,
+    [HttpPut("slots")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<StudentSlotGridResponse>> SaveAvailability(
+        SaveStudentAvailabilityRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -114,14 +116,19 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
             return BadRequest(new { error = "Registration is not open for this review round." });
         }
 
-        if (request.DayOfWeek is < 1 or > 6)
+        if (request.Slots is null)
         {
-            return BadRequest(new { error = "Day of week must be between 1 (Mon) and 6 (Sat)." });
+            return BadRequest(new { error = "Slots are required." });
         }
 
-        if (request.Slot is < 1 or > 5)
+        var slots = request.Slots.Distinct().ToArray();
+        try
         {
-            return BadRequest(new { error = "Slot must be between 1 and 5." });
+            rules.ValidateStudentAvailability(slots.Select(x => (x.DayOfWeek, x.Slot)).ToArray());
+        }
+        catch (CPMS.Core.Exceptions.BusinessRuleException exception)
+        {
+            return BadRequest(new { error = exception.Message });
         }
 
         // Verify student is group leader (first student by code in group)
@@ -131,51 +138,34 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
             return BadRequest(new { error = "Only the group leader can register a review slot." });
         }
 
-        // Check if already registered in this round
-        var existingRegistration = await dbContext.StudentSlotRegistrations
-            .AnyAsync(x => x.ReviewRoundId == request.RoundId && x.GroupId == student.GroupId.Value, cancellationToken);
-        if (existingRegistration)
+        var groupSemesterId = await dbContext.CapstoneGroups
+            .Where(x => x.Id == student.GroupId.Value)
+            .Select(x => (int?)x.SemesterId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (groupSemesterId != round.SemesterId)
         {
-            return BadRequest(new { error = "Your group is already registered for a slot in this round. Unregister first to change." });
+            return BadRequest(new { error = "Your capstone group does not belong to this review round's semester." });
         }
 
-        // Check max 3 groups per slot
-        var groupsInSlot = await dbContext.StudentSlotRegistrations
-            .CountAsync(x => x.ReviewRoundId == request.RoundId &&
-                           x.DayOfWeek == request.DayOfWeek &&
-                           x.Slot == request.Slot, cancellationToken);
-        if (groupsInSlot >= MaxGroupsPerSlot)
-        {
-            return BadRequest(new { error = $"This slot already has {MaxGroupsPerSlot} groups registered. Choose another slot." });
-        }
-
-        var registration = new StudentSlotRegistration
+        var existing = await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == request.RoundId && x.GroupId == student.GroupId.Value)
+            .ToListAsync(cancellationToken);
+        dbContext.StudentSlotRegistrations.RemoveRange(existing);
+        dbContext.StudentSlotRegistrations.AddRange(slots.Select(slot => new StudentSlotRegistration
         {
             ReviewRoundId = request.RoundId,
             GroupId = student.GroupId.Value,
             RegisteredByStudentId = student.Id,
-            DayOfWeek = request.DayOfWeek,
-            Slot = request.Slot
-        };
-
-        dbContext.StudentSlotRegistrations.Add(registration);
+            DayOfWeek = slot.DayOfWeek,
+            Slot = slot.Slot
+        }));
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        var groupCode = await dbContext.CapstoneGroups
-            .Where(g => g.Id == student.GroupId.Value)
-            .Select(g => g.Code)
-            .SingleAsync(cancellationToken);
-
-        return Ok(new StudentSlotRegistrationResponse(
-            registration.Id,
-            registration.GroupId,
-            groupCode,
-            registration.DayOfWeek,
-            registration.Slot));
+        return await GetSlotGrid(request.RoundId, cancellationToken);
     }
 
-    [HttpDelete("register")]
-    public async Task<ActionResult> UnregisterSlot(
+    [HttpDelete("slots")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> ClearAvailability(
         int roundId,
         CancellationToken cancellationToken)
     {
@@ -202,14 +192,15 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
             return BadRequest(new { error = "Only the group leader can unregister." });
         }
 
-        var registration = await dbContext.StudentSlotRegistrations
-            .SingleOrDefaultAsync(x => x.ReviewRoundId == roundId && x.GroupId == student.GroupId.Value, cancellationToken);
-        if (registration is null)
+        var registrations = await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == roundId && x.GroupId == student.GroupId.Value)
+            .ToListAsync(cancellationToken);
+        if (registrations.Count == 0)
         {
             return NotFound(new { error = "No registration found for your group in this round." });
         }
 
-        dbContext.StudentSlotRegistrations.Remove(registration);
+        dbContext.StudentSlotRegistrations.RemoveRange(registrations);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new { message = "Slot registration cancelled." });
@@ -228,7 +219,7 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
         return await dbContext.GroupReviewSlots
             .Where(x => x.GroupId == student.GroupId.Value)
             .Join(
-                dbContext.ReviewSessions.Where(s => s.Status != ReviewSessionStatus.Cancelled),
+                dbContext.ReviewSessions.Where(s => s.Status == ReviewSessionStatus.Published),
                 slot => slot.SessionId,
                 session => session.Id,
                 (slot, session) => new StudentScheduleResponse(
@@ -238,7 +229,9 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
                     session.SessionDate,
                     session.Slot,
                     session.Room,
-                    session.Status))
+                    session.Status,
+                    slot.Status,
+                    slot.CompletedAt))
             .OrderBy(x => x.SessionDate)
             .ThenBy(x => x.Slot)
             .ToListAsync(cancellationToken);
@@ -254,7 +247,11 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
         }
 
         return await dbContext.ReviewAttendances
-            .Where(x => x.StudentId == student.Id)
+            .Where(x => x.StudentId == student.Id &&
+                        dbContext.GroupReviewSlots.Any(slot =>
+                            slot.SessionId == x.SessionId &&
+                            slot.GroupId == student.GroupId &&
+                            slot.Status == ReviewGroupStatus.Completed))
             .OrderByDescending(x => x.MarkedAt)
             .Select(x => new StudentAttendanceResponse(
                 x.SessionId,
@@ -272,6 +269,19 @@ public sealed class StudentReviewController(CpmsDbContext dbContext) : Controlle
     {
         var student = await CurrentStudentAsyncSafe(cancellationToken);
         if (student is null || !student.GroupId.HasValue)
+        {
+            return [];
+        }
+
+        var canView = await dbContext.ReviewSessions.AnyAsync(x =>
+            x.Id == sessionId &&
+            x.Status == ReviewSessionStatus.Published &&
+            dbContext.GroupReviewSlots.Any(slot =>
+                slot.SessionId == x.Id &&
+                slot.GroupId == student.GroupId.Value &&
+                slot.Status == ReviewGroupStatus.Completed),
+            cancellationToken);
+        if (!canView)
         {
             return [];
         }
@@ -339,8 +349,8 @@ public sealed record StudentSlotGridResponse(
     ReviewRoundStatus Status,
     DateOnly WeekStartDate,
     DateOnly WeekEndDate,
-    IReadOnlyCollection<StudentSlotRegistrationResponse> Registrations,
-    StudentSlotRegistrationResponse? MyRegistration);
+    int RequiredAvailabilityCount,
+    IReadOnlyCollection<StudentSlotRegistrationResponse> MyAvailability);
 
 public sealed record StudentSlotRegistrationResponse(
     int Id,
@@ -349,7 +359,11 @@ public sealed record StudentSlotRegistrationResponse(
     int DayOfWeek,
     int Slot);
 
-public sealed record RegisterSlotRequest(int RoundId, int DayOfWeek, int Slot);
+public sealed record ReviewSlotSelection(int DayOfWeek, int Slot);
+
+public sealed record SaveStudentAvailabilityRequest(
+    int RoundId,
+    IReadOnlyCollection<ReviewSlotSelection> Slots);
 
 public sealed record StudentScheduleResponse(
     int SessionId,
@@ -358,7 +372,9 @@ public sealed record StudentScheduleResponse(
     DateTime SessionDate,
     int Slot,
     string Room,
-    ReviewSessionStatus Status);
+    ReviewSessionStatus Status,
+    ReviewGroupStatus GroupStatus,
+    DateTime? CompletedAt);
 
 public sealed record StudentAttendanceResponse(
     int SessionId,

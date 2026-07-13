@@ -17,7 +17,7 @@ namespace CPMS.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.20")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -873,6 +873,14 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int?>("CompletedByLecturerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_by_lecturer_id");
+
                     b.Property<bool>("ConflictFlag")
                         .HasColumnType("boolean")
                         .HasColumnName("conflict_flag");
@@ -897,8 +905,18 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("session_id");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Scheduled")
+                        .HasColumnName("status");
+
                     b.HasKey("Id")
                         .HasName("pk_group_review_slots");
+
+                    b.HasIndex("CompletedByLecturerId")
+                        .HasDatabaseName("ix_group_review_slots_completed_by_lecturer_id");
 
                     b.HasIndex("GroupId")
                         .HasDatabaseName("ix_group_review_slots_group_id");
@@ -907,7 +925,14 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_group_review_slots_session_id_group_id");
 
-                    b.ToTable("group_review_slots", (string)null);
+                    b.HasIndex("SessionId", "GroupPosition")
+                        .IsUnique()
+                        .HasDatabaseName("ix_group_review_slots_session_id_group_position");
+
+                    b.ToTable("group_review_slots", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_group_review_slots_position", "group_position BETWEEN 1 AND 3");
+                        });
                 });
 
             modelBuilder.Entity("CPMS.Core.Entities.InlineComment", b =>
@@ -1143,7 +1168,8 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasColumnName("marked_by_lecturer_id");
 
                     b.Property<string>("Note")
-                        .HasColumnType("text")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
                         .HasColumnName("note");
 
                     b.Property<int>("SessionId")
@@ -1215,9 +1241,9 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     b.ToTable("review_availabilities", null, t =>
                         {
-                            t.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 7");
+                            t.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 6");
 
-                            t.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 8");
+                            t.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 5");
                         });
                 });
 
@@ -1381,9 +1407,9 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.HasIndex("GroupId", "Type")
                         .HasDatabaseName("ix_review_checklist_submissions_group_id_type");
 
-                    b.HasIndex("SessionId", "ReviewerId")
+                    b.HasIndex("SessionId", "GroupId", "ReviewerId")
                         .IsUnique()
-                        .HasDatabaseName("ix_review_checklist_submissions_session_id_reviewer_id");
+                        .HasDatabaseName("ix_review_checklist_submissions_session_id_group_id_reviewer_id");
 
                     b.ToTable("review_checklist_submissions", (string)null);
                 });
@@ -1403,7 +1429,8 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("content");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1547,6 +1574,7 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasDatabaseName("ix_review_schedule_publications_published_by_training_departme");
 
                     b.HasIndex("SemesterId", "ReviewType", "WeekStartDate")
+                        .IsUnique()
                         .HasDatabaseName("ix_review_schedule_publications_semester_id_review_type_week_s");
 
                     b.ToTable("review_schedule_publications", (string)null);
@@ -1636,7 +1664,9 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     b.ToTable("review_sessions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 8");
+                            t.HasCheckConstraint("ck_review_sessions_day_of_week", "day_of_week BETWEEN 1 AND 6");
+
+                            t.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 5");
                         });
                 });
 
@@ -1937,7 +1967,9 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasDatabaseName("ix_students_code");
 
                     b.HasIndex("GroupId")
-                        .HasDatabaseName("ix_students_group_id");
+                        .IsUnique()
+                        .HasDatabaseName("ix_students_group_id")
+                        .HasFilter("\"is_leader\" = TRUE");
 
                     b.HasIndex("UserId")
                         .IsUnique()
@@ -1988,12 +2020,12 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.HasIndex("RegisteredByStudentId")
                         .HasDatabaseName("ix_student_slot_registrations_registered_by_student_id");
 
-                    b.HasIndex("ReviewRoundId", "GroupId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_student_slot_registrations_review_round_id_group_id");
-
                     b.HasIndex("ReviewRoundId", "DayOfWeek", "Slot")
                         .HasDatabaseName("ix_student_slot_registrations_review_round_id_day_of_week_slot");
+
+                    b.HasIndex("ReviewRoundId", "GroupId", "DayOfWeek", "Slot")
+                        .IsUnique()
+                        .HasDatabaseName("ix_student_slot_registrations_review_round_id_group_id_day_of_");
 
                     b.ToTable("student_slot_registrations", null, t =>
                         {
@@ -2528,6 +2560,12 @@ namespace CPMS.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("CPMS.Core.Entities.GroupReviewSlot", b =>
                 {
+                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("CompletedByLecturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_group_review_slots_lecturers_completed_by_lecturer_id");
+
                     b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")

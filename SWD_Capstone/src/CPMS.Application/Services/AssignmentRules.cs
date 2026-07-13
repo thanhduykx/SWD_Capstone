@@ -1,14 +1,18 @@
 using CPMS.Core.Exceptions;
+using CPMS.Core.Enums;
 
 namespace CPMS.Core.Services;
 
 public sealed class AssignmentRules
 {
+    public const int RequiredStudentAvailabilityCount = 5;
+    public const int MaxGroupsPerReviewSession = 3;
+
     public void ValidateReviewSlot(int slot)
     {
-        if (slot is < 1 or > 8)
+        if (slot is < 1 or > 5)
         {
-            throw new BusinessRuleException("Review slot must be between 1 and 8.");
+            throw new BusinessRuleException("Review slot must be between 1 and 5.");
         }
     }
 
@@ -76,6 +80,42 @@ public sealed class AssignmentRules
         if (alreadyScheduled)
         {
             throw new BusinessRuleException("A capstone group already has a session for this review round.");
+        }
+    }
+
+    public void ValidateStudentAvailability(IReadOnlyCollection<(int DayOfWeek, int Slot)> slots)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+        if (slots.Count != RequiredStudentAvailabilityCount || slots.Distinct().Count() != RequiredStudentAvailabilityCount)
+        {
+            throw new BusinessRuleException($"Exactly {RequiredStudentAvailabilityCount} distinct available slots must be selected.");
+        }
+
+        if (slots.Any(x => x.DayOfWeek is < 1 or > 6 || x.Slot is < 1 or > 5))
+        {
+            throw new BusinessRuleException("Student availability must use Monday-Saturday and slots 1-5.");
+        }
+    }
+
+    public void EnsureReviewRoundTransition(ReviewRoundStatus current, ReviewRoundStatus next)
+    {
+        var valid = (current, next) switch
+        {
+            (ReviewRoundStatus.Draft, ReviewRoundStatus.Open) => true,
+            (ReviewRoundStatus.Open, ReviewRoundStatus.Closed) => true,
+            _ => false
+        };
+        if (!valid)
+        {
+            throw new BusinessRuleException($"Review round cannot transition from {current} to {next}.");
+        }
+    }
+
+    public void EnsureReviewSessionCapacity(int existingGroupCount)
+    {
+        if (existingGroupCount is < 0 or >= MaxGroupsPerReviewSession)
+        {
+            throw new BusinessRuleException($"A review session can contain at most {MaxGroupsPerReviewSession} groups.");
         }
     }
 

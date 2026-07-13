@@ -15,6 +15,7 @@ public enum EvaluationTriggerType { Auto, Manual }
 public enum ReviewType { Review1, Review2, Review3 }
 public enum ReviewResult { Pass, Fail, Defense2, Drop }
 public enum ReviewSessionStatus { Draft, Published, Cancelled }
+public enum ReviewGroupStatus { Scheduled, Completed }
 public enum ReviewSubmissionStatus { Draft, Submitted }
 public enum ReviewChecklistAnswer { Yes, No, NotApplicable }
 public enum CouncilType { Defense1, Defense2 }
