@@ -256,13 +256,9 @@ static async Task InitializeDatabaseAsync(WebApplication app)
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CpmsDbContext>();
         await dbContext.Database.MigrateAsync();
-        await Program.SeedAdminAccountAsync(app.Configuration, dbContext);
         await Program.SeedModeratorAccountAsync(dbContext);
         await Program.SeedTestAccountsAsync(dbContext);
-
-
-
-        // Business data must come from official import/admin flows. Admin seeding is opt-in for deployments.
+        await Program.SeedTestAcademicDataAsync(dbContext);
     }
     catch (Npgsql.NpgsqlException exception)
     {
@@ -282,77 +278,6 @@ static string GetCpmsConnectionString(IConfiguration configuration)
 
 public partial class Program
 {
-    public static async Task SeedAdminAccountAsync(IConfiguration configuration, CpmsDbContext dbContext)
-    {
-        if (!configuration.GetValue<bool>("AdminSeed:Enabled"))
-        {
-            return;
-        }
-
-        var username = configuration["AdminSeed:Username"]?.Trim();
-        var email = configuration["AdminSeed:Email"]?.Trim();
-        var password = configuration["AdminSeed:Password"];
-        if (string.IsNullOrWhiteSpace(username) ||
-            string.IsNullOrWhiteSpace(email) ||
-            string.IsNullOrWhiteSpace(password))
-        {
-            throw new InvalidOperationException(
-                "Admin seed is enabled, but AdminSeed:Username, AdminSeed:Email, or AdminSeed:Password is missing.");
-        }
-
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
-        var user = await dbContext.Users
-            .FirstOrDefaultAsync(x => x.Username == username || x.Email == email);
-
-        if (user is null)
-        {
-            user = new User
-            {
-                Username = username,
-                Email = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12),
-                Role = UserRole.SystemAdministrator,
-                IsActive = true
-            };
-            dbContext.Users.Add(user);
-            await dbContext.SaveChangesAsync();
-        }
-        else
-        {
-            user.Username = username;
-            user.Email = email;
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
-            user.Role = UserRole.SystemAdministrator;
-            user.IsActive = true;
-            user.LockedUntil = null;
-            user.FailedLoginAttempts = 0;
-            user.UpdatedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync();
-        }
-
-        if (!await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == user.Id))
-        {
-            dbContext.SystemAdministrators.Add(new SystemAdministrator
-            {
-                UserId = user.Id,
-                AdminLevel = "Root",
-                PermissionScope = "System"
-            });
-        }
-
-        dbContext.AuditLogs.Add(new AuditLog
-        {
-            UserId = user.Id,
-            Action = "SEED_ADMIN_ACCOUNT",
-            EntityType = nameof(User),
-            EntityId = user.Id,
-            NewValue = user.Username,
-            UserAgent = "ApplicationStartup"
-        });
-        await dbContext.SaveChangesAsync();
-        await transaction.CommitAsync();
-    }
-
     public static async Task SeedModeratorAccountAsync(CpmsDbContext dbContext)
     {
         var username = "Admin@gmail.com";
@@ -469,4 +394,169 @@ public partial class Program
             await transaction.CommitAsync();
         }
     }
+
+    public static async Task SeedTestAcademicDataAsync(CpmsDbContext dbContext)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        var lecturer = await dbContext.Lecturers.SingleOrDefaultAsync(x => x.Code == "LEC_TEST")
+            ?? throw new InvalidOperationException("The test lecturer profile must be seeded before test academic data.");
+        var semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        if (semester is null)
+        {
+            semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026");
+            if (semester is null)
+            {
+                semester = new Semester
+                {
+                    Code = "SU2026",
+                    Name = "Summer 2026",
+                    AcademicYear = "2025-2026",
+                    StartDate = new DateOnly(2026, 5, 1),
+                    EndDate = new DateOnly(2026, 8, 31),
+                    IsActive = true
+                };
+                dbContext.Semesters.Add(semester);
+                await dbContext.SaveChangesAsync();
+            }
+            else
+            {
+                semester.IsActive = true;
+            }
+        }
+
+        const string projectTitle = "Smart Home Inventory";
+        var topic = await dbContext.Topics.FirstOrDefaultAsync(x =>
+            x.SemesterId == semester.Id && (x.NameVn == projectTitle || x.NameEn == projectTitle));
+        if (topic is null)
+        {
+            topic = new Topic
+            {
+                Code = BuildUniqueTestTopicCode(semester.Code),
+                NameVn = projectTitle,
+                NameEn = projectTitle,
+                SemesterId = semester.Id
+            };
+            dbContext.Topics.Add(topic);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            topic.NameVn = projectTitle;
+            topic.NameEn = projectTitle;
+        }
+
+        var group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
+            x.SemesterId == semester.Id && x.TopicId == topic.Id);
+        if (group is null)
+        {
+            group = new CapstoneGroup
+            {
+                Code = "TEST_GROUP_SMART_HOME",
+                TopicId = topic.Id,
+                SemesterId = semester.Id,
+                LecturerId = lecturer.Id,
+                Status = GroupStatus.Active
+            };
+            dbContext.CapstoneGroups.Add(group);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            group.LecturerId = lecturer.Id;
+            group.Status = GroupStatus.Active;
+        }
+
+        var students = new[]
+        {
+            new TestStudentSeed("Huỳnh Nhật Thịnh", "SE194673", "duongduy12317@gmail.com", false),
+            new TestStudentSeed("Phạm Thị Ánh", "SE182446", "thanhduykx@gmail.com", false),
+            new TestStudentSeed("Dương Thành Thanh Duy", "SS180745", "victornhatthinh@gmail.com", true),
+            new TestStudentSeed("Trương Đinh Hồng Nhung", "SS194356", "a@gmail.com", false),
+            new TestStudentSeed("Vũ Minh Quang", "SE192755", "acc@gmail.com", false),
+            new TestStudentSeed("Nguyễn Minh Thành", "SE191034", "ab@gmail.com", false)
+        };
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12);
+
+        foreach (var seed in students)
+        {
+            var student = await dbContext.Students.FirstOrDefaultAsync(x => x.Code == seed.Code);
+            var username = AccountUsernameGenerator.Generate(seed.FullName, seed.Code);
+            User? user;
+
+            if (student is not null)
+            {
+                user = await dbContext.Users.SingleAsync(x => x.Id == student.UserId);
+            }
+            else
+            {
+                user = await dbContext.Users.FirstOrDefaultAsync(x => x.Username == username || x.Email == seed.Email);
+            }
+
+            if (user is null)
+            {
+                user = new User
+                {
+                    Username = username,
+                    Email = seed.Email,
+                    PasswordHash = passwordHash,
+                    Role = UserRole.Student,
+                    IsActive = true
+                };
+                dbContext.Users.Add(user);
+                await dbContext.SaveChangesAsync();
+            }
+            else
+            {
+                if (user.Role != UserRole.Student)
+                {
+                    throw new InvalidOperationException($"Test student {seed.Code} conflicts with a non-student account.");
+                }
+
+                user.Username = username;
+                user.Email = seed.Email;
+                user.PasswordHash = passwordHash;
+                user.IsActive = true;
+                user.LockedUntil = null;
+                user.FailedLoginAttempts = 0;
+                user.UpdatedAt = DateTime.UtcNow;
+            }
+
+            if (student is null)
+            {
+                student = new Student
+                {
+                    UserId = user.Id,
+                    Code = seed.Code,
+                    FullName = seed.FullName,
+                    ClassCode = "EXE101",
+                    Major = "Unspecified",
+                    GroupId = group.Id,
+                    IsLeader = seed.IsLeader
+                };
+                dbContext.Students.Add(student);
+            }
+            else
+            {
+                student.FullName = seed.FullName;
+                student.ClassCode = "EXE101";
+                student.Major = "Unspecified";
+                student.GroupId = group.Id;
+                student.IsLeader = seed.IsLeader;
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+    }
+
+    private static string BuildUniqueTestTopicCode(string semesterCode)
+    {
+        var code = $"TEST_TOPIC_{semesterCode}_SMART_HOME";
+        return code.Length <= 50 ? code : code[..50];
+    }
+
+    private sealed record TestStudentSeed(string FullName, string Code, string Email, bool IsLeader);
 }
