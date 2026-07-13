@@ -16,7 +16,7 @@ namespace CPMS.Api.Controllers;
 public sealed class DefenseManagementController(CpmsDbContext dbContext) : ControllerBase
 {
     [HttpGet("rounds")]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<PagedResult<DefenseRoundResponse>> GetRounds(
         [FromQuery] PagedRequest request,
         CancellationToken cancellationToken)
