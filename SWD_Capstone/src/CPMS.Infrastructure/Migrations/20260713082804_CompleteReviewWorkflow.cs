@@ -59,6 +59,10 @@ namespace CPMS.Infrastructure.Migrations
                 DELETE FROM review_availabilities
                 WHERE day_of_week NOT BETWEEN 1 AND 6 OR slot NOT BETWEEN 1 AND 5;
 
+                UPDATE review_sessions
+                SET status = 'Cancelled'
+                WHERE day_of_week NOT BETWEEN 1 AND 6 OR slot NOT BETWEEN 1 AND 5;
+
                 WITH ranked AS (
                     SELECT id, ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY group_position, id) AS new_position
                     FROM group_review_slots
@@ -67,6 +71,13 @@ namespace CPMS.Infrastructure.Migrations
                 SET group_position = ranked.new_position
                 FROM ranked
                 WHERE target.id = ranked.id;
+
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM group_review_slots WHERE group_position > 3) THEN
+                        RAISE EXCEPTION 'Cannot enforce the three-groups-per-session rule: legacy review sessions with more than three groups require manual remediation.';
+                    END IF;
+                END $$;
 
                 DELETE FROM review_schedule_publications AS duplicate
                 USING review_schedule_publications AS keeper
@@ -82,10 +93,15 @@ namespace CPMS.Infrastructure.Migrations
                 columns: new[] { "review_round_id", "group_id", "day_of_week", "slot" },
                 unique: true);
 
-            migrationBuilder.Sql(
-                "ALTER TABLE review_sessions ADD CONSTRAINT ck_review_sessions_day_of_week CHECK (day_of_week BETWEEN 1 AND 6) NOT VALID;");
-            migrationBuilder.Sql(
-                "ALTER TABLE review_sessions ADD CONSTRAINT ck_review_sessions_slot CHECK (slot BETWEEN 1 AND 5) NOT VALID;");
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_review_sessions_day_of_week",
+                table: "review_sessions",
+                sql: "status = 'Cancelled' OR day_of_week BETWEEN 1 AND 6");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_review_sessions_slot",
+                table: "review_sessions",
+                sql: "status = 'Cancelled' OR slot BETWEEN 1 AND 5");
 
             migrationBuilder.CreateIndex(
                 name: "ix_review_schedule_publications_semester_id_review_type_week_s",
@@ -120,8 +136,10 @@ namespace CPMS.Infrastructure.Migrations
                 columns: new[] { "session_id", "group_position" },
                 unique: true);
 
-            migrationBuilder.Sql(
-                "ALTER TABLE group_review_slots ADD CONSTRAINT ck_group_review_slots_position CHECK (group_position BETWEEN 1 AND 3) NOT VALID;");
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_group_review_slots_position",
+                table: "group_review_slots",
+                sql: "group_position BETWEEN 1 AND 3");
 
             migrationBuilder.AddForeignKey(
                 name: "fk_group_review_slots_lecturers_completed_by_lecturer_id",
@@ -190,6 +208,21 @@ namespace CPMS.Infrastructure.Migrations
             migrationBuilder.DropColumn(
                 name: "status",
                 table: "group_review_slots");
+
+            migrationBuilder.Sql(
+                """
+                DELETE FROM student_slot_registrations AS duplicate
+                USING student_slot_registrations AS keeper
+                WHERE duplicate.review_round_id = keeper.review_round_id
+                  AND duplicate.group_id = keeper.group_id
+                  AND duplicate.id > keeper.id;
+
+                DELETE FROM review_checklist_submissions AS duplicate
+                USING review_checklist_submissions AS keeper
+                WHERE duplicate.session_id = keeper.session_id
+                  AND duplicate.reviewer_id = keeper.reviewer_id
+                  AND duplicate.id > keeper.id;
+                """);
 
             migrationBuilder.CreateIndex(
                 name: "ix_student_slot_registrations_review_round_id_group_id",

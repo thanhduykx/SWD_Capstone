@@ -5,6 +5,7 @@ namespace CPMS.Core.Entities;
 public sealed class ReviewAvailability
 {
     public int Id { get; set; }
+    public int ReviewRoundId { get; set; }
     public int SemesterId { get; set; }
     public int LecturerId { get; set; }
     public DateOnly WeekStartDate { get; set; }
@@ -16,6 +17,7 @@ public sealed class ReviewAvailability
 public sealed class ReviewAvailabilitySubmission
 {
     public int Id { get; set; }
+    public int ReviewRoundId { get; set; }
     public int SemesterId { get; set; }
     public int LecturerId { get; set; }
     public DateOnly WeekStartDate { get; set; }
@@ -101,6 +103,7 @@ public sealed class EmailDeliveryLog
     public int? RecipientUserId { get; set; }
     public required string RecipientEmail { get; set; }
     public required string Subject { get; set; }
+    public required string Body { get; set; }
     public EmailDeliveryStatus Status { get; set; } = EmailDeliveryStatus.Pending;
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

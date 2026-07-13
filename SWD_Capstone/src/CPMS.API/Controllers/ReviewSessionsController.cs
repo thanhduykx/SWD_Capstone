@@ -26,6 +26,7 @@ public sealed class ReviewSessionsController(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var response = await CreateSessionAsync(
             new BulkAssignReviewSessionRequest(
                 request.Code,
@@ -38,6 +39,7 @@ public sealed class ReviewSessionsController(
                 request.Room,
                 request.SessionDate),
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return CreatedAtAction(nameof(Create), new { response.Id }, response);
     }
@@ -49,6 +51,10 @@ public sealed class ReviewSessionsController(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Sessions is null)
+        {
+            return BadRequest(new { error = "Sessions is required." });
+        }
         if (request.Sessions.Count == 0)
         {
             return BadRequest(new { error = "At least one review session assignment is required." });
@@ -77,6 +83,7 @@ public sealed class ReviewSessionsController(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
         if (session is null)
         {
@@ -111,6 +118,12 @@ public sealed class ReviewSessionsController(
         {
             return Conflict(new { error = "The review round must remain Closed while Draft assignments are edited." });
         }
+        await AcquireReviewRoundLockAsync(session.SemesterId, session.Type, weekStart, cancellationToken);
+        await dbContext.Entry(round).ReloadAsync(cancellationToken);
+        if (round.Status != ReviewRoundStatus.Closed)
+        {
+            return Conflict(new { error = "The review round must remain Closed while Draft assignments are edited." });
+        }
 
         var validGroupAvailabilityCount = await dbContext.StudentSlotRegistrations
             .Where(x => x.ReviewRoundId == round.Id && groupIds.Contains(x.GroupId))
@@ -123,7 +136,7 @@ public sealed class ReviewSessionsController(
         }
 
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
-        await EnsureReviewersSubmittedAvailabilityAsync(session.SemesterId, sessionDate, request.Slot, reviewerIds, cancellationToken);
+        await EnsureReviewersSubmittedAvailabilityAsync(session.SemesterId, session.Type, sessionDate, request.Slot, reviewerIds, cancellationToken);
         await EnsureNoSlotConflictAsync(session.Id, sessionDate, request.Slot, reviewerIds, cancellationToken);
 
         session.Code = request.Code.Trim();
@@ -152,6 +165,7 @@ public sealed class ReviewSessionsController(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return Ok(await MapSessionAsync(session.Id, cancellationToken));
     }
 
@@ -212,6 +226,12 @@ public sealed class ReviewSessionsController(
         {
             throw new BusinessRuleException("The review round must be Closed before creating assignments.");
         }
+        await AcquireReviewRoundLockAsync(group.SemesterId, request.Type, weekStart, cancellationToken);
+        await dbContext.Entry(round).ReloadAsync(cancellationToken);
+        if (round.Status != ReviewRoundStatus.Closed)
+        {
+            throw new BusinessRuleException("The review round must be Closed before creating assignments.");
+        }
 
         var selectedByGroup = await dbContext.StudentSlotRegistrations.AnyAsync(x =>
             x.ReviewRoundId == round.Id &&
@@ -229,11 +249,16 @@ public sealed class ReviewSessionsController(
             group.LecturerId,
             reviewerIds,
             request.Type == ReviewType.Review2 ? request.PreviousReviewerIds : null);
-        await EnsureReviewersSubmittedAvailabilityAsync(group.SemesterId, sessionDate, request.Slot, reviewerIds, cancellationToken);
+        await EnsureReviewersSubmittedAvailabilityAsync(group.SemesterId, request.Type, sessionDate, request.Slot, reviewerIds, cancellationToken);
 
         var alreadyScheduled = await dbContext.GroupReviewSlots.AnyAsync(slot =>
             slot.GroupId == group.Id &&
-            dbContext.ReviewSessions.Any(session => session.Id == slot.SessionId && session.Type == request.Type),
+            dbContext.ReviewSessions.Any(session =>
+                session.Id == slot.SessionId &&
+                session.Type == request.Type &&
+                session.SessionDate >= sessionDate.Date.AddDays(1 - IsoDayOfWeek(sessionDate)) &&
+                session.SessionDate < sessionDate.Date.AddDays(8 - IsoDayOfWeek(sessionDate)) &&
+                session.Status != ReviewSessionStatus.Cancelled),
             cancellationToken);
         rules.EnsureGroupCanBeScheduledForReviewType(alreadyScheduled);
         await EnsureNoSlotConflictAsync(null, sessionDate, request.Slot, reviewerIds, cancellationToken);
@@ -286,8 +311,21 @@ public sealed class ReviewSessionsController(
         }
     }
 
+    private Task AcquireReviewRoundLockAsync(
+        int semesterId,
+        ReviewType reviewType,
+        DateOnly weekStart,
+        CancellationToken cancellationToken)
+    {
+        var lockKey = $"review-round:{semesterId}:{reviewType}:{weekStart:yyyy-MM-dd}";
+        return dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+            cancellationToken);
+    }
+
     private async Task EnsureReviewersSubmittedAvailabilityAsync(
         int semesterId,
+        ReviewType reviewType,
         DateTime sessionDate,
         int slot,
         IReadOnlyCollection<int> reviewerIds,
@@ -295,16 +333,22 @@ public sealed class ReviewSessionsController(
     {
         var weekStart = NormalizeWeekStart(DateOnly.FromDateTime(sessionDate));
         var dayOfWeek = IsoDayOfWeek(sessionDate);
+        var roundId = await dbContext.ReviewRounds
+            .Where(x => x.SemesterId == semesterId && x.Type == reviewType && x.WeekStartDate == weekStart)
+            .Select(x => x.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (roundId == 0)
+        {
+            throw new BusinessRuleException("The review round does not exist for the selected week.");
+        }
         var availableReviewerCount = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == semesterId &&
-                        x.WeekStartDate == weekStart &&
+            .Where(x => x.ReviewRoundId == roundId &&
                         x.DayOfWeek == dayOfWeek &&
                         x.Slot == slot &&
                         reviewerIds.Contains(x.LecturerId) &&
                         dbContext.ReviewAvailabilitySubmissions.Any(submission =>
-                            submission.SemesterId == x.SemesterId &&
+                            submission.ReviewRoundId == x.ReviewRoundId &&
                             submission.LecturerId == x.LecturerId &&
-                            submission.WeekStartDate == x.WeekStartDate &&
                             submission.SubmittedAt != null))
             .Select(x => x.LecturerId)
             .Distinct()

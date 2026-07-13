@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Security.Claims;
-using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Exceptions;
 using CPMS.Core.Services;
@@ -16,14 +15,12 @@ namespace CPMS.Api.Controllers;
 [Authorize]
 public sealed class ReviewAvailabilityController(
     CpmsDbContext dbContext,
-    AssignmentRules rules,
-    SemesterResolverService semesterResolver) : ControllerBase
+    AssignmentRules rules) : ControllerBase
 {
     [HttpGet("week")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewAvailabilityWeekResponse>> GetWeek(
-        int semesterId,
-        DateOnly weekStart,
+        int roundId,
         CancellationToken cancellationToken)
     {
         var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
@@ -32,25 +29,26 @@ public sealed class ReviewAvailabilityController(
             return Forbid();
         }
 
-        weekStart = NormalizeWeekStart(weekStart);
-        var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
-        if (semester.Id != semesterId)
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x => x.Id == roundId, cancellationToken);
+        if (round is null)
         {
-            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+            return NotFound(new { error = "Review round not found." });
         }
+        var weekStart = round.WeekStartDate;
         var slots = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .Where(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId.Value)
             .OrderBy(x => x.DayOfWeek)
             .ThenBy(x => x.Slot)
             .Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
         var submission = await dbContext.ReviewAvailabilitySubmissions
-            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .Where(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId.Value)
             .Select(x => new { x.SubmittedAt })
             .SingleOrDefaultAsync(cancellationToken);
 
         return Ok(new ReviewAvailabilityWeekResponse(
-            semester.Id,
+            round.Id,
+            round.SemesterId,
             lecturerId.Value,
             weekStart,
             submission?.SubmittedAt is not null,
@@ -61,12 +59,15 @@ public sealed class ReviewAvailabilityController(
     [HttpPut("week")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewAvailabilityWeekResponse>> SaveWeek(
-        int semesterId,
-        DateOnly weekStart,
+        int roundId,
         SaveReviewAvailabilityWeekRequest request,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Slots is null)
+        {
+            return BadRequest(new { error = "Slots is required." });
+        }
 
         var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
         if (lecturerId is null)
@@ -74,22 +75,26 @@ public sealed class ReviewAvailabilityController(
             return Forbid();
         }
 
-        weekStart = NormalizeWeekStart(weekStart);
-        var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
-        if (semester.Id != semesterId)
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x => x.Id == roundId, cancellationToken);
+        if (round is null)
         {
-            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+            return NotFound(new { error = "Review round not found." });
         }
 
-        if (!await HasOpenRoundAsync(semester.Id, weekStart, cancellationToken))
+        if (round.Status != CPMS.Core.Enums.ReviewRoundStatus.Open)
         {
             return Conflict(new { error = "Lecturer availability can only be changed while registration is Open." });
         }
+        var weekStart = round.WeekStartDate;
         var distinctSlots = request.Slots
             .Distinct()
             .OrderBy(x => x.DayOfWeek)
             .ThenBy(x => x.Slot)
             .ToArray();
+        if (distinctSlots.Length > 30)
+        {
+            return BadRequest(new { error = "A review round contains at most 30 availability slots." });
+        }
 
         foreach (var slot in distinctSlots)
         {
@@ -102,16 +107,17 @@ public sealed class ReviewAvailabilityController(
         }
 
         var existing = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .Where(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId.Value)
             .ToListAsync(cancellationToken);
         dbContext.ReviewAvailabilities.RemoveRange(existing);
-        await UpsertSubmissionDraftAsync(semester.Id, lecturerId.Value, weekStart, cancellationToken);
+        await UpsertSubmissionDraftAsync(round, lecturerId.Value, cancellationToken);
 
         foreach (var slot in distinctSlots)
         {
             dbContext.ReviewAvailabilities.Add(new ReviewAvailability
             {
-                SemesterId = semester.Id,
+                ReviewRoundId = round.Id,
+                SemesterId = round.SemesterId,
                 LecturerId = lecturerId.Value,
                 WeekStartDate = weekStart,
                 DayOfWeek = slot.DayOfWeek,
@@ -122,7 +128,8 @@ public sealed class ReviewAvailabilityController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new ReviewAvailabilityWeekResponse(
-            semester.Id,
+            round.Id,
+            round.SemesterId,
             lecturerId.Value,
             weekStart,
             false,
@@ -133,8 +140,7 @@ public sealed class ReviewAvailabilityController(
     [HttpPost("week/submit")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewAvailabilityWeekResponse>> SubmitWeek(
-        int semesterId,
-        DateOnly weekStart,
+        int roundId,
         CancellationToken cancellationToken)
     {
         var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
@@ -143,19 +149,19 @@ public sealed class ReviewAvailabilityController(
             return Forbid();
         }
 
-        weekStart = NormalizeWeekStart(weekStart);
-        var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
-        if (semester.Id != semesterId)
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x => x.Id == roundId, cancellationToken);
+        if (round is null)
         {
-            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+            return NotFound(new { error = "Review round not found." });
         }
 
-        if (!await HasOpenRoundAsync(semester.Id, weekStart, cancellationToken))
+        if (round.Status != CPMS.Core.Enums.ReviewRoundStatus.Open)
         {
             return Conflict(new { error = "Lecturer availability can only be submitted while registration is Open." });
         }
+        var weekStart = round.WeekStartDate;
         var slots = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
+            .Where(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId.Value)
             .OrderBy(x => x.DayOfWeek)
             .ThenBy(x => x.Slot)
             .Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot))
@@ -167,12 +173,13 @@ public sealed class ReviewAvailabilityController(
 
         var submittedAt = DateTime.UtcNow;
         var submission = await dbContext.ReviewAvailabilitySubmissions
-            .SingleOrDefaultAsync(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart, cancellationToken);
+            .SingleOrDefaultAsync(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId.Value, cancellationToken);
         if (submission is null)
         {
             dbContext.ReviewAvailabilitySubmissions.Add(new ReviewAvailabilitySubmission
             {
-                SemesterId = semester.Id,
+                ReviewRoundId = round.Id,
+                SemesterId = round.SemesterId,
                 LecturerId = lecturerId.Value,
                 WeekStartDate = weekStart,
                 UpdatedAt = submittedAt,
@@ -188,7 +195,8 @@ public sealed class ReviewAvailabilityController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new ReviewAvailabilityWeekResponse(
-            semester.Id,
+            round.Id,
+            round.SemesterId,
             lecturerId.Value,
             weekStart,
             true,
@@ -212,21 +220,21 @@ public sealed class ReviewAvailabilityController(
             CultureInfo.InvariantCulture);
 
     private async Task UpsertSubmissionDraftAsync(
-        int semesterId,
+        ReviewRound round,
         int lecturerId,
-        DateOnly weekStart,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var submission = await dbContext.ReviewAvailabilitySubmissions
-            .SingleOrDefaultAsync(x => x.SemesterId == semesterId && x.LecturerId == lecturerId && x.WeekStartDate == weekStart, cancellationToken);
+            .SingleOrDefaultAsync(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId, cancellationToken);
         if (submission is null)
         {
             dbContext.ReviewAvailabilitySubmissions.Add(new ReviewAvailabilitySubmission
             {
-                SemesterId = semesterId,
+                ReviewRoundId = round.Id,
+                SemesterId = round.SemesterId,
                 LecturerId = lecturerId,
-                WeekStartDate = weekStart,
+                WeekStartDate = round.WeekStartDate,
                 UpdatedAt = now
             });
             return;
@@ -236,28 +244,13 @@ public sealed class ReviewAvailabilityController(
         submission.SubmittedAt = null;
     }
 
-    private async Task<bool> HasOpenRoundAsync(int semesterId, DateOnly weekStart, CancellationToken cancellationToken)
-    {
-        var statuses = await dbContext.ReviewRounds
-            .Where(x => x.SemesterId == semesterId && x.WeekStartDate == weekStart)
-            .Select(x => x.Status)
-            .ToListAsync(cancellationToken);
-        return statuses.Count > 0 &&
-               statuses.All(x => x == CPMS.Core.Enums.ReviewRoundStatus.Open);
-    }
-
-    private static DateOnly NormalizeWeekStart(DateOnly date)
-    {
-        var day = (int)date.DayOfWeek;
-        var daysFromMonday = day == 0 ? 6 : day - 1;
-        return date.AddDays(-daysFromMonday);
-    }
 }
 
 public sealed record SaveReviewAvailabilityWeekRequest(IReadOnlyCollection<ReviewAvailabilitySlotRequest> Slots);
 public sealed record ReviewAvailabilitySlotRequest(int DayOfWeek, int Slot);
 public sealed record ReviewAvailabilitySlotResponse(int DayOfWeek, int Slot);
 public sealed record ReviewAvailabilityWeekResponse(
+    int RoundId,
     int SemesterId,
     int LecturerId,
     DateOnly WeekStart,

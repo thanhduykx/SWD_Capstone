@@ -1,10 +1,8 @@
 using System.Globalization;
-using System.Net.Mail;
 using System.Security.Claims;
 using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
-using CPMS.Core.Exceptions;
 using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -29,6 +27,11 @@ public sealed class ReviewSchedulesController(
 
         var trainingDepartmentId = await CurrentTrainingDepartmentIdAsync(cancellationToken);
         var weekStart = NormalizeWeekStart(request.WeekStart);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var publicationLockKey = $"review-round:{request.SemesterId}:{request.ReviewType}:{weekStart:yyyy-MM-dd}";
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({publicationLockKey}, 0))",
+            cancellationToken);
         var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x =>
             x.SemesterId == request.SemesterId &&
             x.Type == request.ReviewType &&
@@ -117,10 +120,13 @@ public sealed class ReviewSchedulesController(
                 dbContext.Users.Where(user => user.Id == x.UserId).Select(user => user.Email).Single()))
             .ToListAsync(cancellationToken);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var subject = string.IsNullOrWhiteSpace(request.Subject)
             ? $"CPMS review schedule - {request.ReviewType} - {weekStart:yyyy-MM-dd}"
             : request.Subject.Trim();
+        if (subject.Length > 250)
+        {
+            return BadRequest(new { error = "Email subject cannot exceed 250 characters." });
+        }
         var publication = new ReviewSchedulePublication
         {
             SemesterId = request.SemesterId,
@@ -133,8 +139,6 @@ public sealed class ReviewSchedulesController(
         dbContext.ReviewSchedulePublications.Add(publication);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var sent = 0;
-        var failed = 0;
         foreach (var reviewer in reviewers)
         {
             var reviewerSessions = sessions
@@ -147,33 +151,10 @@ public sealed class ReviewSchedulesController(
                 RecipientUserId = reviewer.UserId,
                 RecipientEmail = reviewer.Email,
                 Subject = subject,
+                Body = body,
                 Status = EmailDeliveryStatus.Pending
             };
             dbContext.EmailDeliveryLogs.Add(log);
-
-            try
-            {
-                await emailSender.SendAsync(reviewer.Email, subject, body, cancellationToken);
-                log.Status = EmailDeliveryStatus.Sent;
-                log.SentAt = DateTime.UtcNow;
-                sent++;
-            }
-            catch (BusinessRuleException)
-            {
-                throw;
-            }
-            catch (SmtpException exception)
-            {
-                log.Status = EmailDeliveryStatus.Failed;
-                log.ErrorMessage = exception.Message;
-                failed++;
-            }
-            catch (InvalidOperationException exception)
-            {
-                log.Status = EmailDeliveryStatus.Failed;
-                log.ErrorMessage = exception.Message;
-                failed++;
-            }
         }
 
         var sessionIds = sessions.Select(x => x.Id).ToArray();
@@ -232,29 +213,10 @@ public sealed class ReviewSchedulesController(
                         RecipientUserId = leader.UserId,
                         RecipientEmail = email,
                         Subject = leaderSubject,
+                        Body = leaderBody,
                         Status = EmailDeliveryStatus.Pending
                     };
                     dbContext.EmailDeliveryLogs.Add(log);
-
-                    try
-                    {
-                        await emailSender.SendAsync(email, leaderSubject, leaderBody, cancellationToken);
-                        log.Status = EmailDeliveryStatus.Sent;
-                        log.SentAt = DateTime.UtcNow;
-                        sent++;
-                    }
-                    catch (SmtpException exception)
-                    {
-                        log.Status = EmailDeliveryStatus.Failed;
-                        log.ErrorMessage = exception.Message;
-                        failed++;
-                    }
-                    catch (InvalidOperationException exception)
-                    {
-                        log.Status = EmailDeliveryStatus.Failed;
-                        log.ErrorMessage = exception.Message;
-                        failed++;
-                    }
                 }
             }
         }
@@ -282,7 +244,46 @@ public sealed class ReviewSchedulesController(
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
+        var (sent, failed) = await DispatchPublicationEmailsAsync(publication.Id, CancellationToken.None);
         return Ok(new ReviewSchedulePublishResponse(publication.Id, sessions.Count, sent, failed));
+    }
+
+    private async Task<(int Sent, int Failed)> DispatchPublicationEmailsAsync(
+        int publicationId,
+        CancellationToken cancellationToken)
+    {
+        var pendingLogs = await dbContext.EmailDeliveryLogs
+            .Where(x => x.PublicationId == publicationId && x.Status == EmailDeliveryStatus.Pending)
+            .ToListAsync(cancellationToken);
+        var sent = 0;
+        var failed = 0;
+
+        foreach (var log in pendingLogs)
+        {
+            try
+            {
+                await emailSender.SendAsync(log.RecipientEmail, log.Subject, log.Body, cancellationToken);
+                log.Status = EmailDeliveryStatus.Sent;
+                log.SentAt = DateTime.UtcNow;
+                log.ErrorMessage = null;
+                sent++;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                log.Status = EmailDeliveryStatus.Failed;
+                log.ErrorMessage = exception.Message.Length <= 1000
+                    ? exception.Message
+                    : exception.Message[..1000];
+                failed++;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return (sent, failed);
     }
 
     private async Task<int> CurrentTrainingDepartmentIdAsync(CancellationToken cancellationToken)
