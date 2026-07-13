@@ -1,7 +1,7 @@
 using System.Text.Json;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
-using CPMS.Infrastructure.Data;
+using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 
 const string marker = "DEMO_2026";
@@ -15,7 +15,7 @@ try
     Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
     var options = new DbContextOptionsBuilder<CpmsDbContext>()
-        .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly("CPMS.Infrastructure"))
+        .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly("CPMS.DAL"))
         .UseSnakeCaseNamingConvention()
         .Options;
     await using var db = new CpmsDbContext(options);
@@ -134,7 +134,7 @@ static async Task SeedAsync(CpmsDbContext db)
     var publication = new ReviewSchedulePublication { SemesterId = semester.Id, ReviewType = ReviewType.Review1, WeekStartDate = week, PublishedByTrainingDepartmentId = training.Id, PublishedAt = now.AddDays(-27), Subject = marker + " review schedule", Body = "Synthetic schedule; no email was sent." };
     db.ReviewSchedulePublications.Add(publication);
     await db.SaveChangesAsync();
-    db.EmailDeliveryLogs.Add(new EmailDeliveryLog { PublicationId = publication.Id, RecipientUserId = studentUsers[0].Id, RecipientEmail = studentUsers[0].Email, Subject = publication.Subject, Status = EmailDeliveryStatus.Pending, ErrorMessage = "DEMO_ONLY_NOT_SENT", CreatedAt = now.AddDays(-27) });
+    db.EmailDeliveryLogs.Add(new EmailDeliveryLog { PublicationId = publication.Id, RecipientUserId = studentUsers[0].Id, RecipientEmail = studentUsers[0].Email, Subject = publication.Subject, Body = publication.Body, Status = EmailDeliveryStatus.Pending, ErrorMessage = "DEMO_ONLY_NOT_SENT", CreatedAt = now.AddDays(-27) });
     db.ReviewAttendances.AddRange(students.Take(3).Select(x => new ReviewAttendance { SessionId = reviewSession.Id, StudentId = x.Id, IsPresent = true, Note = marker, MarkedByLecturerId = lecturers[0].Id, MarkedAt = now.AddDays(-25) }));
     db.ReviewComments.Add(new ReviewComment { SessionId = reviewSession.Id, GroupId = groups[0].Id, AuthorUserId = lecturerUsers[0].Id, Content = marker + ": prepare deployment evidence.", CreatedAt = now.AddDays(-25) });
 

@@ -4,7 +4,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 
 ## Current Implementation
 
-- Clean Architecture ASP.NET Core solution under `src/`: `CPMS.API`, `CPMS.Application`, `CPMS.Domain`, `CPMS.Infrastructure`, `CPMS.Shared`.
+- Clean Architecture ASP.NET Core solution under `src/`: `CPMS.API`, `CPMS.BLL`, `CPMS.Domain`, `CPMS.DAL`, `CPMS.Shared`.
 - PostgreSQL 16 with EF Core/Npgsql covering the production reference entities: authentication, academic structure, documents/evaluation, review/defense, audit and notifications.
 - JWT access token and rotating refresh token endpoints, BCrypt password verification and login lockout handling.
 - API foundation for semesters, review-session assignment and defense score submission/locking.
@@ -31,10 +31,10 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 ## Stack
 
 - Backend: ASP.NET Core 9 MVC/Web API hybrid and EF Core 9.
-- Architecture: Clean Architecture / N-Layer with Domain, Application, Infrastructure and API boundaries.
+- Architecture: three-layer backend with API, BLL and DAL projects, supported by Domain and Shared projects.
 - Real-time: ASP.NET Core SignalR over `/hubs/defense`.
 - Database: PostgreSQL 16 through `Npgsql.EntityFrameworkCore.PostgreSQL`.
-- Cache / messaging: Redis and RabbitMQ adapters are available through Application abstractions.
+- Cache / messaging: Redis and RabbitMQ adapters are available through BLL abstractions.
 - Logging / jobs: Serilog and optional Hangfire.
 
 ## Run Database
@@ -42,7 +42,7 @@ Foundation implementation based on `CPMS_ProjectSpec_v1.1.docx` for FPT Universi
 ```powershell
 docker compose up -d postgres
 dotnet tool restore
-dotnet tool run dotnet-ef database update --project .\src\CPMS.Infrastructure\CPMS.Infrastructure.csproj --startup-project .\src\CPMS.API\CPMS.API.csproj
+dotnet tool run dotnet-ef database update --project .\src\CPMS.DAL\CPMS.DAL.csproj --startup-project .\src\CPMS.API\CPMS.API.csproj
 ```
 
 The Docker development connection string targets PostgreSQL at `localhost:5433`, database `cpms`, username `postgres`, password `123456`. Port `5433` avoids colliding with an existing local PostgreSQL installation on the default port.

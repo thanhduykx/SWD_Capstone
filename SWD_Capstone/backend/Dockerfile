@@ -4,8 +4,8 @@ WORKDIR /src
 COPY Directory.Build.props ./
 COPY src/CPMS.Domain/*.csproj src/CPMS.Domain/
 COPY src/CPMS.Shared/*.csproj src/CPMS.Shared/
-COPY src/CPMS.Application/*.csproj src/CPMS.Application/
-COPY src/CPMS.Infrastructure/*.csproj src/CPMS.Infrastructure/
+COPY src/CPMS.BLL/*.csproj src/CPMS.BLL/
+COPY src/CPMS.DAL/*.csproj src/CPMS.DAL/
 COPY src/CPMS.API/*.csproj src/CPMS.API/
 RUN dotnet restore "src/CPMS.API/CPMS.API.csproj"
 

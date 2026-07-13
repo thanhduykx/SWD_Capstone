@@ -1,15 +1,15 @@
 using System.Globalization;
 using System.Security.Claims;
 using Asp.Versioning;
-using CPMS.Application.Features.Accounts.Commands.CreateAccount;
-using CPMS.Application.Features.Accounts.Queries.GetAccounts;
+using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
+using CPMS.BLL.Features.Accounts.Queries.GetAccounts;
 using CPMS.Core.Enums;
 using CPMS.Shared.Models;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CPMS.Api.Controllers.V1;
+namespace CPMS.API.Controllers.V1;
 
 [ApiController]
 [ApiVersion("1.0")]
@@ -21,20 +21,20 @@ public sealed class AccountsController(
     IValidator<CreateAccountCommand> createValidator) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<Application.DTOs.Accounts.AccountResponse>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ApiResponse<PagedResult<Application.DTOs.Accounts.AccountResponse>>>> GetAll(
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<CPMS.BLL.DTOs.Accounts.AccountResponse>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<PagedResult<CPMS.BLL.DTOs.Accounts.AccountResponse>>>> GetAll(
         [FromQuery] PagedRequest request,
         CancellationToken cancellationToken)
     {
         var result = await getAccounts.HandleAsync(request, cancellationToken);
-        return Ok(ApiResponse<PagedResult<Application.DTOs.Accounts.AccountResponse>>.Ok(
+        return Ok(ApiResponse<PagedResult<CPMS.BLL.DTOs.Accounts.AccountResponse>>.Ok(
             result,
             HttpContext.TraceIdentifier));
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(ApiResponse<Application.DTOs.Accounts.AccountCreatedResponse>), StatusCodes.Status201Created)]
-    public async Task<ActionResult<ApiResponse<Application.DTOs.Accounts.AccountCreatedResponse>>> Create(
+    [ProducesResponseType(typeof(ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>), StatusCodes.Status201Created)]
+    public async Task<ActionResult<ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>>> Create(
         CreateAccountRequest request,
         CancellationToken cancellationToken)
     {
@@ -60,7 +60,7 @@ public sealed class AccountsController(
 
         return StatusCode(
             StatusCodes.Status201Created,
-            ApiResponse<Application.DTOs.Accounts.AccountCreatedResponse>.Created(
+            ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>.Created(
                 response,
                 HttpContext.TraceIdentifier));
     }

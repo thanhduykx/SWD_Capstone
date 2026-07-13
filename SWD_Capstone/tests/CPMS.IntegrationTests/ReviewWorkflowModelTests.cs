@@ -1,5 +1,5 @@
 using CPMS.Core.Entities;
-using CPMS.Infrastructure.Data;
+using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

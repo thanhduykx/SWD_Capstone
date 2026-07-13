@@ -1,9 +1,9 @@
 using CPMS.Core.Exceptions;
-using CPMS.Application.Common.Exceptions;
+using CPMS.BLL.Common.Exceptions;
 using CPMS.Shared.Models;
 using FluentValidation;
 
-namespace CPMS.Api.Middleware;
+namespace CPMS.API.Middleware;
 
 public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExceptionMiddleware> logger)
 {

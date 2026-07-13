@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace CPMS.Api.Configuration;
+namespace CPMS.API.Configuration;
 
 internal static class ApplicationConfiguration
 {

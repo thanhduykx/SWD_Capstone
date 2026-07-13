@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CPMS.Infrastructure\CPMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CPMS.DAL\CPMS.DAL.csproj" />
   </ItemGroup>
 </Project>

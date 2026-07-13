@@ -1,545 +1,84 @@
 using System.Globalization;
-using System.Net;
 using System.Security.Claims;
-using CPMS.Api.Services;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.API.Contracts.Accounts;
+using CPMS.BLL.Accounts;
+using CPMS.BLL.Common.Exceptions;
 using CPMS.Core.Exceptions;
-using CPMS.Core.Services;
-using CPMS.Infrastructure.Data;
 using CPMS.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace CPMS.Api.Controllers;
+namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/accounts")]
 [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-public sealed class AccountsController(
-    CpmsDbContext dbContext,
-    IReviewEmailSender emailSender) : ControllerBase
+public sealed class AccountsController(IAccountAdministrationService accountService) : ControllerBase
 {
     [HttpGet]
     public async Task<PagedResult<AccountResponse>> GetAll(
-        [FromQuery] PagedRequest request,
-        CancellationToken cancellationToken)
+        [FromQuery] PagedRequest request, CancellationToken cancellationToken)
     {
-        var query = dbContext.Users.AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(request.Search))
-        {
-            var search = request.Search.Trim().ToLowerInvariant();
-            query = query.Where(x =>
-                x.Username.ToLower().Contains(search) ||
-                x.Email.ToLower().Contains(search));
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
-        {
-            var filterBy = request.FilterBy.Trim().ToLowerInvariant();
-            var filterValue = request.FilterValue.Trim();
-            query = filterBy switch
-            {
-                "role" when Enum.TryParse<UserRole>(filterValue, true, out var role) => query.Where(x => x.Role == role),
-                "isactive" when bool.TryParse(filterValue, out var isActive) => query.Where(x => x.IsActive == isActive),
-                _ => query
-            };
-        }
-
-        query = request.SortBy?.ToLowerInvariant() switch
-        {
-            "email" => request.Desc ? query.OrderByDescending(x => x.Email) : query.OrderBy(x => x.Email),
-            "role" => request.Desc ? query.OrderByDescending(x => x.Role) : query.OrderBy(x => x.Role),
-            "isactive" => request.Desc ? query.OrderByDescending(x => x.IsActive) : query.OrderBy(x => x.IsActive),
-            _ => request.Desc ? query.OrderByDescending(x => x.Username) : query.OrderBy(x => x.Username)
-        };
-
-        var total = await query.CountAsync(cancellationToken);
-        var users = await query
-            .Skip((request.SafePage - 1) * request.SafePageSize)
-            .Take(request.SafePageSize)
-            .Select(x => new AccountResponse(
-                x.Id,
-                x.Username,
-                x.Email,
-                x.Role,
-                x.IsActive,
-                x.LastLoginAt,
-                x.LockedUntil))
-            .ToListAsync(cancellationToken);
-
-        return new PagedResult<AccountResponse>(users, request.SafePage, request.SafePageSize, total);
+        var result = await accountService.GetAllAsync(request, cancellationToken);
+        return new PagedResult<AccountResponse>(
+            result.Items.Select(Map).ToArray(), result.Page, result.PageSize, result.TotalCount);
     }
 
     [HttpPost]
-    public async Task<ActionResult<AccountCreatedResponse>> Create(CreateAccountRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountCreatedResponse>> Create(
+        CreateAccountRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        var fullName = Required(request.FullName, "Full name is required for generated account usernames.");
-        var identityCode = Required(request.IdentityCode ?? request.Username, "Identity code is required.");
-        var username = AccountUsernameGenerator.Generate(fullName, identityCode);
-        var email = request.Email?.Trim();
-        if (string.IsNullOrWhiteSpace(email) ||
-            string.IsNullOrWhiteSpace(request.Password))
+        try
         {
-            return BadRequest(new { error = "Email and password are required." });
+            var result = await accountService.CreateAsync(
+                new CreateAccountData(
+                    request.Username, request.IdentityCode, request.Email, request.Password, request.Role,
+                    request.FullName, request.Department, request.Position, request.PermissionScope,
+                    request.IsPartTime, request.ClassCode, request.Batch, request.Major),
+                CurrentAudit(),
+                cancellationToken);
+            return CreatedAtAction(nameof(GetAll), new { result.Id }, new AccountCreatedResponse(
+                result.Id, result.Username, result.Email, result.InitialPassword, result.Role,
+                result.IsActive, result.LastLoginAt, result.LockedUntil, result.IdentityCode,
+                result.EmailDeliveryStatus, result.EmailDeliveryError));
         }
-
-        if (request.Password.Length < 6)
-        {
-            return BadRequest(new { error = "Password must contain at least 6 characters." });
-        }
-
-        if (await dbContext.Users.AnyAsync(x => x.Username == username || x.Email == email, cancellationToken))
-        {
-            return Conflict(new { error = "Username or email already exists." });
-        }
-
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var user = new User
-        {
-            Username = username,
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12),
-            Role = request.Role,
-            IsActive = true,
-            CreatedById = CurrentUserId()
-        };
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        AddRoleProfile(user.Id, request with
-        {
-            Username = username,
-            IdentityCode = identityCode,
-            Email = email,
-            FullName = fullName
-        });
-        dbContext.AuditLogs.Add(new AuditLog
-        {
-            UserId = CurrentUserId(),
-            Action = "CREATE_ACCOUNT",
-            EntityType = nameof(User),
-            EntityId = user.Id,
-            NewValue = user.Username,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            UserAgent = Request.Headers.UserAgent
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        var emailResult = await SendAccountCreatedEmailAsync(user, fullName, request.Password, cancellationToken);
-
-        return CreatedAtAction(nameof(GetAll), new { user.Id }, new AccountCreatedResponse(
-            user.Id,
-            user.Username,
-            user.Email,
-            request.Password,
-            user.Role,
-            user.IsActive,
-            user.LastLoginAt,
-            user.LockedUntil,
-            identityCode,
-            emailResult.Status,
-            emailResult.Error));
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
+        catch (ConflictException exception) { return Conflict(new { error = exception.Message }); }
     }
 
     [HttpPatch("{userId:int}/status")]
     public async Task<ActionResult<AccountResponse>> UpdateStatus(
-        int userId,
-        UpdateAccountStatusRequest request,
-        CancellationToken cancellationToken)
+        int userId, UpdateAccountStatusRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        if (user is null)
+        try
         {
-            return NotFound();
+            return Ok(Map(await accountService.UpdateStatusAsync(
+                userId, request.IsActive, request.Unlock, CurrentAudit(), cancellationToken)));
         }
-
-        user.IsActive = request.IsActive;
-        user.LockedUntil = request.Unlock ? null : user.LockedUntil;
-        user.UpdatedAt = DateTime.UtcNow;
-        dbContext.AuditLogs.Add(new AuditLog
-        {
-            UserId = CurrentUserId(),
-            Action = request.IsActive ? "ACTIVATE_ACCOUNT" : "DEACTIVATE_ACCOUNT",
-            EntityType = nameof(User),
-            EntityId = user.Id,
-            OldValue = (!request.IsActive).ToString(),
-            NewValue = request.IsActive.ToString(),
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            UserAgent = Request.Headers.UserAgent
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new AccountResponse(
-            user.Id,
-            user.Username,
-            user.Email,
-            user.Role,
-            user.IsActive,
-            user.LastLoginAt,
-            user.LockedUntil));
+        catch (KeyNotFoundException) { return NotFound(); }
     }
 
     [HttpPatch("{userId:int}/role")]
     public async Task<ActionResult<AccountResponse>> UpdateRole(
-        int userId,
-        UpdateAccountRoleRequest request,
-        CancellationToken cancellationToken)
+        int userId, UpdateAccountRoleRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
-        if (user is null)
-        {
-            return NotFound();
-        }
-
-        var oldRole = user.Role;
-        var newRole = request.Role;
-
-        if (oldRole != newRole)
-        {
-            user.Role = newRole;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            // Resolve name and identity code from existing profiles to populate the new profile if needed
-            string fullName = user.Username;
-            string identityCode = user.Username;
-
-            var student = await dbContext.Students.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            if (student != null)
-            {
-                fullName = student.FullName;
-                identityCode = student.Code;
-            }
-            else
-            {
-                var lecturer = await dbContext.Lecturers.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-                if (lecturer != null)
-                {
-                    fullName = lecturer.FullName;
-                    identityCode = lecturer.Code;
-                }
-            }
-
-            if (newRole == UserRole.Student)
-            {
-                var exists = await dbContext.Students.AnyAsync(x => x.UserId == userId, cancellationToken);
-                if (!exists)
-                {
-                    dbContext.Students.Add(new Student
-                    {
-                        UserId = userId,
-                        Code = identityCode,
-                        FullName = fullName,
-                        ClassCode = "SE",
-                        Major = "SE"
-                    });
-                }
-            }
-            else if (newRole == UserRole.Lecturer)
-            {
-                var exists = await dbContext.Lecturers.AnyAsync(x => x.UserId == userId, cancellationToken);
-                if (!exists)
-                {
-                    dbContext.Lecturers.Add(new Lecturer
-                    {
-                        UserId = userId,
-                        Code = identityCode,
-                        FullName = fullName,
-                        Department = "General",
-                        IsPartTime = false
-                    });
-                }
-            }
-            else if (newRole == UserRole.TrainingDepartment)
-            {
-                var exists = await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == userId, cancellationToken);
-                if (!exists)
-                {
-                    dbContext.TrainingDepartments.Add(new TrainingDepartment
-                    {
-                        UserId = userId,
-                        DepartmentName = "Training Department",
-                        StaffCode = identityCode,
-                        Position = "Moderator"
-                    });
-                }
-            }
-            else if (newRole == UserRole.SystemAdministrator)
-            {
-                var exists = await dbContext.SystemAdministrators.AnyAsync(x => x.UserId == userId, cancellationToken);
-                if (!exists)
-                {
-                    dbContext.SystemAdministrators.Add(new SystemAdministrator
-                    {
-                        UserId = userId,
-                        AdminLevel = "Admin",
-                        PermissionScope = "System"
-                    });
-                }
-            }
-
-            dbContext.AuditLogs.Add(new AuditLog
-            {
-                UserId = CurrentUserId(),
-                Action = "UPDATE_ACCOUNT_ROLE",
-                EntityType = nameof(User),
-                EntityId = user.Id,
-                OldValue = oldRole.ToString(),
-                NewValue = newRole.ToString(),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                UserAgent = Request.Headers.UserAgent
-            });
-
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        return Ok(new AccountResponse(
-            user.Id,
-            user.Username,
-            user.Email,
-            user.Role,
-            user.IsActive,
-            user.LastLoginAt,
-            user.LockedUntil));
-    }
-
-    private void AddRoleProfile(int userId, CreateAccountRequest request)
-    {
-        switch (request.Role)
-        {
-            case UserRole.Lecturer:
-                dbContext.Lecturers.Add(new Lecturer
-                {
-                    UserId = userId,
-                    Code = Required(request.IdentityCode, "Identity code is required for lecturers."),
-                    FullName = Required(request.FullName, "Full name is required for lecturers."),
-                    Department = OptionalOrDefault(request.Department, string.Empty),
-                    IsPartTime = request.IsPartTime
-                });
-                break;
-            case UserRole.TrainingDepartment:
-                dbContext.TrainingDepartments.Add(new TrainingDepartment
-                {
-                    UserId = userId,
-                    DepartmentName = OptionalOrDefault(request.Department, "Training Department"),
-                    StaffCode = Required(request.IdentityCode, "Identity code is required for moderator accounts."),
-                    Position = OptionalOrDefault(request.Position, "Moderator")
-                });
-                break;
-            case UserRole.SystemAdministrator:
-                dbContext.SystemAdministrators.Add(new SystemAdministrator
-                {
-                    UserId = userId,
-                    AdminLevel = request.Position ?? "Admin",
-                    PermissionScope = request.PermissionScope ?? "System"
-                });
-                break;
-            case UserRole.Student:
-                dbContext.Students.Add(new Student
-                {
-                    UserId = userId,
-                    Code = Required(request.IdentityCode, "Identity code is required for students."),
-                    FullName = Required(request.FullName, "Full name is required for students."),
-                    ClassCode = OptionalOrDefault(request.ClassCode, string.Empty),
-                    Batch = request.Batch,
-                    Major = request.Major ?? "SE"
-                });
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(request), "Unsupported role.");
-        }
-    }
-
-    private int CurrentUserId() =>
-        int.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException("Missing user identifier."),
-            CultureInfo.InvariantCulture);
-
-    private static string Required(string? value, string message) =>
-        string.IsNullOrWhiteSpace(value) ? throw new ArgumentException(message) : value.Trim();
-
-    private static string OptionalOrDefault(string? value, string fallback) =>
-        string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-
-    private async Task<AccountEmailResult> SendAccountCreatedEmailAsync(
-        User user,
-        string fullName,
-        string initialPassword,
-        CancellationToken cancellationToken)
-    {
-        var subject = "CPMS account login information";
-        var textBody = string.Join(Environment.NewLine, [
-            $"Hello {fullName},",
-            string.Empty,
-            "Your CPMS account has been created successfully.",
-            "Use the credentials below to sign in:",
-            $"Username / Account: {user.Username}",
-            $"Initial password: {initialPassword}",
-            string.Empty,
-            "Important notes:",
-            "- Keep this account information private.",
-            "- Do not share your password with anyone.",
-            "- Sign in as soon as possible and change your password according to your department process.",
-            "- If you did not request or expect this account, contact the moderator immediately."
-        ]);
-        var logoPath = AccountEmailLogoPath();
-        var logoContentId = "fpt-logo";
-        var htmlBody = BuildAccountCreatedEmailHtml(
-            fullName,
-            user.Username,
-            initialPassword,
-            logoPath is null ? null : $"cid:{logoContentId}");
-        var inlineImages = logoPath is null
-            ? Array.Empty<EmailInlineImage>()
-            : [new EmailInlineImage(logoContentId, logoPath, "image/png")];
-
         try
         {
-            await emailSender.SendHtmlAsync(user.Email, subject, htmlBody, textBody, inlineImages, cancellationToken);
-            return new AccountEmailResult("Sent", null);
+            return Ok(Map(await accountService.UpdateRoleAsync(
+                userId, request.Role, CurrentAudit(), cancellationToken)));
         }
-        catch (BusinessRuleException exception)
-        {
-            return new AccountEmailResult("Skipped", exception.Message);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return new AccountEmailResult("Failed", exception.Message);
-        }
-        catch (System.Net.Mail.SmtpException exception)
-        {
-            return new AccountEmailResult("Failed", exception.Message);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return new AccountEmailResult("Failed", exception.Message);
-        }
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
-    private static string? AccountEmailLogoPath()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "EmailAssets", "fptlogo.png");
-        return System.IO.File.Exists(path) ? path : null;
-    }
-
-    private static string BuildAccountCreatedEmailHtml(
-        string fullName,
-        string username,
-        string initialPassword,
-        string? logoSource)
-    {
-        var safeFullName = WebUtility.HtmlEncode(fullName);
-        var safeUsername = WebUtility.HtmlEncode(username);
-        var safePassword = WebUtility.HtmlEncode(initialPassword);
-        var logoHtml = string.IsNullOrWhiteSpace(logoSource)
-            ? "<div style=\"font-size:20px;font-weight:800;color:#0f5ea8;letter-spacing:.2px;\">FPT University</div>"
-            : $"<img src=\"{logoSource}\" width=\"180\" alt=\"FPT University\" style=\"display:block;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;\" />";
-
-        return $$"""
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CPMS account information</title>
-  </head>
-  <body style="margin:0;padding:0;background:#f3f6fb;font-family:Arial,Helvetica,sans-serif;color:#172033;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;margin:0;padding:28px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width:640px;max-width:100%;background:#ffffff;border:1px solid #e1e7f0;border-radius:12px;overflow:hidden;">
-            <tr>
-              <td style="padding:24px 28px 10px 28px;text-align:left;">
-                {{logoHtml}}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:10px 28px 28px 28px;">
-                <h1 style="margin:0 0 10px 0;font-size:24px;line-height:32px;color:#10243e;">CPMS account information</h1>
-                <p style="margin:0 0 18px 0;font-size:15px;line-height:23px;color:#44546a;">Hello <strong>{{safeFullName}}</strong>, your CPMS account has been created successfully. Use the credentials below to sign in.</p>
-
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0;margin:18px 0;border:1px solid #d8e2ef;border-radius:10px;overflow:hidden;">
-                  <tr>
-                    <td style="padding:13px 16px;background:#f7fafc;width:34%;font-size:13px;color:#667085;border-bottom:1px solid #d8e2ef;">Username / Account</td>
-                    <td style="padding:13px 16px;background:#ffffff;font-size:16px;font-weight:700;color:#0f5ea8;border-bottom:1px solid #d8e2ef;">{{safeUsername}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:13px 16px;background:#f7fafc;font-size:13px;color:#667085;">Initial password</td>
-                    <td style="padding:13px 16px;background:#ffffff;font-size:16px;font-weight:700;color:#cc4b00;">{{safePassword}}</td>
-                  </tr>
-                </table>
-
-                <div style="margin:18px 0;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#7c2d12;font-size:14px;line-height:22px;">
-                  Keep this account information private. Do not forward this email or share your password with anyone.
-                </div>
-
-                <p style="margin:0 0 10px 0;font-size:14px;line-height:22px;color:#44546a;">Next steps:</p>
-                <ol style="margin:0 0 18px 20px;padding:0;color:#44546a;font-size:14px;line-height:22px;">
-                  <li>Sign in to CPMS using the username and initial password above.</li>
-                  <li>Change your password according to your department process after the first sign-in.</li>
-                  <li>If this account information looks incorrect, contact the moderator before using it.</li>
-                </ol>
-
-                <p style="margin:20px 0 0 0;font-size:12px;line-height:18px;color:#98a2b3;">This is an automated CPMS email. Please keep it for your first sign-in only.</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
-""";
-    }
+    private AccountAuditContext CurrentAudit() => new(
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new UnauthorizedAccessException("Missing user identifier."), CultureInfo.InvariantCulture),
+        HttpContext.Connection.RemoteIpAddress?.ToString(),
+        Request.Headers.UserAgent);
+    private static AccountResponse Map(AccountResult x) =>
+        new(x.Id, x.Username, x.Email, x.Role, x.IsActive, x.LastLoginAt, x.LockedUntil);
 }
-
-public sealed record AccountResponse(
-    int Id,
-    string Username,
-    string Email,
-    UserRole Role,
-    bool IsActive,
-    DateTime? LastLoginAt,
-    DateTime? LockedUntil);
-
-public sealed record CreateAccountRequest(
-    string? Username,
-    string? IdentityCode,
-    string Email,
-    string Password,
-    UserRole Role,
-    string? FullName,
-    string? Department,
-    string? Position,
-    string? PermissionScope,
-    bool IsPartTime,
-    string? ClassCode,
-    string? Batch,
-    string? Major);
-
-public sealed record UpdateAccountStatusRequest(bool IsActive, bool Unlock);
-
-public sealed record UpdateAccountRoleRequest(UserRole Role);
-
-public sealed record AccountCreatedResponse(
-    int Id,
-    string Username,
-    string Email,
-    string InitialPassword,
-    UserRole Role,
-    bool IsActive,
-    DateTime? LastLoginAt,
-    DateTime? LockedUntil,
-    string IdentityCode,
-    string EmailDeliveryStatus,
-    string? EmailDeliveryError);
-
-internal sealed record AccountEmailResult(string Status, string? Error);

@@ -6,11 +6,11 @@ This project uses ISO/IEC 9126 as the quality model baseline and aligns practica
 
 | Standard concern | CPMS control | Verification |
 | --- | --- | --- |
-| Functionality / functional suitability | Business rules live in `CPMS.Application`/`CPMS.Domain` and are covered by unit tests. Chairman-only session control, council membership, score locking and conflict checks must stay server-side. | `dotnet test .\CPMS.sln` |
+| Functionality / functional suitability | Business rules live in `CPMS.BLL`/`CPMS.Domain` and are covered by unit tests. Chairman-only session control, council membership, score locking and conflict checks must stay server-side. | `dotnet test .\CPMS.sln` |
 | Reliability | Database constraints, immutable score locking, append-only audit logs and EF migrations protect critical data. APIs should fail with explicit business errors, not silent success. | Backend build, tests, migration review |
 | Usability | Swagger and API responses must expose clear business state: waiting, live scoring, locked, validation errors and audit evidence. | Swagger/API review |
 | Efficiency / performance | PostgreSQL indexes exist for login, refresh token lookup, unique assignments and score writes. Realtime scoring uses SignalR groups per session. | Query review before adding high-volume APIs |
-| Maintainability | Clean Architecture: API orchestration in `CPMS.API`, use cases in `CPMS.Application`, entities/rules in `CPMS.Domain`, persistence/external adapters in `CPMS.Infrastructure`. No business rules hidden only in controllers. | Code review, analyzer warnings |
+| Maintainability | Clean Architecture: API orchestration in `CPMS.API`, use cases in `CPMS.BLL`, entities/rules in `CPMS.Domain`, persistence/external adapters in `CPMS.DAL`. No business rules hidden only in controllers. | Code review, analyzer warnings |
 | Portability | Docker Compose for PostgreSQL, Redis, RabbitMQ and the ASP.NET Core backend. Environment-specific settings stay in config/secrets. | Fresh setup runbook |
 | Security | JWT + refresh rotation, BCrypt, auth rate limiting, RBAC, strict CORS, server-side authorization for scoring. | Auth endpoint tests and manual security review |
 
@@ -31,7 +31,7 @@ dotnet build ..\SWD_Capstone.sln --no-restore
 
 ## Engineering Rules
 
-- Keep domain decisions in `CPMS.Application`/`CPMS.Domain`; controllers should coordinate requests, authorization and response mapping.
+- Keep domain decisions in `CPMS.BLL`/`CPMS.Domain`; controllers should coordinate requests, authorization and response mapping.
 - Never trust client state for scoring permissions. Backend must verify the lecturer, council membership, chairman role and session state.
 - Every score write must create audit evidence: `audit_logs` plus `score_submission_histories`.
 - Locked score data is immutable at API, EF and database levels.

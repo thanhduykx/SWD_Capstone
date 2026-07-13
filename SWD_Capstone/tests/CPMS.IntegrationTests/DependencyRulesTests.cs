@@ -15,9 +15,9 @@ public sealed class DependencyRulesTests
     }
 
     [Fact]
-    public void Application_ReferencesOnlyDomainAndShared()
+    public void BLL_ReferencesOnlyDomainAndShared()
     {
-        var references = ProjectReferences("src/CPMS.Application/CPMS.Application.csproj");
+        var references = ProjectReferences("src/CPMS.BLL/CPMS.BLL.csproj");
 
         Assert.Equal(
             ["../CPMS.Domain/CPMS.Domain.csproj", "../CPMS.Shared/CPMS.Shared.csproj"],
@@ -25,17 +25,53 @@ public sealed class DependencyRulesTests
     }
 
     [Fact]
-    public void Infrastructure_ReferencesApplicationAndDomain()
+    public void DAL_ReferencesBLLAndDomain()
     {
-        var references = ProjectReferences("src/CPMS.Infrastructure/CPMS.Infrastructure.csproj")
+        var references = ProjectReferences("src/CPMS.DAL/CPMS.DAL.csproj")
             .Select(Normalize)
             .ToArray();
 
-        Assert.Contains("../CPMS.Application/CPMS.Application.csproj", references);
+        Assert.Contains("../CPMS.BLL/CPMS.BLL.csproj", references);
         Assert.Contains("../CPMS.Domain/CPMS.Domain.csproj", references);
     }
 
-    private static IReadOnlyCollection<string> ProjectReferences(string projectPath)
+    [Fact]
+    public void PresentationEndpoints_DoNotAccessDalOrEntityFramework()
+    {
+        var root = FindRepositoryRoot();
+        var endpointRoots = new[]
+        {
+            Path.Combine(root, "src", "CPMS.API", "Controllers"),
+            Path.Combine(root, "src", "CPMS.API", "Hubs"),
+            Path.Combine(root, "src", "CPMS.API", "Services")
+        };
+        foreach (var sourcePath in endpointRoots.SelectMany(path =>
+                     Directory.GetFiles(path, "*.cs", SearchOption.AllDirectories)))
+        {
+            var source = File.ReadAllText(sourcePath);
+            Assert.DoesNotContain("CpmsDbContext", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Microsoft.EntityFrameworkCore", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("CPMS.DAL", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void BLL_DoesNotReferenceEntityFrameworkOrDAL()
+    {
+        var root = FindRepositoryRoot();
+        var bllRoot = Path.Combine(root, "src", "CPMS.BLL");
+        var sources = Directory.GetFiles(bllRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(File.ReadAllText);
+
+        foreach (var source in sources)
+        {
+            Assert.DoesNotContain("Microsoft.EntityFrameworkCore", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("CPMS.DAL", source, StringComparison.Ordinal);
+        }
+    }
+
+    private static string[] ProjectReferences(string projectPath)
     {
         var root = FindRepositoryRoot();
         var document = XDocument.Load(Path.Combine(root, projectPath));

@@ -1,0 +1,152 @@
+using CPMS.BLL.Abstractions.Security;
+using CPMS.BLL.Accounts;
+using CPMS.Core.Enums;
+
+namespace CPMS.UnitTests.Services;
+
+public sealed class AuthenticationServiceTests
+{
+    [Fact]
+    public async Task Login_RejectsLockedAccountWithoutCheckingPassword()
+    {
+        var store = new AuthenticationStoreFake
+        {
+            User = User(lockedUntil: DateTime.UtcNow.AddMinutes(1))
+        };
+        var hasher = new PasswordHasherFake { Matches = true };
+        var service = CreateService(store, hasher);
+
+        var result = await service.LoginAsync("lecturer", "secret", null, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(hasher.VerifyCalled);
+        Assert.Null(store.SavedRefreshToken);
+    }
+
+    [Fact]
+    public async Task Login_TenthFailedAttemptTemporarilyLocksAccount()
+    {
+        var store = new AuthenticationStoreFake { User = User(failedAttempts: 9) };
+        var service = CreateService(store, new PasswordHasherFake { Matches = false });
+
+        var result = await service.LoginAsync("lecturer", "wrong", null, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Equal(10, store.RecordedFailedAttempts);
+        Assert.True(store.RecordedLockedUntil > DateTime.UtcNow.AddMinutes(4));
+    }
+
+    [Fact]
+    public async Task Login_WithValidPasswordPersistsRefreshToken()
+    {
+        var store = new AuthenticationStoreFake { User = User() };
+        var service = CreateService(store, new PasswordHasherFake { Matches = true });
+
+        var result = await service.LoginAsync(" lecturer ", "secret", "browser", CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("access", result.AccessToken);
+        Assert.Equal("refresh", result.RefreshToken);
+        Assert.Equal(7, store.SuccessfulLoginUserId);
+        Assert.Equal("refresh-hash", store.SavedRefreshToken?.TokenHash);
+        Assert.Equal("browser", store.SavedRefreshToken?.DeviceInfo);
+    }
+
+    [Fact]
+    public async Task Refresh_RejectsLockedAccountWithoutRotatingToken()
+    {
+        var store = new AuthenticationStoreFake
+        {
+            User = User(lockedUntil: DateTime.UtcNow.AddMinutes(1)),
+            RefreshToken = new RefreshTokenState(3, 7, false, DateTime.UtcNow.AddHours(1))
+        };
+        var service = CreateService(store, new PasswordHasherFake());
+
+        var result = await service.RefreshAsync("refresh", null, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Null(store.RotatedToken);
+    }
+
+    private static AuthenticationService CreateService(
+        AuthenticationStoreFake store, PasswordHasherFake hasher) =>
+        new(store, hasher, new TokenIssuerFake(), new GoogleVerifierFake());
+
+    private static AuthenticationUser User(int failedAttempts = 0, DateTime? lockedUntil = null) =>
+        new(7, "lecturer", "lecturer@fpt.edu.vn", "hash", UserRole.Lecturer,
+            true, failedAttempts, lockedUntil);
+
+    private sealed class PasswordHasherFake : IPasswordHasher
+    {
+        public bool Matches { get; init; }
+        public bool VerifyCalled { get; private set; }
+        public string Hash(string password) => $"hashed:{password}";
+        public bool Verify(string passwordHash, string password)
+        {
+            VerifyCalled = true;
+            return Matches;
+        }
+    }
+
+    private sealed class TokenIssuerFake : IAuthenticationTokenIssuer
+    {
+        public IssuedToken Issue(AuthIdentity identity, string? deviceInfo) =>
+            new("access", "refresh", "refresh-hash", DateTime.UtcNow.AddDays(7));
+        public string HashRefreshToken(string rawToken) => $"hash:{rawToken}";
+    }
+
+    private sealed class GoogleVerifierFake : IGoogleIdentityVerifier
+    {
+        public Task<string?> VerifyEmailAsync(string idToken, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>(null);
+    }
+
+    private sealed class AuthenticationStoreFake : IAuthenticationStore
+    {
+        public AuthenticationUser? User { get; init; }
+        public RefreshTokenState? RefreshToken { get; init; }
+        public int? RecordedFailedAttempts { get; private set; }
+        public DateTime? RecordedLockedUntil { get; private set; }
+        public int? SuccessfulLoginUserId { get; private set; }
+        public PersistRefreshToken? SavedRefreshToken { get; private set; }
+        public PersistRefreshToken? RotatedToken { get; private set; }
+
+        public Task<AuthenticationUser?> FindByLoginAsync(string login, CancellationToken cancellationToken) =>
+            Task.FromResult(User);
+        public Task<AuthenticationUser?> FindByEmailAsync(string email, CancellationToken cancellationToken) =>
+            Task.FromResult(User);
+        public Task RecordFailedLoginAsync(
+            int userId, int failedAttempts, DateTime? lockedUntil, CancellationToken cancellationToken)
+        {
+            RecordedFailedAttempts = failedAttempts;
+            RecordedLockedUntil = lockedUntil;
+            return Task.CompletedTask;
+        }
+        public Task RecordSuccessfulLoginAsync(
+            int userId, DateTime loginAt, CancellationToken cancellationToken)
+        {
+            SuccessfulLoginUserId = userId;
+            return Task.CompletedTask;
+        }
+        public Task SaveRefreshTokenAsync(PersistRefreshToken token, CancellationToken cancellationToken)
+        {
+            SavedRefreshToken = token;
+            return Task.CompletedTask;
+        }
+        public Task<RefreshTokenState?> FindRefreshTokenAsync(
+            string tokenHash, CancellationToken cancellationToken) => Task.FromResult(RefreshToken);
+        public Task<AuthenticationUser?> FindUserAsync(int userId, CancellationToken cancellationToken) =>
+            Task.FromResult(User);
+        public Task RotateRefreshTokenAsync(
+            int existingTokenId, PersistRefreshToken replacement, CancellationToken cancellationToken)
+        {
+            RotatedToken = replacement;
+            return Task.CompletedTask;
+        }
+        public Task<bool> AnyUsersAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<BootstrapAdminResult> CreateBootstrapAdminAsync(
+            string username, string email, string passwordHash, string? ipAddress,
+            string? userAgent, CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapAdminResult(1, username, UserRole.SystemAdministrator));
+    }
+}
