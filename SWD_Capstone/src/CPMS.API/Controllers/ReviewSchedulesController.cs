@@ -5,6 +5,7 @@ using CPMS.Api.Services;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Core.Exceptions;
+using CPMS.Core.Services;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,27 @@ public sealed class ReviewSchedulesController(
 
         var trainingDepartmentId = await CurrentTrainingDepartmentIdAsync(cancellationToken);
         var weekStart = NormalizeWeekStart(request.WeekStart);
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x =>
+            x.SemesterId == request.SemesterId &&
+            x.Type == request.ReviewType &&
+            x.WeekStartDate == weekStart, cancellationToken);
+        if (round is null)
+        {
+            return BadRequest(new { error = "The selected review round does not exist." });
+        }
+
+        if (round.Status != ReviewRoundStatus.Closed)
+        {
+            return Conflict(new { error = "Only a Closed review round can be published." });
+        }
+
+        if (await dbContext.ReviewSchedulePublications.AnyAsync(x =>
+                x.SemesterId == request.SemesterId &&
+                x.ReviewType == request.ReviewType &&
+                x.WeekStartDate == weekStart, cancellationToken))
+        {
+            return Conflict(new { error = "This review schedule has already been published." });
+        }
         var weekStartDate = DateTime.SpecifyKind(weekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var weekEndDate = weekStartDate.AddDays(7);
 
@@ -36,13 +58,46 @@ public sealed class ReviewSchedulesController(
                         x.Type == request.ReviewType &&
                         x.SessionDate >= weekStartDate &&
                         x.SessionDate < weekEndDate &&
-                        x.Status != ReviewSessionStatus.Cancelled)
+                        x.Status == ReviewSessionStatus.Draft)
             .OrderBy(x => x.SessionDate)
             .ThenBy(x => x.Slot)
             .ToListAsync(cancellationToken);
         if (sessions.Count == 0)
         {
             return BadRequest(new { error = "No review sessions exist for the selected week and review round." });
+        }
+
+        var activeGroupIds = await dbContext.CapstoneGroups
+            .Where(x => x.SemesterId == request.SemesterId && x.Status == GroupStatus.Active)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        var fullyRegisteredGroupIds = await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == round.Id && activeGroupIds.Contains(x.GroupId))
+            .GroupBy(x => x.GroupId)
+            .Where(x => x.Count() == AssignmentRules.RequiredStudentAvailabilityCount)
+            .Select(x => x.Key)
+            .ToListAsync(cancellationToken);
+        var scheduledGroupIdsForRound = await dbContext.GroupReviewSlots
+            .Where(x => dbContext.ReviewSessions.Any(session => session.Id == x.SessionId &&
+                session.SemesterId == request.SemesterId &&
+                session.Type == request.ReviewType &&
+                session.SessionDate >= weekStartDate &&
+                session.SessionDate < weekEndDate &&
+                session.Status == ReviewSessionStatus.Draft))
+            .Select(x => x.GroupId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        if (fullyRegisteredGroupIds.Count != activeGroupIds.Count ||
+            scheduledGroupIdsForRound.Count != activeGroupIds.Count ||
+            activeGroupIds.Any(id => !scheduledGroupIdsForRound.Contains(id)))
+        {
+            return Conflict(new
+            {
+                error = "Every active group must submit five slots and receive an assignment before publication.",
+                activeGroups = activeGroupIds.Count,
+                fullyRegisteredGroups = fullyRegisteredGroupIds.Count,
+                scheduledGroups = scheduledGroupIdsForRound.Count
+            });
         }
 
         var reviewerIds = sessions
@@ -211,6 +266,8 @@ public sealed class ReviewSchedulesController(
             session.PublishedByTrainingDepartmentId = trainingDepartmentId;
         }
 
+        round.Status = ReviewRoundStatus.Published;
+
         dbContext.AuditLogs.Add(new AuditLog
         {
             UserId = CurrentUserId(),
@@ -290,9 +347,6 @@ public sealed class ReviewSchedulesController(
             3 => "Slot 3 (12:30-14:45)",
             4 => "Slot 4 (15:00-17:15)",
             5 => "Slot 5 (17:30-19:45)",
-            6 => "Slot 6 (20:00-22:15)",
-            7 => "Slot 7 (22:30-00:45)",
-            8 => "Slot 8 (01:00-03:15)",
             _ => $"Slot {slot}"
         };
 

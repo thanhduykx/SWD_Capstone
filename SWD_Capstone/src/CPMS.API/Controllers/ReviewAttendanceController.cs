@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using CPMS.Core.Entities;
+using CPMS.Core.Enums;
 using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,7 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
     [HttpGet("{sessionId:int}")]
     public async Task<ActionResult<ReviewAttendanceListResponse>> GetAttendance(
         int sessionId,
+        [FromQuery] int? groupId,
         CancellationToken cancellationToken)
     {
         var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
@@ -24,25 +26,27 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
             return NotFound(new { error = "Review session not found." });
         }
 
-        var groupSlot = await dbContext.GroupReviewSlots
-            .Where(x => x.SessionId == sessionId)
-            .Select(x => new { x.GroupId })
-            .SingleOrDefaultAsync(cancellationToken);
+        var groupSlot = await ResolveGroupSlotAsync(sessionId, groupId, cancellationToken);
         if (groupSlot is null)
         {
             return NotFound(new { error = "No group assigned to this session." });
         }
 
+        if (session.Status != ReviewSessionStatus.Published)
+        {
+            return Forbid();
+        }
+
         if (User.IsInRole("Lecturer"))
         {
             var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
-            if (lecturerId is null) return Forbid();
+            if (lecturerId is null || !IsAssignedReviewer(session, lecturerId.Value)) return Forbid();
         }
         else if (User.IsInRole("Student"))
         {
             var userId = CurrentUserId();
             var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            if (student is null || student.GroupId != groupSlot.GroupId) return Forbid();
+            if (student is null || student.GroupId != groupSlot.GroupId || groupSlot.Status != ReviewGroupStatus.Completed) return Forbid();
         }
         else
         {
@@ -102,6 +106,41 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
             return NotFound(new { error = "Review session not found." });
         }
 
+        if (session.Status != ReviewSessionStatus.Published || !IsAssignedReviewer(session, lecturerId.Value))
+        {
+            return Forbid();
+        }
+
+        var groupSlot = await ResolveGroupSlotAsync(sessionId, request.GroupId, cancellationToken);
+        if (groupSlot is null)
+        {
+            return NotFound(new { error = "The group is not assigned to this review session." });
+        }
+
+        if (groupSlot.Status == ReviewGroupStatus.Completed)
+        {
+            return Conflict(new { error = "Attendance is locked after the group's review is completed." });
+        }
+
+        if (request.Entries.Count == 0 || request.Entries.Select(x => x.StudentId).Distinct().Count() != request.Entries.Count)
+        {
+            return BadRequest(new { error = "Attendance entries must contain distinct students." });
+        }
+
+        if (request.Entries.Any(x => x.Note?.Length > 1000))
+        {
+            return BadRequest(new { error = "Attendance notes cannot exceed 1000 characters." });
+        }
+
+        var validStudentIds = await dbContext.Students
+            .Where(x => x.GroupId == groupSlot.GroupId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        if (request.Entries.Any(x => !validStudentIds.Contains(x.StudentId)))
+        {
+            return BadRequest(new { error = "Every attendance entry must belong to the selected group." });
+        }
+
         foreach (var item in request.Entries)
         {
             var existing = await dbContext.ReviewAttendances
@@ -128,21 +167,24 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return await GetAttendance(sessionId, cancellationToken);
+        return await GetAttendance(sessionId, request.GroupId, cancellationToken);
     }
 
     [HttpGet("{sessionId:int}/comments")]
-    public async Task<IReadOnlyList<ReviewCommentResponse>> GetComments(
+    public async Task<ActionResult<IReadOnlyList<ReviewCommentResponse>>> GetComments(
         int sessionId,
+        [FromQuery] int? groupId,
         CancellationToken cancellationToken)
     {
-        var groupId = await dbContext.GroupReviewSlots
-            .Where(x => x.SessionId == sessionId)
-            .Select(x => x.GroupId)
-            .SingleOrDefaultAsync(cancellationToken);
+        var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        var groupSlot = await ResolveGroupSlotAsync(sessionId, groupId, cancellationToken);
+        if (session is null || groupSlot is null || !await CanViewGroupAsync(session, groupSlot.GroupId, cancellationToken))
+        {
+            return Forbid();
+        }
 
-        return await dbContext.ReviewComments
-            .Where(x => x.SessionId == sessionId && x.GroupId == groupId)
+        return Ok(await dbContext.ReviewComments
+            .Where(x => x.SessionId == sessionId && x.GroupId == groupSlot.GroupId)
             .OrderBy(x => x.CreatedAt)
             .Select(x => new ReviewCommentResponse(
                 x.Id,
@@ -151,10 +193,11 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
                 x.Content,
                 x.CreatedAt,
                 x.UpdatedAt))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken));
     }
 
     [HttpPost("{sessionId:int}/comments")]
+    [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewCommentResponse>> AddComment(
         int sessionId,
         AddCommentRequest request,
@@ -163,28 +206,36 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
         ArgumentNullException.ThrowIfNull(request);
 
         var userId = CurrentUserId();
-        var groupId = await dbContext.GroupReviewSlots
-            .Where(x => x.SessionId == sessionId)
-            .Select(x => x.GroupId)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (groupId == 0)
+        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+        var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        var groupSlot = await ResolveGroupSlotAsync(sessionId, request.GroupId, cancellationToken);
+        if (session is null || groupSlot is null)
         {
-            return NotFound(new { error = "No group assigned to this session." });
+            return NotFound(new { error = "The session or assigned group was not found." });
         }
 
-        if (User.IsInRole("Student"))
+        if (lecturerId is null || session.Status != ReviewSessionStatus.Published || !IsAssignedReviewer(session, lecturerId.Value))
         {
-            var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            if (student is null || student.GroupId != groupId) return Forbid();
+            return Forbid();
+        }
+
+        if (groupSlot.Status == ReviewGroupStatus.Completed)
+        {
+            return Conflict(new { error = "Comments are locked after the group's review is completed." });
+        }
+
+        var content = request.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(content) || content.Length > 2000)
+        {
+            return BadRequest(new { error = "Comment content is required and cannot exceed 2000 characters." });
         }
 
         var comment = new ReviewComment
         {
             SessionId = sessionId,
-            GroupId = groupId,
+            GroupId = groupSlot.GroupId,
             AuthorUserId = userId,
-            Content = request.Content.Trim()
+            Content = content
         };
 
         dbContext.ReviewComments.Add(comment);
@@ -203,6 +254,93 @@ public sealed class ReviewAttendanceController(CpmsDbContext dbContext) : Contro
             comment.CreatedAt,
             comment.UpdatedAt));
     }
+
+    [HttpPost("{sessionId:int}/groups/{groupId:int}/complete")]
+    [Authorize(Roles = "Lecturer")]
+    public async Task<ActionResult> CompleteReview(
+        int sessionId,
+        int groupId,
+        CancellationToken cancellationToken)
+    {
+        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+        var session = await dbContext.ReviewSessions.SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
+        var groupSlot = await ResolveGroupSlotAsync(sessionId, groupId, cancellationToken);
+        if (lecturerId is null || session is null || groupSlot is null || !IsAssignedReviewer(session, lecturerId.Value))
+        {
+            return Forbid();
+        }
+
+        if (session.Status != ReviewSessionStatus.Published)
+        {
+            return Conflict(new { error = "Only a published review session can be completed." });
+        }
+
+        if (groupSlot.Status == ReviewGroupStatus.Completed)
+        {
+            return Ok(new { sessionId, groupId, status = groupSlot.Status, groupSlot.CompletedAt });
+        }
+
+        var studentCount = await dbContext.Students.CountAsync(x => x.GroupId == groupId, cancellationToken);
+        var attendanceCount = await dbContext.ReviewAttendances.CountAsync(x =>
+            x.SessionId == sessionId && dbContext.Students.Any(student => student.Id == x.StudentId && student.GroupId == groupId), cancellationToken);
+        var expectedSubmissionCount = new[] { session.Reviewer1Id, session.Reviewer2Id }.Count(x => x.HasValue);
+        var submittedCount = await dbContext.ReviewChecklistSubmissions.CountAsync(x =>
+            x.SessionId == sessionId && x.GroupId == groupId && x.Status == ReviewSubmissionStatus.Submitted, cancellationToken);
+        if (studentCount == 0 || attendanceCount != studentCount || submittedCount != expectedSubmissionCount)
+        {
+            return Conflict(new { error = "Attendance for every student and all reviewer submissions are required before completion." });
+        }
+
+        groupSlot.Status = ReviewGroupStatus.Completed;
+        groupSlot.CompletedAt = DateTime.UtcNow;
+        groupSlot.CompletedByLecturerId = lecturerId.Value;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new { sessionId, groupId, status = groupSlot.Status, groupSlot.CompletedAt });
+    }
+
+    private async Task<GroupReviewSlot?> ResolveGroupSlotAsync(
+        int sessionId,
+        int? groupId,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId);
+        if (groupId.HasValue)
+        {
+            return await query.SingleOrDefaultAsync(x => x.GroupId == groupId.Value, cancellationToken);
+        }
+
+        var slots = await query.Take(2).ToListAsync(cancellationToken);
+        return slots.Count == 1 ? slots[0] : null;
+    }
+
+    private async Task<bool> CanViewGroupAsync(ReviewSession session, int groupId, CancellationToken cancellationToken)
+    {
+        if (User.IsInRole(nameof(UserRole.SystemAdministrator)) || User.IsInRole(nameof(UserRole.TrainingDepartment)))
+        {
+            return true;
+        }
+
+        if (User.IsInRole(nameof(UserRole.Lecturer)))
+        {
+            var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
+            return session.Status == ReviewSessionStatus.Published &&
+                   lecturerId.HasValue && IsAssignedReviewer(session, lecturerId.Value);
+        }
+
+        if (User.IsInRole(nameof(UserRole.Student)) && session.Status == ReviewSessionStatus.Published)
+        {
+            var userId = CurrentUserId();
+            return await dbContext.Students.AnyAsync(x => x.UserId == userId && x.GroupId == groupId, cancellationToken) &&
+                   await dbContext.GroupReviewSlots.AnyAsync(x =>
+                       x.SessionId == session.Id && x.GroupId == groupId && x.Status == ReviewGroupStatus.Completed,
+                       cancellationToken);
+        }
+
+        return false;
+    }
+
+    private static bool IsAssignedReviewer(ReviewSession session, int lecturerId) =>
+        session.Reviewer1Id == lecturerId || session.Reviewer2Id == lecturerId;
 
     private async Task<int?> CurrentLecturerIdAsync(CancellationToken cancellationToken)
     {
@@ -237,8 +375,8 @@ public sealed record AttendanceStudentResponse(
     bool? IsPresent,
     string? Note);
 
-public sealed record SubmitAttendanceRequest(IReadOnlyCollection<AttendanceEntryRequest> Entries);
+public sealed record SubmitAttendanceRequest(int GroupId, IReadOnlyCollection<AttendanceEntryRequest> Entries);
 
 public sealed record AttendanceEntryRequest(int StudentId, bool IsPresent, string? Note);
 
-public sealed record AddCommentRequest(string Content);
+public sealed record AddCommentRequest(int GroupId, string Content);

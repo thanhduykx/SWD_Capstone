@@ -9,10 +9,43 @@ public sealed class AssignmentRulesTests
 
     [Theory]
     [InlineData(0)]
+    [InlineData(6)]
     [InlineData(9)]
-    public void ReviewSlot_RejectsValueOutsideOneToEight(int slot)
+    public void ReviewSlot_RejectsValueOutsideOneToFive(int slot)
     {
         var action = () => _rules.ValidateReviewSlot(slot);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void StudentAvailability_AcceptsExactlyFiveDistinctSlots()
+    {
+        _rules.ValidateStudentAvailability([(1, 1), (1, 2), (2, 1), (3, 4), (6, 5)]);
+    }
+
+    [Fact]
+    public void StudentAvailability_RejectsFewerThanFiveSlots()
+    {
+        var action = () => _rules.ValidateStudentAvailability([(1, 1), (1, 2), (2, 1), (3, 4)]);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void ReviewRound_RejectsSkippingFromDraftToClosed()
+    {
+        var action = () => _rules.EnsureReviewRoundTransition(
+            CPMS.Core.Enums.ReviewRoundStatus.Draft,
+            CPMS.Core.Enums.ReviewRoundStatus.Closed);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void ReviewSession_RejectsFourthGroup()
+    {
+        var action = () => _rules.EnsureReviewSessionCapacity(3);
 
         Assert.Throws<BusinessRuleException>(action);
     }

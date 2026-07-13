@@ -41,6 +41,9 @@ public sealed class ReviewSubmissionsController(
                                      where sub.GroupId == groupId && sub.Status != ReviewSubmissionStatus.Draft
                                      join slot in dbContext.GroupReviewSlots on new { sub.SessionId, sub.GroupId } equals new { slot.SessionId, slot.GroupId } into slotGroup
                                      from slot in slotGroup.DefaultIfEmpty()
+                                     where slot != null && slot.Status == ReviewGroupStatus.Completed &&
+                                           dbContext.ReviewSessions.Any(session =>
+                                               session.Id == sub.SessionId && session.Status == ReviewSessionStatus.Published)
                                      orderby sub.LastSavedAt descending
                                      select new
                                      {
@@ -119,6 +122,15 @@ public sealed class ReviewSubmissionsController(
         }
 
         await EnsureCanEditAsync(submission, cancellationToken);
+        if (submission.Status == ReviewSubmissionStatus.Submitted)
+        {
+            return Conflict(new { error = "A submitted review cannot be moved back to Draft." });
+        }
+
+        if (!await IsSessionPublishedAsync(submission.SessionId, cancellationToken))
+        {
+            return Conflict(new { error = "Review feedback can only be edited after the schedule is published." });
+        }
         submission.WorkProductVersion = EmptyToNull(request.WorkProductVersion);
         submission.WorkProductSize = EmptyToNull(request.WorkProductSize);
         submission.EffortHours = request.EffortHours;
@@ -147,6 +159,29 @@ public sealed class ReviewSubmissionsController(
         }
 
         await EnsureCanEditAsync(submission, cancellationToken);
+        if (submission.Status == ReviewSubmissionStatus.Submitted)
+        {
+            return Conflict(new { error = "This review submission has already been submitted." });
+        }
+
+        if (!await IsSessionPublishedAsync(submission.SessionId, cancellationToken))
+        {
+            return Conflict(new { error = "Review feedback can only be submitted for a published session." });
+        }
+
+        var requiredItemKeys = templateService.GetItems(submission.Type)
+            .Where(x => !x.IsSection)
+            .Select(x => x.ItemKey)
+            .ToArray();
+        var answeredItemCount = await dbContext.ReviewChecklistItemResponses.CountAsync(x =>
+            x.SubmissionId == submission.Id &&
+            requiredItemKeys.Contains(x.ItemKey) &&
+            x.Answer != null, cancellationToken);
+        if (answeredItemCount != requiredItemKeys.Length || string.IsNullOrWhiteSpace(submission.ReviewerComment))
+        {
+            return Conflict(new { error = "Every checklist item and the reviewer comment are required before submission." });
+        }
+
         submission.Status = ReviewSubmissionStatus.Submitted;
         submission.SubmittedAt = DateTime.UtcNow;
         submission.LastSavedAt = DateTime.UtcNow;
@@ -167,7 +202,7 @@ public sealed class ReviewSubmissionsController(
         }
 
         await EnsureCanViewAsync(submission, cancellationToken);
-        var exportData = await BuildExportDataAsync(submission.SessionId, cancellationToken);
+        var exportData = await BuildExportDataAsync(submission.SessionId, submission.GroupId, cancellationToken);
         var bytes = templateService.ExportWorkbook(exportData);
         return File(
             bytes,
@@ -182,13 +217,17 @@ public sealed class ReviewSubmissionsController(
         ReviewType reviewType,
         CancellationToken cancellationToken)
     {
-        var sessionIds = await dbContext.ReviewSessions
-            .Where(x => x.SemesterId == semesterId && x.Type == reviewType)
+        var scheduledGroups = await dbContext.GroupReviewSlots
+            .Join(
+                dbContext.ReviewSessions.Where(x => x.SemesterId == semesterId && x.Type == reviewType),
+                slot => slot.SessionId,
+                session => session.Id,
+                (slot, session) => new { slot.SessionId, slot.GroupId, session.SessionDate, session.Slot })
             .OrderBy(x => x.SessionDate)
             .ThenBy(x => x.Slot)
-            .Select(x => x.Id)
+            .ThenBy(x => x.GroupId)
             .ToListAsync(cancellationToken);
-        if (sessionIds.Count == 0)
+        if (scheduledGroups.Count == 0)
         {
             return NotFound(new { error = "No review sessions were found for export." });
         }
@@ -196,9 +235,9 @@ public sealed class ReviewSubmissionsController(
         using var archiveStream = new MemoryStream();
         using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            foreach (var sessionId in sessionIds)
+            foreach (var scheduledGroup in scheduledGroups)
             {
-                var exportData = await BuildExportDataAsync(sessionId, cancellationToken);
+                var exportData = await BuildExportDataAsync(scheduledGroup.SessionId, scheduledGroup.GroupId, cancellationToken);
                 var entry = archive.CreateEntry(SafeFileName($"{exportData.GroupCode}_{exportData.Type}_{exportData.SessionId}.xlsx"));
                 await using var entryStream = entry.Open();
                 var bytes = templateService.ExportWorkbook(exportData);
@@ -305,17 +344,20 @@ public sealed class ReviewSubmissionsController(
             items);
     }
 
-    private async Task<ReviewChecklistExportData> BuildExportDataAsync(int sessionId, CancellationToken cancellationToken)
+    private async Task<ReviewChecklistExportData> BuildExportDataAsync(
+        int sessionId,
+        int groupId,
+        CancellationToken cancellationToken)
     {
         var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
-        var slot = await dbContext.GroupReviewSlots.SingleAsync(x => x.SessionId == sessionId, cancellationToken);
+        var slot = await dbContext.GroupReviewSlots.SingleAsync(x => x.SessionId == sessionId && x.GroupId == groupId, cancellationToken);
         var group = await dbContext.CapstoneGroups.SingleAsync(x => x.Id == slot.GroupId, cancellationToken);
         var projectName = await dbContext.Topics
             .Where(x => x.Id == group.TopicId)
             .Select(x => x.NameEn)
             .SingleAsync(cancellationToken);
         var submissions = await dbContext.ReviewChecklistSubmissions
-            .Where(x => x.SessionId == sessionId)
+            .Where(x => x.SessionId == sessionId && x.GroupId == groupId)
             .OrderBy(x => x.ReviewerId)
             .ToListAsync(cancellationToken);
         var submissionIds = submissions.Select(x => x.Id).ToArray();
@@ -391,7 +433,20 @@ public sealed class ReviewSubmissionsController(
         {
             throw new UnauthorizedAccessException("Only the assigned reviewer can edit this review submission.");
         }
+
+        var isCompleted = await dbContext.GroupReviewSlots.AnyAsync(x =>
+            x.SessionId == submission.SessionId &&
+            x.GroupId == submission.GroupId &&
+            x.Status == ReviewGroupStatus.Completed,
+            cancellationToken);
+        if (isCompleted)
+        {
+            throw new BusinessRuleException("Review feedback is locked after the group's review is completed.");
+        }
     }
+
+    private Task<bool> IsSessionPublishedAsync(int sessionId, CancellationToken cancellationToken) =>
+        dbContext.ReviewSessions.AnyAsync(x => x.Id == sessionId && x.Status == ReviewSessionStatus.Published, cancellationToken);
 
     private async Task<int?> CurrentLecturerIdAsync(CancellationToken cancellationToken)
     {

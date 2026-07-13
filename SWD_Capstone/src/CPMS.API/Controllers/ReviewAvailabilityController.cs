@@ -34,6 +34,10 @@ public sealed class ReviewAvailabilityController(
 
         weekStart = NormalizeWeekStart(weekStart);
         var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
+        if (semester.Id != semesterId)
+        {
+            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+        }
         var slots = await dbContext.ReviewAvailabilities
             .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
             .OrderBy(x => x.DayOfWeek)
@@ -72,6 +76,15 @@ public sealed class ReviewAvailabilityController(
 
         weekStart = NormalizeWeekStart(weekStart);
         var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
+        if (semester.Id != semesterId)
+        {
+            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+        }
+
+        if (!await HasOpenRoundAsync(semester.Id, weekStart, cancellationToken))
+        {
+            return Conflict(new { error = "Lecturer availability can only be changed while registration is Open." });
+        }
         var distinctSlots = request.Slots
             .Distinct()
             .OrderBy(x => x.DayOfWeek)
@@ -80,9 +93,9 @@ public sealed class ReviewAvailabilityController(
 
         foreach (var slot in distinctSlots)
         {
-            if (slot.DayOfWeek is < 1 or > 7)
+            if (slot.DayOfWeek is < 1 or > 6)
             {
-                throw new BusinessRuleException("Review availability dayOfWeek must be between 1 and 7.");
+                throw new BusinessRuleException("Review availability dayOfWeek must be between 1 and 6.");
             }
 
             rules.ValidateReviewSlot(slot.Slot);
@@ -132,6 +145,15 @@ public sealed class ReviewAvailabilityController(
 
         weekStart = NormalizeWeekStart(weekStart);
         var semester = await semesterResolver.ResolveForDateAsync(weekStart, cancellationToken);
+        if (semester.Id != semesterId)
+        {
+            return BadRequest(new { error = "The selected week does not belong to the supplied semester." });
+        }
+
+        if (!await HasOpenRoundAsync(semester.Id, weekStart, cancellationToken))
+        {
+            return Conflict(new { error = "Lecturer availability can only be submitted while registration is Open." });
+        }
         var slots = await dbContext.ReviewAvailabilities
             .Where(x => x.SemesterId == semester.Id && x.LecturerId == lecturerId.Value && x.WeekStartDate == weekStart)
             .OrderBy(x => x.DayOfWeek)
@@ -212,6 +234,16 @@ public sealed class ReviewAvailabilityController(
 
         submission.UpdatedAt = now;
         submission.SubmittedAt = null;
+    }
+
+    private async Task<bool> HasOpenRoundAsync(int semesterId, DateOnly weekStart, CancellationToken cancellationToken)
+    {
+        var statuses = await dbContext.ReviewRounds
+            .Where(x => x.SemesterId == semesterId && x.WeekStartDate == weekStart)
+            .Select(x => x.Status)
+            .ToListAsync(cancellationToken);
+        return statuses.Count > 0 &&
+               statuses.All(x => x == CPMS.Core.Enums.ReviewRoundStatus.Open);
     }
 
     private static DateOnly NormalizeWeekStart(DateOnly date)
