@@ -1,3 +1,4 @@
+using CPMS.API.Contracts.Academic;
 using CPMS.BLL.Academic.Import;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,23 +12,23 @@ public sealed class ImportController(IGroupImportService importService) : Contro
 {
     [HttpPost("groups")]
     public async Task<ActionResult<GroupImportResult>> ImportGroups(
-        [FromForm] IFormFile file,
-        [FromForm] int lecturerId,
+        [FromForm] ImportGroupsRequest request,
         CancellationToken cancellationToken)
     {
-        if (file == null || file.Length == 0)
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.File is null || request.File.Length == 0)
         {
             return BadRequest(new { error = "No Excel file was uploaded." });
         }
 
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
         if (extension != ".xlsx")
         {
             return BadRequest(new { error = "Only .xlsx Excel files are supported." });
         }
 
-        using var stream = file.OpenReadStream();
-        var result = await importService.ImportAsync(stream, lecturerId, cancellationToken);
+        using var stream = request.File.OpenReadStream();
+        var result = await importService.ImportAsync(stream, request.LecturerId, cancellationToken);
         return Ok(result);
     }
 }
