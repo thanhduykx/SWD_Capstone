@@ -1,9 +1,9 @@
-using CPMS.Application.Abstractions.Identity;
-using CPMS.Application.Abstractions.Persistence;
-using CPMS.Application.Abstractions.Security;
-using CPMS.Application.Common.Exceptions;
-using CPMS.Application.DTOs.Accounts;
-using CPMS.Application.Features.Accounts.Commands.CreateAccount;
+using CPMS.BLL.Abstractions.Identity;
+using CPMS.BLL.Abstractions.Persistence;
+using CPMS.BLL.Abstractions.Security;
+using CPMS.BLL.Common.Exceptions;
+using CPMS.BLL.DTOs.Accounts;
+using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 using CPMS.Core.Entities;
 using CPMS.Core.Enums;
 using CPMS.Core.Services;
@@ -109,6 +109,6 @@ public sealed class AccountsCommandHandlerTests
     {
         public string Hash(string password) => $"hashed:{password}";
 
-        public bool Verify(User user, string password) => user.PasswordHash == $"hashed:{password}";
+        public bool Verify(string passwordHash, string password) => passwordHash == $"hashed:{password}";
     }
 }

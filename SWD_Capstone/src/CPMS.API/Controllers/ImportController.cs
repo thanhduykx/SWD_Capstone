@@ -1,16 +1,16 @@
-using CPMS.Api.Services;
+using CPMS.BLL.Academic.Import;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CPMS.Api.Controllers;
+namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/import")]
 [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-public sealed class ImportController(ExcelImportService importService) : ControllerBase
+public sealed class ImportController(IGroupImportService importService) : ControllerBase
 {
     [HttpPost("groups")]
-    public async Task<ActionResult<ExcelImportResult>> ImportGroups(
+    public async Task<ActionResult<GroupImportResult>> ImportGroups(
         [FromForm] IFormFile file,
         [FromForm] int lecturerId,
         CancellationToken cancellationToken)
@@ -27,7 +27,7 @@ public sealed class ImportController(ExcelImportService importService) : Control
         }
 
         using var stream = file.OpenReadStream();
-        var result = await importService.ImportSelectedGroupColumnsAsync(stream, lecturerId, cancellationToken);
+        var result = await importService.ImportAsync(stream, lecturerId, cancellationToken);
         return Ok(result);
     }
 }

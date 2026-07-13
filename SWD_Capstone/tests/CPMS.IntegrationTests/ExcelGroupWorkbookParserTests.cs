@@ -1,6 +1,6 @@
 using ClosedXML.Excel;
-using CPMS.Api.Services;
 using CPMS.Core.Exceptions;
+using CPMS.DAL.ExternalServices;
 
 namespace CPMS.IntegrationTests;
 
@@ -10,9 +10,7 @@ public sealed class ExcelGroupWorkbookParserTests
     public void Parse_ReadsOnlySelectedColumnsAndIdentifiesLeader()
     {
         using var workbook = CreateWorkbook();
-        var worksheet = workbook.Worksheet(1);
-
-        var groups = ExcelGroupWorkbookParser.Parse(worksheet);
+        var groups = Parse(workbook);
 
         var group = Assert.Single(groups);
         Assert.Equal("Smart Home Inventory", group.ProjectTitle);
@@ -29,7 +27,7 @@ public sealed class ExcelGroupWorkbookParserTests
         workbook.Worksheet(1).Cell(2, 11).Value = "Người Không Thuộc Nhóm";
 
         var exception = Assert.Throws<BusinessRuleException>(() =>
-            ExcelGroupWorkbookParser.Parse(workbook.Worksheet(1)));
+            Parse(workbook));
 
         Assert.Contains("must match exactly one student", exception.Message, StringComparison.Ordinal);
     }
@@ -41,7 +39,7 @@ public sealed class ExcelGroupWorkbookParserTests
         workbook.Worksheet(1).Cell(3, 6).Value = "SE194673";
 
         var exception = Assert.Throws<BusinessRuleException>(() =>
-            ExcelGroupWorkbookParser.Parse(workbook.Worksheet(1)));
+            Parse(workbook));
 
         Assert.Contains("duplicate MSSV", exception.Message, StringComparison.Ordinal);
     }
@@ -90,5 +88,14 @@ public sealed class ExcelGroupWorkbookParserTests
         worksheet.Cell(3, 6).Value = "SS180745";
         worksheet.Cell(3, 9).Value = "victornhatthinh@gmail.com";
         return workbook;
+    }
+
+    private static IReadOnlyList<CPMS.BLL.Academic.Import.ImportedGroupData> Parse(
+        XLWorkbook workbook)
+    {
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        return new ExcelGroupWorkbookParser().Parse(stream);
     }
 }

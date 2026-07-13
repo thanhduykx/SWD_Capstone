@@ -1,527 +1,130 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Security.Claims;
-using CPMS.Api.Services;
-using CPMS.Core.Entities;
+using CPMS.API.Contracts.Reviews;
+using CPMS.API.Services;
+using CPMS.BLL.Common.Exceptions;
+using CPMS.BLL.Reviews.Assessment;
 using CPMS.Core.Enums;
-using CPMS.Core.Exceptions;
-using CPMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace CPMS.Api.Controllers;
+namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/review-submissions")]
 [Authorize]
 public sealed class ReviewSubmissionsController(
-    CpmsDbContext dbContext,
+    IReviewSubmissionService submissionService,
     ReviewChecklistTemplateService templateService) : ControllerBase
 {
     [HttpGet("my")]
-    public async Task<ActionResult> GetMySubmissions(CancellationToken cancellationToken)
-    {
-        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdStr, out var userId))
-        {
-            return Ok(Array.Empty<object>());
-        }
-
-        if (User.IsInRole("Student"))
-        {
-            var student = await dbContext.Students.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            if (student is null || !student.GroupId.HasValue)
-            {
-                return Ok(Array.Empty<object>());
-            }
-
-            var groupId = student.GroupId.Value;
-            var submissions = await (from sub in dbContext.ReviewChecklistSubmissions
-                                     where sub.GroupId == groupId && sub.Status != ReviewSubmissionStatus.Draft
-                                     join slot in dbContext.GroupReviewSlots on new { sub.SessionId, sub.GroupId } equals new { slot.SessionId, slot.GroupId } into slotGroup
-                                     from slot in slotGroup.DefaultIfEmpty()
-                                     where slot != null && slot.Status == ReviewGroupStatus.Completed &&
-                                           dbContext.ReviewSessions.Any(session =>
-                                               session.Id == sub.SessionId && session.Status == ReviewSessionStatus.Published)
-                                     orderby sub.LastSavedAt descending
-                                     select new
-                                     {
-                                         id = sub.Id,
-                                         sessionId = sub.SessionId,
-                                         groupId = sub.GroupId,
-                                         reviewType = sub.Type.ToString(),
-                                         status = sub.Status.ToString(),
-                                         result = slot != null && slot.Result != null ? slot.Result.ToString() : (sub.ResultText ?? "Pass"),
-                                         score = sub.EffortHours.HasValue ? sub.EffortHours.Value.ToString("F1") : "8.5",
-                                         notes = sub.ReviewerComment ?? sub.Suggestion ?? (slot != null ? slot.Notes : null) ?? "Đã hoàn thành đánh giá review checkpoint",
-                                         submittedAt = sub.SubmittedAt ?? sub.LastSavedAt
-                                     }).ToListAsync(cancellationToken);
-
-            return Ok(submissions);
-        }
-        else if (User.IsInRole("Lecturer"))
-        {
-            var lecturer = await dbContext.Lecturers.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            if (lecturer is null)
-            {
-                return Ok(Array.Empty<object>());
-            }
-
-            var lecturerId = lecturer.Id;
-            var submissions = await (from sub in dbContext.ReviewChecklistSubmissions
-                                     where sub.ReviewerId == lecturerId
-                                     orderby sub.LastSavedAt descending
-                                     select new
-                                     {
-                                         id = sub.Id,
-                                         sessionId = sub.SessionId,
-                                         groupId = sub.GroupId,
-                                         reviewType = sub.Type.ToString(),
-                                         status = sub.Status.ToString(),
-                                         result = sub.ResultText ?? "Pass",
-                                         score = sub.EffortHours.HasValue ? sub.EffortHours.Value.ToString("F1") : "N/A",
-                                         notes = sub.ReviewerComment ?? sub.Suggestion ?? "",
-                                         submittedAt = sub.SubmittedAt ?? sub.LastSavedAt
-                                     }).ToListAsync(cancellationToken);
-
-            return Ok(submissions);
-        }
-
-        return Ok(Array.Empty<object>());
-    }
+    public async Task<ActionResult> GetMySubmissions(CancellationToken cancellationToken) =>
+        Ok(await submissionService.GetMySubmissionsAsync(CurrentActor(), cancellationToken));
 
     [HttpGet("{submissionId:int}")]
     public async Task<ActionResult<ReviewSubmissionResponse>> Get(
-        int submissionId,
-        CancellationToken cancellationToken)
+        int submissionId, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleOrDefaultAsync(x => x.Id == submissionId, cancellationToken);
-        if (submission is null)
-        {
-            return NotFound();
-        }
-
-        await EnsureCanViewAsync(submission, cancellationToken);
-        return Ok(await MapSubmissionAsync(submission.Id, cancellationToken));
+        try { return Ok(Map(await submissionService.GetAsync(submissionId, CurrentActor(), cancellationToken))); }
+        catch (KeyNotFoundException) { return NotFound(); }
     }
 
     [HttpPut("{submissionId:int}/draft")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewSubmissionResponse>> SaveDraft(
-        int submissionId,
-        SaveReviewSubmissionDraftRequest request,
-        CancellationToken cancellationToken)
+        int submissionId, SaveReviewSubmissionDraftRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleOrDefaultAsync(x => x.Id == submissionId, cancellationToken);
-        if (submission is null)
+        try
         {
-            return NotFound();
+            var draft = new SaveReviewDraft(
+                request.WorkProductVersion, request.WorkProductSize, request.EffortHours,
+                request.ReviewerComment, request.Suggestion, request.ResultText,
+                request.Items.Select(x => new SaveReviewItem(x.ItemKey, x.Answer, x.Comment)).ToArray());
+            return Ok(Map(await submissionService.SaveDraftAsync(
+                submissionId, draft, CurrentActor(), cancellationToken)));
         }
-
-        await EnsureCanEditAsync(submission, cancellationToken);
-        if (submission.Status == ReviewSubmissionStatus.Submitted)
-        {
-            return Conflict(new { error = "A submitted review cannot be moved back to Draft." });
-        }
-
-        if (!await IsSessionPublishedAsync(submission.SessionId, cancellationToken))
-        {
-            return Conflict(new { error = "Review feedback can only be edited after the schedule is published." });
-        }
-        submission.WorkProductVersion = EmptyToNull(request.WorkProductVersion);
-        submission.WorkProductSize = EmptyToNull(request.WorkProductSize);
-        submission.EffortHours = request.EffortHours;
-        submission.ReviewerComment = EmptyToNull(request.ReviewerComment);
-        submission.Suggestion = EmptyToNull(request.Suggestion);
-        submission.ResultText = EmptyToNull(request.ResultText);
-        submission.Status = ReviewSubmissionStatus.Draft;
-        submission.LastSavedAt = DateTime.UtcNow;
-
-        await UpsertItemResponsesAsync(submission.Id, request.Items, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(await MapSubmissionAsync(submission.Id, cancellationToken));
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (ConflictException exception) { return Conflict(new { error = exception.Message }); }
     }
 
     [HttpPost("{submissionId:int}/submit")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewSubmissionResponse>> Submit(
-        int submissionId,
-        CancellationToken cancellationToken)
+        int submissionId, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleOrDefaultAsync(x => x.Id == submissionId, cancellationToken);
-        if (submission is null)
+        try
         {
-            return NotFound();
+            return Ok(Map(await submissionService.SubmitAsync(
+                submissionId, CurrentActor(), cancellationToken)));
         }
-
-        await EnsureCanEditAsync(submission, cancellationToken);
-        if (submission.Status == ReviewSubmissionStatus.Submitted)
-        {
-            return Conflict(new { error = "This review submission has already been submitted." });
-        }
-
-        if (!await IsSessionPublishedAsync(submission.SessionId, cancellationToken))
-        {
-            return Conflict(new { error = "Review feedback can only be submitted for a published session." });
-        }
-
-        var requiredItemKeys = templateService.GetItems(submission.Type)
-            .Where(x => !x.IsSection)
-            .Select(x => x.ItemKey)
-            .ToArray();
-        var answeredItemCount = await dbContext.ReviewChecklistItemResponses.CountAsync(x =>
-            x.SubmissionId == submission.Id &&
-            requiredItemKeys.Contains(x.ItemKey) &&
-            x.Answer != null, cancellationToken);
-        if (answeredItemCount != requiredItemKeys.Length || string.IsNullOrWhiteSpace(submission.ReviewerComment))
-        {
-            return Conflict(new { error = "Every checklist item and the reviewer comment are required before submission." });
-        }
-
-        submission.Status = ReviewSubmissionStatus.Submitted;
-        submission.SubmittedAt = DateTime.UtcNow;
-        submission.LastSavedAt = DateTime.UtcNow;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(await MapSubmissionAsync(submission.Id, cancellationToken));
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (ConflictException exception) { return Conflict(new { error = exception.Message }); }
     }
 
     [HttpGet("{submissionId:int}/export.xlsx")]
-    public async Task<ActionResult> Export(
-        int submissionId,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult> Export(int submissionId, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleOrDefaultAsync(x => x.Id == submissionId, cancellationToken);
-        if (submission is null)
+        try
         {
-            return NotFound();
+            var data = await submissionService.GetExportDataAsync(
+                submissionId, CurrentActor(), cancellationToken);
+            return File(templateService.ExportWorkbook(data),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                SafeFileName($"{data.GroupCode}_{data.Type}_{data.SessionId}.xlsx"));
         }
-
-        await EnsureCanViewAsync(submission, cancellationToken);
-        var exportData = await BuildExportDataAsync(submission.SessionId, submission.GroupId, cancellationToken);
-        var bytes = templateService.ExportWorkbook(exportData);
-        return File(
-            bytes,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            SafeFileName($"{exportData.GroupCode}_{exportData.Type}_{exportData.SessionId}.xlsx"));
+        catch (KeyNotFoundException) { return NotFound(); }
     }
 
     [HttpGet("export.zip")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult> ExportZip(
-        int semesterId,
-        ReviewType reviewType,
-        CancellationToken cancellationToken)
+        int semesterId, ReviewType reviewType, CancellationToken cancellationToken)
     {
-        var scheduledGroups = await dbContext.GroupReviewSlots
-            .Join(
-                dbContext.ReviewSessions.Where(x => x.SemesterId == semesterId && x.Type == reviewType),
-                slot => slot.SessionId,
-                session => session.Id,
-                (slot, session) => new { slot.SessionId, slot.GroupId, session.SessionDate, session.Slot })
-            .OrderBy(x => x.SessionDate)
-            .ThenBy(x => x.Slot)
-            .ThenBy(x => x.GroupId)
-            .ToListAsync(cancellationToken);
-        if (scheduledGroups.Count == 0)
+        try
         {
-            return NotFound(new { error = "No review sessions were found for export." });
-        }
-
-        using var archiveStream = new MemoryStream();
-        using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            foreach (var scheduledGroup in scheduledGroups)
+            var exports = await submissionService.GetBulkExportDataAsync(
+                semesterId, reviewType, cancellationToken);
+            using var archiveStream = new MemoryStream();
+            using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                var exportData = await BuildExportDataAsync(scheduledGroup.SessionId, scheduledGroup.GroupId, cancellationToken);
-                var entry = archive.CreateEntry(SafeFileName($"{exportData.GroupCode}_{exportData.Type}_{exportData.SessionId}.xlsx"));
-                await using var entryStream = entry.Open();
-                var bytes = templateService.ExportWorkbook(exportData);
-                await entryStream.WriteAsync(bytes, cancellationToken);
-            }
-        }
-
-        return File(archiveStream.ToArray(), "application/zip", SafeFileName($"review_{reviewType}_{semesterId}.zip"));
-    }
-
-    private async Task UpsertItemResponsesAsync(
-        int submissionId,
-        IReadOnlyCollection<SaveReviewSubmissionItemRequest> items,
-        CancellationToken cancellationToken)
-    {
-        var allowedKeys = templateService.GetItems(
-                await dbContext.ReviewChecklistSubmissions
-                    .Where(x => x.Id == submissionId)
-                    .Select(x => x.Type)
-                    .SingleAsync(cancellationToken))
-            .Where(x => !x.IsSection)
-            .Select(x => x.ItemKey)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var existing = await dbContext.ReviewChecklistItemResponses
-            .Where(x => x.SubmissionId == submissionId)
-            .ToDictionaryAsync(x => x.ItemKey, StringComparer.OrdinalIgnoreCase, cancellationToken);
-
-        foreach (var item in items)
-        {
-            if (!allowedKeys.Contains(item.ItemKey))
-            {
-                throw new BusinessRuleException($"Checklist item '{item.ItemKey}' does not belong to this review template.");
-            }
-
-            if (!existing.TryGetValue(item.ItemKey, out var response))
-            {
-                response = new ReviewChecklistItemResponse
+                foreach (var data in exports)
                 {
-                    SubmissionId = submissionId,
-                    ItemKey = item.ItemKey
-                };
-                dbContext.ReviewChecklistItemResponses.Add(response);
+                    var entry = archive.CreateEntry(SafeFileName(
+                        $"{data.GroupCode}_{data.Type}_{data.SessionId}.xlsx"));
+                    await using var entryStream = entry.Open();
+                    await entryStream.WriteAsync(templateService.ExportWorkbook(data), cancellationToken);
+                }
             }
-
-            response.Answer = item.Answer;
-            response.Comment = EmptyToNull(item.Comment);
-            response.UpdatedAt = DateTime.UtcNow;
+            return File(archiveStream.ToArray(), "application/zip",
+                SafeFileName($"review_{reviewType}_{semesterId}.zip"));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
         }
     }
 
-    private async Task<ReviewSubmissionResponse> MapSubmissionAsync(int submissionId, CancellationToken cancellationToken)
-    {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleAsync(x => x.Id == submissionId, cancellationToken);
-        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == submission.SessionId, cancellationToken);
-        var group = await dbContext.CapstoneGroups.SingleAsync(x => x.Id == submission.GroupId, cancellationToken);
-        var projectName = await dbContext.Topics
-            .Where(x => x.Id == group.TopicId)
-            .Select(x => x.NameEn)
-            .SingleAsync(cancellationToken);
-        var reviewer = await dbContext.Lecturers.SingleAsync(x => x.Id == submission.ReviewerId, cancellationToken);
-        var responses = await dbContext.ReviewChecklistItemResponses
-            .Where(x => x.SubmissionId == submission.Id)
-            .ToDictionaryAsync(x => x.ItemKey, StringComparer.OrdinalIgnoreCase, cancellationToken);
-        var items = templateService.GetItems(submission.Type)
-            .Select(item =>
-            {
-                responses.TryGetValue(item.ItemKey, out var response);
-                return new ReviewSubmissionItemResponse(
-                    item.ItemKey,
-                    item.Label,
-                    item.Description,
-                    item.Priority,
-                    item.IsSection,
-                    item.CriteriaCode,
-                    response?.Answer,
-                    response?.Comment);
-            })
-            .ToArray();
+    private ReviewActor CurrentActor() => new(CurrentUserId(), CurrentRole());
+    private UserRole CurrentRole() => Enum.GetValues<UserRole>().FirstOrDefault(role => User.IsInRole(role.ToString()));
+    private int CurrentUserId() => int.Parse(
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new UnauthorizedAccessException("Missing user identifier."), CultureInfo.InvariantCulture);
 
-        return new ReviewSubmissionResponse(
-            submission.Id,
-            submission.SessionId,
-            submission.GroupId,
-            group.Code,
-            projectName,
-            submission.Type,
-            submission.Status,
-            session.Status,
-            session.SessionDate,
-            session.Slot,
-            session.Room,
-            submission.ReviewerId,
-            reviewer.Code,
-            reviewer.FullName,
-            submission.WorkProductVersion,
-            submission.WorkProductSize,
-            submission.EffortHours,
-            submission.ReviewerComment,
-            submission.Suggestion,
-            submission.ResultText,
-            submission.LastSavedAt,
-            submission.SubmittedAt,
-            items);
-    }
-
-    private async Task<ReviewChecklistExportData> BuildExportDataAsync(
-        int sessionId,
-        int groupId,
-        CancellationToken cancellationToken)
-    {
-        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
-        var slot = await dbContext.GroupReviewSlots.SingleAsync(x => x.SessionId == sessionId && x.GroupId == groupId, cancellationToken);
-        var group = await dbContext.CapstoneGroups.SingleAsync(x => x.Id == slot.GroupId, cancellationToken);
-        var projectName = await dbContext.Topics
-            .Where(x => x.Id == group.TopicId)
-            .Select(x => x.NameEn)
-            .SingleAsync(cancellationToken);
-        var submissions = await dbContext.ReviewChecklistSubmissions
-            .Where(x => x.SessionId == sessionId && x.GroupId == groupId)
-            .OrderBy(x => x.ReviewerId)
-            .ToListAsync(cancellationToken);
-        var submissionIds = submissions.Select(x => x.Id).ToArray();
-        var itemResponses = await dbContext.ReviewChecklistItemResponses
-            .Where(x => submissionIds.Contains(x.SubmissionId))
-            .ToListAsync(cancellationToken);
-
-        var reviewers = new List<ReviewChecklistExportReviewer>();
-        foreach (var submission in submissions)
-        {
-            var reviewer = await dbContext.Lecturers.SingleAsync(x => x.Id == submission.ReviewerId, cancellationToken);
-            reviewers.Add(new ReviewChecklistExportReviewer(
-                reviewer.Id,
-                reviewer.Code,
-                reviewer.FullName,
-                submission.EffortHours,
-                submission.ReviewerComment,
-                submission.Suggestion,
-                itemResponses
-                    .Where(x => x.SubmissionId == submission.Id)
-                    .Select(x => new ReviewChecklistExportItem(x.ItemKey, x.Answer, x.Comment))
-                    .ToArray()));
-        }
-
-        var firstSubmission = submissions.FirstOrDefault();
-        return new ReviewChecklistExportData(
-            session.Id,
-            session.Type,
-            group.Code,
-            projectName,
-            session.SessionDate,
-            firstSubmission?.WorkProductVersion,
-            firstSubmission?.WorkProductSize,
-            reviewers);
-    }
-
-    private async Task EnsureCanViewAsync(ReviewChecklistSubmission submission, CancellationToken cancellationToken)
-    {
-        if (User.IsInRole(nameof(UserRole.SystemAdministrator)) || User.IsInRole(nameof(UserRole.TrainingDepartment)))
-        {
-            return;
-        }
-
-        if (User.IsInRole(nameof(UserRole.Lecturer)))
-        {
-            var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
-            if (lecturerId == submission.ReviewerId)
-            {
-                return;
-            }
-        }
-
-        if (User.IsInRole(nameof(UserRole.Student)))
-        {
-            var userId = CurrentUserId();
-            var studentGroupId = await dbContext.Students
-                .Where(x => x.UserId == userId)
-                .Select(x => x.GroupId)
-                .SingleOrDefaultAsync(cancellationToken);
-            if (studentGroupId == submission.GroupId && submission.Status != ReviewSubmissionStatus.Draft)
-            {
-                return;
-            }
-        }
-
-        throw new UnauthorizedAccessException("You are not allowed to view this review submission.");
-    }
-
-    private async Task EnsureCanEditAsync(ReviewChecklistSubmission submission, CancellationToken cancellationToken)
-    {
-        var lecturerId = await CurrentLecturerIdAsync(cancellationToken);
-        if (lecturerId != submission.ReviewerId)
-        {
-            throw new UnauthorizedAccessException("Only the assigned reviewer can edit this review submission.");
-        }
-
-        var isCompleted = await dbContext.GroupReviewSlots.AnyAsync(x =>
-            x.SessionId == submission.SessionId &&
-            x.GroupId == submission.GroupId &&
-            x.Status == ReviewGroupStatus.Completed,
-            cancellationToken);
-        if (isCompleted)
-        {
-            throw new BusinessRuleException("Review feedback is locked after the group's review is completed.");
-        }
-    }
-
-    private Task<bool> IsSessionPublishedAsync(int sessionId, CancellationToken cancellationToken) =>
-        dbContext.ReviewSessions.AnyAsync(x => x.Id == sessionId && x.Status == ReviewSessionStatus.Published, cancellationToken);
-
-    private async Task<int?> CurrentLecturerIdAsync(CancellationToken cancellationToken)
-    {
-        var userId = CurrentUserId();
-        return await dbContext.Lecturers
-            .Where(x => x.UserId == userId)
-            .Select(x => (int?)x.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-    }
-
-    private int CurrentUserId() =>
-        int.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? throw new UnauthorizedAccessException("Missing user identifier."),
-            CultureInfo.InvariantCulture);
-
-    private static string? EmptyToNull(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static ReviewSubmissionResponse Map(ReviewSubmissionResult result) =>
+        new(result.Id, result.SessionId, result.GroupId, result.GroupCode, result.ProjectName,
+            result.Type, result.Status, result.SessionStatus, result.SessionDate, result.Slot, result.Room,
+            result.ReviewerId, result.ReviewerCode, result.ReviewerName, result.WorkProductVersion,
+            result.WorkProductSize, result.EffortHours, result.ReviewerComment, result.Suggestion,
+            result.ResultText, result.LastSavedAt, result.SubmittedAt,
+            result.Items.Select(x => new ReviewSubmissionItemResponse(
+                x.ItemKey, x.Label, x.Description, x.Priority, x.IsSection,
+                x.CriteriaCode, x.Answer, x.Comment)).ToArray());
 
     private static string SafeFileName(string fileName)
     {
-        foreach (var invalidChar in Path.GetInvalidFileNameChars())
-        {
-            fileName = fileName.Replace(invalidChar, '_');
-        }
-
+        foreach (var invalidChar in Path.GetInvalidFileNameChars()) fileName = fileName.Replace(invalidChar, '_');
         return fileName;
     }
 }
-
-public sealed record SaveReviewSubmissionDraftRequest(
-    string? WorkProductVersion,
-    string? WorkProductSize,
-    decimal? EffortHours,
-    string? ReviewerComment,
-    string? Suggestion,
-    string? ResultText,
-    IReadOnlyCollection<SaveReviewSubmissionItemRequest> Items);
-
-public sealed record SaveReviewSubmissionItemRequest(
-    string ItemKey,
-    ReviewChecklistAnswer? Answer,
-    string? Comment);
-
-public sealed record ReviewSubmissionResponse(
-    int Id,
-    int SessionId,
-    int GroupId,
-    string GroupCode,
-    string ProjectName,
-    ReviewType Type,
-    ReviewSubmissionStatus Status,
-    ReviewSessionStatus SessionStatus,
-    DateTime SessionDate,
-    int Slot,
-    string Room,
-    int ReviewerId,
-    string ReviewerCode,
-    string ReviewerName,
-    string? WorkProductVersion,
-    string? WorkProductSize,
-    decimal? EffortHours,
-    string? ReviewerComment,
-    string? Suggestion,
-    string? ResultText,
-    DateTime LastSavedAt,
-    DateTime? SubmittedAt,
-    IReadOnlyCollection<ReviewSubmissionItemResponse> Items);
-
-public sealed record ReviewSubmissionItemResponse(
-    string ItemKey,
-    string Label,
-    string? Description,
-    string? Priority,
-    bool IsSection,
-    string? CriteriaCode,
-    ReviewChecklistAnswer? Answer,
-    string? Comment);

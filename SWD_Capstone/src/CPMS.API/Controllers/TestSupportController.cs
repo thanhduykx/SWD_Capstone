@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using CPMS.Infrastructure.Data;
+using CPMS.BLL.Testing;
 
-namespace CPMS.Api.Controllers;
+namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/test-support")]
@@ -11,7 +10,7 @@ namespace CPMS.Api.Controllers;
 public sealed class TestSupportController(
     IWebHostEnvironment environment,
     IConfiguration configuration,
-    CpmsDbContext dbContext) : ControllerBase
+    ITestDataResetService resetService) : ControllerBase
 {
     [HttpGet("swagger-guide")]
     public ActionResult<SwaggerTestGuideResponse> GetSwaggerGuide()
@@ -71,56 +70,7 @@ public sealed class TestSupportController(
             return NotFound();
         }
 
-        var tableNames = new[]
-        {
-            "audit_logs",
-            "notifications",
-            "review_comments",
-            "review_attendances",
-            "student_slot_registrations",
-            "review_rounds",
-            "group_results",
-            "defense_evidences",
-            "score_submission_histories",
-            "scores",
-            "defense_sessions",
-            "defense_rounds",
-            "council_groups",
-            "council_members",
-            "councils",
-            "email_delivery_logs",
-            "review_schedule_publications",
-            "review_checklist_item_responses",
-            "review_checklist_submissions",
-            "group_review_slots",
-            "review_sessions",
-            "review_availability_submissions",
-            "review_availabilities",
-            "inline_comments",
-            "evaluation_details",
-            "evaluation_reports",
-            "documents",
-            "rule_keywords",
-            "clos",
-            "syllabuses",
-            "students",
-            "capstone_groups",
-            "topics",
-            "semesters",
-            "system_administrators",
-            "training_departments",
-            "lecturers",
-            "evaluation_panels",
-            "refresh_tokens",
-            "users"
-        };
-
-        var sql = $"TRUNCATE TABLE {string.Join(", ", tableNames.Select(t => $"\"{t}\""))} RESTART IDENTITY CASCADE;";
-        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
-
-        await global::Program.SeedModeratorAccountAsync(dbContext);
-        await global::Program.SeedTestAccountsAsync(dbContext);
-        await global::Program.SeedTestAcademicDataAsync(dbContext);
+        await resetService.ResetAsync(cancellationToken);
 
         return Ok(new { message = "All database tables truncated successfully and default seed data restored." });
     }

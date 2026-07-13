@@ -2,10 +2,11 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CPMS.Core.Enums;
+using CPMS.BLL.Reviews.Assessment;
 
-namespace CPMS.Api.Services;
+namespace CPMS.API.Services;
 
-public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environment)
+public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environment) : IReviewChecklistTemplateProvider
 {
     private const string TemplateFileName = "05_Checklist_CapstoneProjectReview1_Final.xlsx";
 
@@ -265,36 +266,3 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
     private static string Prefix(ReviewChecklistExportReviewer reviewer, string? value) =>
         string.IsNullOrWhiteSpace(value) ? string.Empty : $"[{reviewer.ReviewerCode}] {value.Trim()}";
 }
-
-public sealed record ReviewChecklistTemplateItem(
-    string ItemKey,
-    string Label,
-    string? Description,
-    string? Priority,
-    int RowNumber,
-    bool IsSection,
-    string? CriteriaCode);
-
-public sealed record ReviewChecklistExportData(
-    int SessionId,
-    ReviewType Type,
-    string GroupCode,
-    string ProjectName,
-    DateTime ReviewDate,
-    string? WorkProductVersion,
-    string? WorkProductSize,
-    IReadOnlyList<ReviewChecklistExportReviewer> Reviewers);
-
-public sealed record ReviewChecklistExportReviewer(
-    int ReviewerId,
-    string ReviewerCode,
-    string ReviewerName,
-    decimal? EffortHours,
-    string? ReviewerComment,
-    string? Suggestion,
-    IReadOnlyList<ReviewChecklistExportItem> Items);
-
-public sealed record ReviewChecklistExportItem(
-    string ItemKey,
-    ReviewChecklistAnswer? Answer,
-    string? Comment);

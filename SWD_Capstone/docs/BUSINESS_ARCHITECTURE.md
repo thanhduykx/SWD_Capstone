@@ -119,7 +119,7 @@ Contains MVC/API controllers, SignalR hubs, request/response mapping, authentica
 
 CPMS.API must not own business decisions such as conflict rules, score lock rules or import validation. It coordinates transport concerns only.
 
-### CPMS.Application
+### CPMS.BLL
 
 Contains application services and business workflows.
 
@@ -138,15 +138,15 @@ Contains entities, enums, domain rules, interfaces and pure business concepts.
 
 CPMS.Domain must stay free of EF Core, ASP.NET and external infrastructure dependencies.
 
-### CPMS.Infrastructure
+### CPMS.DAL
 
 Contains EF Core persistence, repositories, unit of work, migrations, cache, messaging and external services.
 
-CPMS.Infrastructure must enforce low-level integrity such as unique indexes, FK constraints, append-only audit protection and locked score immutability.
+CPMS.DAL must enforce low-level integrity such as unique indexes, FK constraints, append-only audit protection and locked score immutability.
 
 ## Current Architecture Gaps
 
-- Some legacy controllers still access `CpmsDbContext` directly; business workflows should continue moving into CPMS.Application feature handlers.
+- Some legacy controllers still access `CpmsDbContext` directly; business workflows should continue moving into CPMS.BLL feature handlers.
 - Import Excel is not implemented yet.
 - TEF writer/export history is not implemented yet.
 - Council creation and project-scoped defense assignment APIs exist, but need broader integration tests.
@@ -156,7 +156,7 @@ CPMS.Infrastructure must enforce low-level integrity such as unique indexes, FK 
 
 ## Implementation Order
 
-1. Move business workflows from controllers into CPMS.Application feature handlers.
+1. Move business workflows from controllers into CPMS.BLL feature handlers.
 2. Implement official account/import flow for lecturers, students, groups and topics.
 3. Complete review scheduling and result lifecycle.
 4. Complete council management before expanding realtime scoring APIs.

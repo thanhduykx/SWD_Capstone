@@ -3,11 +3,11 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using CPMS.Core.Entities;
+using CPMS.BLL.Accounts;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CPMS.Api.Services;
+namespace CPMS.API.Services;
 
 public sealed class JwtOptions
 {
@@ -19,22 +19,22 @@ public sealed class JwtOptions
     public int RefreshTokenDays { get; init; } = 7;
 }
 
-public sealed class JwtTokenService(IOptions<JwtOptions> options)
+public sealed class JwtTokenService(IOptions<JwtOptions> options) : IAuthenticationTokenIssuer
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateAccessToken(User user)
+    public IssuedToken Issue(AuthIdentity identity, string? deviceInfo)
     {
-        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(identity);
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
-            new Claim("sub", user.Id.ToString(CultureInfo.InvariantCulture)),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim("name", user.Username),
-            new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("role", user.Role.ToString())
+            new Claim(ClaimTypes.NameIdentifier, identity.Id.ToString(CultureInfo.InvariantCulture)),
+            new Claim("sub", identity.Id.ToString(CultureInfo.InvariantCulture)),
+            new Claim(ClaimTypes.Name, identity.Username),
+            new Claim("name", identity.Username),
+            new Claim(ClaimTypes.Role, identity.Role.ToString()),
+            new Claim("role", identity.Role.ToString())
         };
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -45,23 +45,12 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
             expires: DateTime.UtcNow.AddMinutes(_options.AccessTokenMinutes),
             signingCredentials: credentials);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    public (string RawToken, RefreshToken Entity) CreateRefreshToken(User user, string? deviceInfo)
-    {
-        ArgumentNullException.ThrowIfNull(user);
-
         var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-        return (rawToken, new RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = HashRefreshToken(rawToken),
-            ExpiresAt = DateTime.UtcNow.AddDays(_options.RefreshTokenDays),
-            DeviceInfo = deviceInfo
-        });
+        return new IssuedToken(
+            new JwtSecurityTokenHandler().WriteToken(token), rawToken,
+            HashRefreshToken(rawToken), DateTime.UtcNow.AddDays(_options.RefreshTokenDays));
     }
 
-    public static string HashRefreshToken(string rawToken) =>
+    public string HashRefreshToken(string rawToken) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
 }

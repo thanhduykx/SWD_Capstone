@@ -1,15 +1,13 @@
 using System.Globalization;
 using System.Security.Claims;
-using CPMS.Core.Services;
-using CPMS.Infrastructure.Data;
+using CPMS.BLL.Defense.Sessions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
-namespace CPMS.Api.Hubs;
+namespace CPMS.API.Hubs;
 
 [Authorize(Roles = "Lecturer")]
-public sealed class DefenseScoringHub(CpmsDbContext dbContext, AssignmentRules rules) : Hub
+public sealed class DefenseScoringHub(IDefenseSessionService defenseService) : Hub
 {
     public const string SessionStarted = "defenseSessionStarted";
     public const string SessionClosed = "defenseSessionClosed";
@@ -18,74 +16,29 @@ public sealed class DefenseScoringHub(CpmsDbContext dbContext, AssignmentRules r
 
     public async Task JoinDefenseSession(int sessionId)
     {
-        var userId = CurrentUserId();
-        var lecturer = await dbContext.Lecturers
-            .Where(x => x.UserId == userId)
-            .Select(x => new { x.Id, x.Code, x.FullName })
-            .SingleOrDefaultAsync(Context.ConnectionAborted)
-            ?? throw new HubException("Only lecturers assigned to a council can join defense scoring.");
-
-        var session = await dbContext.DefenseSessions
-            .Where(x => x.Id == sessionId)
-            .Select(x => new
-            {
-                x.Id,
-                x.Code,
-                x.DefenseRoundId,
-                x.CouncilId,
-                x.GroupId,
-                x.SessionDate,
-                x.Slot,
-                x.Room,
-                x.StartedAt,
-                x.EndedAt,
-                x.IsLocked,
-                ChairmanId = dbContext.Councils
-                    .Where(c => c.Id == x.CouncilId)
-                    .Select(c => c.ChairmanId)
-                    .Single(),
-                MemberIds = dbContext.CouncilMembers
-                    .Where(m => m.CouncilId == x.CouncilId)
-                    .Select(m => m.LecturerId)
-                    .ToArray()
-            })
-            .SingleOrDefaultAsync(Context.ConnectionAborted)
-            ?? throw new HubException("Defense session was not found.");
-
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
-
+        DefenseJoinResult result;
+        try
+        {
+            result = await defenseService.JoinAsync(sessionId, CurrentUserId(), Context.ConnectionAborted);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or UnauthorizedAccessException)
+        {
+            throw new HubException(exception.Message);
+        }
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(sessionId), Context.ConnectionAborted);
         await Clients.Group(GroupName(sessionId)).SendAsync(MemberJoined, new
         {
             sessionId,
-            lecturerId = lecturer.Id,
-            lecturer.Code,
-            lecturer.FullName,
+            lecturerId = result.LecturerId,
+            Code = result.LecturerCode,
+            FullName = result.LecturerName,
             joinedAt = DateTime.UtcNow
         }, Context.ConnectionAborted);
-
-        await Clients.Caller.SendAsync("defenseSessionState", new
-        {
-            sessionId = session.Id,
-            sessionCode = session.Code,
-            session.DefenseRoundId,
-            session.CouncilId,
-            session.GroupId,
-            session.SessionDate,
-            session.Slot,
-            session.Room,
-            session.StartedAt,
-            session.EndedAt,
-            session.IsLocked,
-            isChairman = lecturer.Id == session.ChairmanId
-        }, Context.ConnectionAborted);
+        await Clients.Caller.SendAsync("defenseSessionState", result.Session, Context.ConnectionAborted);
     }
 
     public static string GroupName(int sessionId) => $"defense-session:{sessionId}";
-
-    private int CurrentUserId() =>
-        int.Parse(
-            Context.User?.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? throw new HubException("Missing user identifier."),
-            CultureInfo.InvariantCulture);
+    private int CurrentUserId() => int.Parse(
+        Context.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new HubException("Missing user identifier."), CultureInfo.InvariantCulture);
 }

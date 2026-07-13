@@ -1,4 +1,4 @@
-using CPMS.Api.Configuration;
+using CPMS.API.Configuration;
 using Microsoft.Extensions.Configuration;
 
 namespace CPMS.IntegrationTests;
