@@ -82,9 +82,17 @@ Configure SMTP and Google OAuth in `src/CPMS.API/appsettings.json`.
 ## Deploy to Render
 
 Render automatically detects the repository-root `Dockerfile`. Add the GitHub
-repository as a Docker web service; no Render environment variables or Blueprint
-are required. The application uses the existing Supabase PostgreSQL instance,
-so no database is recreated or data migrated during this provider migration.
+repository as a Docker web service. Configure `ConnectionStrings__CpmsDatabase`
+as a Render environment variable with a PostgreSQL connection string that is
+reachable from the service. For Supabase on Render, use the IPv4-compatible
+Supavisor session-pooler host and port 5432 from the Supabase **Connect** dialog;
+the direct `db.<project-ref>.supabase.co` endpoint requires IPv6 unless the project
+has the IPv4 add-on. Deployment environment variables override values in
+`appsettings.json`. The application runs EF Core migrations against the configured
+database during startup.
+
+After deployment, verify that `/health/ready` returns HTTP 200 before testing
+database-backed endpoints such as `/api/auth/login`.
 
 ## Quality Gates
 
