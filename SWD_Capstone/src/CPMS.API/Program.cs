@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
+using CPMS.Api.Configuration;
 using CPMS.Api.Hubs;
 using CPMS.Api.Middleware;
 using CPMS.Api.Services;
@@ -27,6 +28,7 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+ApplicationConfiguration.AddDeploymentOverrides(builder.Configuration);
 
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
