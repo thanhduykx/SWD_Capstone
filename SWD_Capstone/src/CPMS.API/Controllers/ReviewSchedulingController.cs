@@ -33,6 +33,13 @@ public sealed class ReviewSchedulingController(
         }
 
         weekStart = NormalizeWeekStart(weekStart);
+        var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x =>
+            x.SemesterId == semesterId && x.Type == reviewType && x.WeekStartDate == weekStart,
+            cancellationToken);
+        if (round is null)
+        {
+            return NotFound(new { error = "Review round not found." });
+        }
         var weekStartDate = DateTime.SpecifyKind(weekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var weekEndDate = weekStartDate.AddDays(7);
 
@@ -47,11 +54,10 @@ public sealed class ReviewSchedulingController(
             .ToListAsync(cancellationToken);
 
         var availability = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == semesterId && x.WeekStartDate == weekStart &&
+            .Where(x => x.ReviewRoundId == round.Id &&
                         dbContext.ReviewAvailabilitySubmissions.Any(submission =>
-                            submission.SemesterId == x.SemesterId &&
+                            submission.ReviewRoundId == x.ReviewRoundId &&
                             submission.LecturerId == x.LecturerId &&
-                            submission.WeekStartDate == x.WeekStartDate &&
                             submission.SubmittedAt != null))
             .OrderBy(x => x.LecturerId)
             .ThenBy(x => x.DayOfWeek)
@@ -60,16 +66,15 @@ public sealed class ReviewSchedulingController(
             .ToListAsync(cancellationToken);
 
         var availabilitySubmissions = await dbContext.ReviewAvailabilitySubmissions
-            .Where(x => x.SemesterId == semesterId && x.WeekStartDate == weekStart)
+            .Where(x => x.ReviewRoundId == round.Id)
             .OrderBy(x => x.LecturerId)
             .Select(x => new ReviewSchedulingAvailabilitySubmissionResponse(
                 x.LecturerId,
                 x.SubmittedAt != null,
                 x.SubmittedAt,
                 dbContext.ReviewAvailabilities.Count(slot =>
-                    slot.SemesterId == x.SemesterId &&
-                    slot.LecturerId == x.LecturerId &&
-                    slot.WeekStartDate == x.WeekStartDate)))
+                    slot.ReviewRoundId == x.ReviewRoundId &&
+                    slot.LecturerId == x.LecturerId)))
             .ToListAsync(cancellationToken);
 
         var groups = await dbContext.CapstoneGroups
@@ -155,6 +160,11 @@ public sealed class ReviewSchedulingController(
         }
 
         var weekStart = NormalizeWeekStart(request.WeekStart);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        var assignmentLockKey = $"review-round:{request.SemesterId}:{request.ReviewType}:{weekStart:yyyy-MM-dd}";
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({assignmentLockKey}, 0))",
+            cancellationToken);
         var round = await dbContext.ReviewRounds.SingleOrDefaultAsync(x =>
             x.SemesterId == request.SemesterId &&
             x.Type == request.ReviewType &&
@@ -172,11 +182,10 @@ public sealed class ReviewSchedulingController(
         var weekStartDate = DateTime.SpecifyKind(weekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var weekEndDate = weekStartDate.AddDays(7);
         var submittedAvailability = await dbContext.ReviewAvailabilities
-            .Where(x => x.SemesterId == request.SemesterId && x.WeekStartDate == weekStart &&
+            .Where(x => x.ReviewRoundId == round.Id &&
                         dbContext.ReviewAvailabilitySubmissions.Any(submission =>
-                            submission.SemesterId == x.SemesterId &&
+                            submission.ReviewRoundId == x.ReviewRoundId &&
                             submission.LecturerId == x.LecturerId &&
-                            submission.WeekStartDate == x.WeekStartDate &&
                             submission.SubmittedAt != null))
             .Select(x => new AvailabilityCandidate(x.LecturerId, x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
@@ -190,6 +199,8 @@ public sealed class ReviewSchedulingController(
                 session.Id == slot.SessionId &&
                 session.SemesterId == request.SemesterId &&
                 session.Type == request.ReviewType &&
+                session.SessionDate >= weekStartDate &&
+                session.SessionDate < weekEndDate &&
                 session.Status != ReviewSessionStatus.Cancelled))
             .Select(slot => slot.GroupId)
             .ToListAsync(cancellationToken);
@@ -258,7 +269,6 @@ public sealed class ReviewSchedulingController(
                 x.GroupCount))
             .ToList();
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var random = request.Seed.HasValue ? new Random(request.Seed.Value) : new Random();
         var assignedSessions = new List<ReviewSchedulingSessionResponse>();
         var unassignedGroups = new List<RandomAssignUnassignedGroupResponse>();
@@ -281,6 +291,7 @@ public sealed class ReviewSchedulingController(
                 : [];
             var reusablePanels = panels
                 .Where(panel => panel.GroupCount < 3 &&
+                                panel.ReviewerIds.Length == reviewersPerSession &&
                                 groupAvailability.Contains(SlotKey(panel.Session.DayOfWeek, panel.Session.Slot)) &&
                                 !panel.ReviewerIds.Contains(group.SupervisorId) &&
                                 !panel.ReviewerIds.Any(previousReviewerIds.Contains))

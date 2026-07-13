@@ -198,14 +198,16 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
                 table.HasCheckConstraint("ck_review_availabilities_day_of_week", "day_of_week BETWEEN 1 AND 6");
                 table.HasCheckConstraint("ck_review_availabilities_slot", "slot BETWEEN 1 AND 5");
             });
-            entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate, x.DayOfWeek, x.Slot }).IsUnique();
+            entity.HasIndex(x => new { x.ReviewRoundId, x.LecturerId, x.DayOfWeek, x.Slot }).IsUnique();
+            entity.HasOne<ReviewRound>().WithMany().HasForeignKey(x => x.ReviewRoundId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ReviewAvailabilitySubmission>(entity =>
         {
             entity.ToTable("review_availability_submissions");
-            entity.HasIndex(x => new { x.SemesterId, x.LecturerId, x.WeekStartDate }).IsUnique();
+            entity.HasIndex(x => new { x.ReviewRoundId, x.LecturerId }).IsUnique();
+            entity.HasOne<ReviewRound>().WithMany().HasForeignKey(x => x.ReviewRoundId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -214,8 +216,8 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("review_sessions", table =>
             {
-                table.HasCheckConstraint("ck_review_sessions_day_of_week", "day_of_week BETWEEN 1 AND 6");
-                table.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 5");
+                table.HasCheckConstraint("ck_review_sessions_day_of_week", "status = 'Cancelled' OR day_of_week BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_review_sessions_slot", "status = 'Cancelled' OR slot BETWEEN 1 AND 5");
             });
             entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
             entity.HasIndex(x => new { x.SemesterId, x.Type, x.SessionDate, x.Slot });
@@ -268,6 +270,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasIndex(x => new { x.SemesterId, x.ReviewType, x.WeekStartDate }).IsUnique();
             entity.Property(x => x.ReviewType).HasConversion<string>();
             entity.Property(x => x.Subject).HasMaxLength(250);
+            entity.Property(x => x.Body);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.PublishedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
         });

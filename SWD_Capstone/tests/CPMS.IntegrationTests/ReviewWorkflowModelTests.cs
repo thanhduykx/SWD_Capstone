@@ -61,6 +61,30 @@ public sealed class ReviewWorkflowModelTests
 
         Assert.Contains(entity.GetIndexes(), index => index.IsUnique &&
             index.Properties.Single().Name == nameof(Student.GroupId) &&
-            index.GetFilter() == "\"is_leader\" = TRUE");
+                index.GetFilter() == "\"is_leader\" = TRUE");
+    }
+
+    [Fact]
+    public void LecturerAvailability_IsUniqueWithinExactReviewRound()
+    {
+        using var context = CreateContext();
+        var availability = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailability))!;
+        var submission = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailabilitySubmission))!;
+
+        Assert.Contains(availability.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ReviewAvailability.ReviewRoundId), nameof(ReviewAvailability.LecturerId), nameof(ReviewAvailability.DayOfWeek), nameof(ReviewAvailability.Slot)]));
+        Assert.Contains(submission.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ReviewAvailabilitySubmission.ReviewRoundId), nameof(ReviewAvailabilitySubmission.LecturerId)]));
+    }
+
+    [Fact]
+    public void EmailDeliveryLog_PersistsBodyForPostCommitDispatch()
+    {
+        using var context = CreateContext();
+        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(EmailDeliveryLog))!;
+
+        Assert.False(entity.FindProperty(nameof(EmailDeliveryLog.Body))!.IsNullable);
     }
 }

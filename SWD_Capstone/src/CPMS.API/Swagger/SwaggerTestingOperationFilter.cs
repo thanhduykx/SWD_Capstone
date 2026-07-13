@@ -52,21 +52,21 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Creates an academic semester. Setting isActive=true automatically deactivates the previous active semester."),
 
         ["GET /api/review-availability/week"] = new(
-            "Get my weekly availability",
-            "Lecturer-only. weekStart may be any date in the week; API normalizes it to Monday."),
+            "Get my review-round availability",
+            "Lecturer-only. Pass roundId; availability is isolated between Review1, Review2, and Review3 rounds."),
         ["PUT /api/review-availability/week"] = new(
-            "Save my weekly availability",
-            "Lecturer-only. Saves a draft availability week. Saving after submit returns the week to draft until the lecturer submits again."),
+            "Save my review-round availability",
+            "Lecturer-only. Pass an Open roundId. Saving after submit returns that round's availability to draft until the lecturer submits again."),
         ["POST /api/review-availability/week/submit"] = new(
             "Submit availability to moderator",
-            "Lecturer-only. Submits the saved weekly availability. Moderator scheduling only uses submitted availability."),
+            "Lecturer-only. Pass roundId. Moderator scheduling only uses availability submitted for that exact review round."),
 
         ["GET /api/review-scheduling/board"] = new(
             "Review scheduling board",
             "Moderator view. Returns lecturers, submitted availability, groups, and sessions needed by FE scheduling screens. Legacy SystemAdministrator tokens are still accepted."),
         ["POST /api/review-scheduling/random-assign"] = new(
             "Random assign groups to submitted lecturer slots",
-            "Moderator view. Randomly assigns active unscheduled groups to lecturers using only submitted availability, avoiding supervisor/self-review, repeated Review1 reviewers for Review2, and reviewer slot conflicts. Sends lecturer notification email after a successful assignment and returns delivery counts."),
+            "Moderator view. Creates draft assignments using only submitted availability, avoiding supervisor/self-review, previous-round reviewers, and reviewer slot conflicts. Notifications are sent only after publish."),
         ["POST /api/review-sessions"] = new(
             "Create one review session",
             "Assigns one group to one or two reviewers. Reviewers must have submitted availability for the selected date and slot. Sends lecturer notification email after the assignment is created."),

@@ -613,6 +613,11 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1217,6 +1222,10 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lecturer_id");
 
+                    b.Property<int>("ReviewRoundId")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_round_id");
+
                     b.Property<int>("SemesterId")
                         .HasColumnType("integer")
                         .HasColumnName("semester_id");
@@ -1235,9 +1244,12 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.HasIndex("LecturerId")
                         .HasDatabaseName("ix_review_availabilities_lecturer_id");
 
-                    b.HasIndex("SemesterId", "LecturerId", "WeekStartDate", "DayOfWeek", "Slot")
+                    b.HasIndex("SemesterId")
+                        .HasDatabaseName("ix_review_availabilities_semester_id");
+
+                    b.HasIndex("ReviewRoundId", "LecturerId", "DayOfWeek", "Slot")
                         .IsUnique()
-                        .HasDatabaseName("ix_review_availabilities_semester_id_lecturer_id_week_start_da");
+                        .HasDatabaseName("ix_review_availabilities_review_round_id_lecturer_id_day_of_we");
 
                     b.ToTable("review_availabilities", null, t =>
                         {
@@ -1259,6 +1271,10 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.Property<int>("LecturerId")
                         .HasColumnType("integer")
                         .HasColumnName("lecturer_id");
+
+                    b.Property<int>("ReviewRoundId")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_round_id");
 
                     b.Property<int>("SemesterId")
                         .HasColumnType("integer")
@@ -1282,9 +1298,12 @@ namespace CPMS.Infrastructure.Data.Migrations
                     b.HasIndex("LecturerId")
                         .HasDatabaseName("ix_review_availability_submissions_lecturer_id");
 
-                    b.HasIndex("SemesterId", "LecturerId", "WeekStartDate")
+                    b.HasIndex("SemesterId")
+                        .HasDatabaseName("ix_review_availability_submissions_semester_id");
+
+                    b.HasIndex("ReviewRoundId", "LecturerId")
                         .IsUnique()
-                        .HasDatabaseName("ix_review_availability_submissions_semester_id_lecturer_id_wee");
+                        .HasDatabaseName("ix_review_availability_submissions_review_round_id_lecturer_id");
 
                     b.ToTable("review_availability_submissions", (string)null);
                 });
@@ -1664,9 +1683,9 @@ namespace CPMS.Infrastructure.Data.Migrations
 
                     b.ToTable("review_sessions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_review_sessions_day_of_week", "day_of_week BETWEEN 1 AND 6");
+                            t.HasCheckConstraint("ck_review_sessions_day_of_week", "status = 'Cancelled' OR day_of_week BETWEEN 1 AND 6");
 
-                            t.HasCheckConstraint("ck_review_sessions_slot", "slot BETWEEN 1 AND 5");
+                            t.HasCheckConstraint("ck_review_sessions_slot", "status = 'Cancelled' OR slot BETWEEN 1 AND 5");
                         });
                 });
 
@@ -2673,6 +2692,13 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_review_availabilities_lecturers_lecturer_id");
 
+                    b.HasOne("CPMS.Core.Entities.ReviewRound", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_availabilities_review_rounds_review_round_id");
+
                     b.HasOne("CPMS.Core.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
@@ -2689,6 +2715,13 @@ namespace CPMS.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_availability_submissions_lecturers_lecturer_id");
+
+                    b.HasOne("CPMS.Core.Entities.ReviewRound", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_availability_submissions_review_rounds_review_round_");
 
                     b.HasOne("CPMS.Core.Entities.Semester", null)
                         .WithMany()

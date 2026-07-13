@@ -82,7 +82,7 @@ Accept: application/json
 }
 
 ### Save lecturer weekly availability
-PUT {{CPMS_API_HostAddress}}/api/review-availability/week?semesterId=1&weekStart=2026-06-15
+PUT {{CPMS_API_HostAddress}}/api/review-availability/week?roundId=1
 Authorization: Bearer {{AccessToken}}
 Content-Type: application/json
 Accept: application/json
@@ -95,7 +95,7 @@ Accept: application/json
 }
 
 ### Submit lecturer weekly availability to moderator
-POST {{CPMS_API_HostAddress}}/api/review-availability/week/submit?semesterId=1&weekStart=2026-06-15
+POST {{CPMS_API_HostAddress}}/api/review-availability/week/submit?roundId=1
 Authorization: Bearer {{AccessToken}}
 Accept: application/json
 
