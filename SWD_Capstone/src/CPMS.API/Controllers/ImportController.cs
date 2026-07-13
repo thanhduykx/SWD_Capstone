@@ -11,7 +11,8 @@ public sealed class ImportController(ExcelImportService importService) : Control
 {
     [HttpPost("groups")]
     public async Task<ActionResult<ExcelImportResult>> ImportGroups(
-        IFormFile file,
+        [FromForm] IFormFile file,
+        [FromForm] int lecturerId,
         CancellationToken cancellationToken)
     {
         if (file == null || file.Length == 0)
@@ -26,7 +27,7 @@ public sealed class ImportController(ExcelImportService importService) : Control
         }
 
         using var stream = file.OpenReadStream();
-        var result = await importService.ImportGroupsAsync(stream, cancellationToken);
+        var result = await importService.ImportSelectedGroupColumnsAsync(stream, lecturerId, cancellationToken);
         return Ok(result);
     }
 }
