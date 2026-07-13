@@ -1,7 +1,7 @@
 using CPMS.API.Contracts.Accounts;
 using CPMS.BLL.Accounts;
 using CPMS.BLL.Common.Exceptions;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

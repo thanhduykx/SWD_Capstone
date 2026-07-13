@@ -1,5 +1,5 @@
 using ClosedXML.Excel;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 using CPMS.DAL.ExternalServices;
 
 namespace CPMS.IntegrationTests;

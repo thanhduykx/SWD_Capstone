@@ -1,6 +1,6 @@
 using CPMS.BLL.Abstractions.Identity;
 
-namespace CPMS.Core.Services;
+namespace CPMS.BLL.Services;
 
 public sealed class DefaultAccountUsernameGenerator : IAccountUsernameGenerator
 {

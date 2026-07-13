@@ -3,8 +3,8 @@ using System.Security.Claims;
 using CPMS.API.Contracts.Accounts;
 using CPMS.BLL.Accounts;
 using CPMS.BLL.Common.Exceptions;
-using CPMS.Core.Exceptions;
-using CPMS.Shared.Models;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

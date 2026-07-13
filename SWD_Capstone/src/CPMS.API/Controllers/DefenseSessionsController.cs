@@ -3,7 +3,7 @@ using System.Security.Claims;
 using CPMS.API.Contracts.Defense;
 using CPMS.API.Hubs;
 using CPMS.BLL.Defense.Sessions;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;

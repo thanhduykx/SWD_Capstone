@@ -1,5 +1,5 @@
-using CPMS.Core.Exceptions;
-using CPMS.Core.Services;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Services;
 
 namespace CPMS.UnitTests.Services;
 
@@ -36,8 +36,8 @@ public sealed class AssignmentRulesTests
     public void ReviewRound_RejectsSkippingFromDraftToClosed()
     {
         var action = () => _rules.EnsureReviewRoundTransition(
-            CPMS.Core.Enums.ReviewRoundStatus.Draft,
-            CPMS.Core.Enums.ReviewRoundStatus.Closed);
+            CPMS.BLL.Enums.ReviewRoundStatus.Draft,
+            CPMS.BLL.Enums.ReviewRoundStatus.Closed);
 
         Assert.Throws<BusinessRuleException>(action);
     }

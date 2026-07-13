@@ -1,6 +1,6 @@
 using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Common.Exceptions;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 
 namespace CPMS.BLL.Accounts;
 

@@ -1,7 +1,7 @@
 using CPMS.BLL.Abstractions.Identity;
 using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 using CPMS.BLL.Features.Accounts.Queries.GetAccounts;
-using CPMS.Core.Services;
+using CPMS.BLL.Services;
 using CPMS.BLL.Reviews.Registration;
 using CPMS.BLL.Reviews.Scheduling;
 using CPMS.BLL.Reviews.Sessions;

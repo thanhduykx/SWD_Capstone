@@ -1,5 +1,5 @@
-using CPMS.Core.Exceptions;
-using CPMS.Core.Services;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Defense.Sessions;
 

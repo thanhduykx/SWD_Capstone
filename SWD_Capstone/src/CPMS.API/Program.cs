@@ -12,7 +12,7 @@ using CPMS.BLL;
 using CPMS.BLL.Abstractions.Persistence;
 using CPMS.BLL.Accounts;
 using CPMS.BLL.Reviews.Assessment;
-using CPMS.Core.Services;
+using CPMS.BLL.Services;
 using CPMS.DAL;
 using CPMS.DAL.Data;
 using Hangfire;

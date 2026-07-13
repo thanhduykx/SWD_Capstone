@@ -22,7 +22,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CPMS.BLL\CPMS.BLL.csproj" />
-    <ProjectReference Include="..\..\src\CPMS.Domain\CPMS.Domain.csproj" />
   </ItemGroup>
 
 </Project>

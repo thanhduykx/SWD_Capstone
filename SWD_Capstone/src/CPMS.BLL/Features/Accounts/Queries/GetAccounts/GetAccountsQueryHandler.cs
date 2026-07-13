@@ -1,6 +1,6 @@
 using CPMS.BLL.Abstractions.Identity;
 using CPMS.BLL.DTOs.Accounts;
-using CPMS.Shared.Models;
+using CPMS.BLL.Models;
 
 namespace CPMS.BLL.Features.Accounts.Queries.GetAccounts;
 

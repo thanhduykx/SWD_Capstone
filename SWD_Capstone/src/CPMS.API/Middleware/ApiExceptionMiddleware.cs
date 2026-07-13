@@ -1,6 +1,7 @@
-using CPMS.Core.Exceptions;
+using CPMS.API.Contracts.Common;
+using CPMS.BLL.Exceptions;
 using CPMS.BLL.Common.Exceptions;
-using CPMS.Shared.Models;
+using CPMS.BLL.Models;
 using FluentValidation;
 
 namespace CPMS.API.Middleware;

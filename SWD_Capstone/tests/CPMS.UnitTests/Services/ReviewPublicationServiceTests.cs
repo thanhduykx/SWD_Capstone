@@ -1,5 +1,5 @@
 using CPMS.BLL.Reviews.Publication;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 
 namespace CPMS.UnitTests.Services;
 

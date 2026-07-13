@@ -28,7 +28,6 @@
   <ItemGroup>
     <ProjectReference Include="..\CPMS.BLL\CPMS.BLL.csproj" />
     <ProjectReference Include="..\CPMS.DAL\CPMS.DAL.csproj" />
-    <ProjectReference Include="..\CPMS.Shared\CPMS.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

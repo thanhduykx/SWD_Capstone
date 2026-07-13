@@ -2,8 +2,6 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend-build
 WORKDIR /src
 
 COPY Directory.Build.props ./
-COPY src/CPMS.Domain/*.csproj src/CPMS.Domain/
-COPY src/CPMS.Shared/*.csproj src/CPMS.Shared/
 COPY src/CPMS.BLL/*.csproj src/CPMS.BLL/
 COPY src/CPMS.DAL/*.csproj src/CPMS.DAL/
 COPY src/CPMS.API/*.csproj src/CPMS.API/

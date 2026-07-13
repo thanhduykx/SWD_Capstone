@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
 using CPMS.BLL.Defense.Sessions;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;

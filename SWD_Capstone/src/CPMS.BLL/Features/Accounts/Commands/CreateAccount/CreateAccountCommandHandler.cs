@@ -3,8 +3,7 @@ using CPMS.BLL.Abstractions.Persistence;
 using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.DTOs.Accounts;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 
 namespace CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 
@@ -28,83 +27,50 @@ public sealed class CreateAccountCommandHandler(
             throw new ConflictException("Username or email already exists.");
         }
 
-        var user = new User
-        {
-            Username = username,
-            Email = email,
-            PasswordHash = passwordHasher.Hash(command.Password),
-            Role = command.Role,
-            IsActive = true,
-            CreatedById = command.CreatedByUserId
-        };
-
-        var profile = CreateRoleProfile(user.Id, username, identityCode, fullName, command);
-        var auditLog = new AuditLog
-        {
-            UserId = command.CreatedByUserId,
-            Action = "CREATE_ACCOUNT",
-            EntityType = nameof(User),
-            EntityId = user.Id,
-            NewValue = username,
-            IpAddress = command.IpAddress,
-            UserAgent = command.UserAgent
-        };
-
-        await accounts.AddUserWithProfileAsync(user, profile, auditLog, cancellationToken);
+        EnsureSupportedRole(command.Role, username);
+        var account = await accounts.AddUserWithProfileAsync(
+            new CreateAccountPersistenceData(
+                username,
+                email,
+                passwordHasher.Hash(command.Password),
+                command.Role,
+                fullName,
+                identityCode,
+                OptionalOrDefault(command.Department, command.Role == UserRole.TrainingDepartment
+                    ? "Training Department"
+                    : string.Empty),
+                OptionalOrDefault(command.Position, command.Role == UserRole.SystemAdministrator
+                    ? "Admin"
+                    : "Moderator"),
+                OptionalOrDefault(command.PermissionScope, "System"),
+                command.IsPartTime,
+                OptionalOrDefault(command.ClassCode, string.Empty),
+                command.Batch,
+                OptionalOrDefault(command.Major, "SE"),
+                command.CreatedByUserId,
+                command.IpAddress,
+                command.UserAgent),
+            cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new AccountCreatedResponse(
-            user.Id,
-            user.Username,
-            user.Email,
+            account.Id,
+            account.Username,
+            account.Email,
             command.Password,
-            user.Role,
-            user.IsActive,
-            user.LastLoginAt,
-            user.LockedUntil,
+            account.Role,
+            account.IsActive,
+            account.LastLoginAt,
+            account.LockedUntil,
             identityCode);
     }
 
-    private static object CreateRoleProfile(
-        int userId,
-        string username,
-        string identityCode,
-        string fullName,
-        CreateAccountCommand command) =>
-        command.Role switch
-        {
-            UserRole.Lecturer => new Lecturer
-            {
-                UserId = userId,
-                Code = identityCode,
-                FullName = fullName,
-                Department = OptionalOrDefault(command.Department, string.Empty),
-                IsPartTime = command.IsPartTime
-            },
-            UserRole.TrainingDepartment => new TrainingDepartment
-            {
-                UserId = userId,
-                DepartmentName = OptionalOrDefault(command.Department, "Training Department"),
-                StaffCode = identityCode,
-                Position = OptionalOrDefault(command.Position, "Moderator")
-            },
-            UserRole.SystemAdministrator => new SystemAdministrator
-            {
-                UserId = userId,
-                AdminLevel = OptionalOrDefault(command.Position, "Admin"),
-                PermissionScope = OptionalOrDefault(command.PermissionScope, "System")
-            },
-            UserRole.Student => new Student
-            {
-                UserId = userId,
-                Code = identityCode,
-                FullName = fullName,
-                ClassCode = OptionalOrDefault(command.ClassCode, string.Empty),
-                Batch = command.Batch,
-                Major = OptionalOrDefault(command.Major, "SE")
-            },
-            _ => throw new ArgumentOutOfRangeException(nameof(command), $"Unsupported role for account {username}.")
-        };
+    private static void EnsureSupportedRole(UserRole role, string username)
+    {
+        if (role is not (UserRole.Lecturer or UserRole.TrainingDepartment or
+            UserRole.SystemAdministrator or UserRole.Student))
+            throw new ArgumentOutOfRangeException(nameof(role), $"Unsupported role for account {username}.");
+    }
 
     private static string Required(string? value, string message) =>
         string.IsNullOrWhiteSpace(value) ? throw new ArgumentException(message) : value.Trim();

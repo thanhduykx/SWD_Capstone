@@ -25,7 +25,7 @@ namespace DataAccessLayer.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("CPMS.Core.Entities.AuditLog", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.AuditLog", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -81,7 +81,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CapstoneDocument", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CapstoneDocument", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -165,7 +165,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("documents", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CapstoneGroup", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CapstoneGroup", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -215,7 +215,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("capstone_groups", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Clo", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Clo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -253,7 +253,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("clos", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Council", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Council", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -315,7 +315,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("councils", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CouncilGroup", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CouncilGroup", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -353,7 +353,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("council_groups", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CouncilMember", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CouncilMember", b =>
                 {
                     b.Property<int>("CouncilId")
                         .HasColumnType("integer")
@@ -377,7 +377,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("council_members", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseEvidence", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseEvidence", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -452,7 +452,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("defense_evidences", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseRound", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseRound", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -515,7 +515,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("defense_rounds", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseSession", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseSession", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -607,7 +607,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("defense_sessions", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EmailDeliveryLog", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EmailDeliveryLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -669,7 +669,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("email_delivery_logs", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationDetail", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationDetail", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -722,7 +722,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("evaluation_details", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationPanel", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationPanel", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -755,7 +755,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("evaluation_panels", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationReport", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationReport", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -808,7 +808,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("evaluation_reports", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.GroupResult", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.GroupResult", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -867,7 +867,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("group_results", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.GroupReviewSlot", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.GroupReviewSlot", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -913,7 +913,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("group_review_slots", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.InlineComment", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.InlineComment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -975,7 +975,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("inline_comments", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Lecturer", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Lecturer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1025,7 +1025,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("lecturers", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Notification", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Notification", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1081,7 +1081,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("notifications", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.RefreshToken", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.RefreshToken", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1128,7 +1128,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailability", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewAvailability", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1179,7 +1179,7 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistItemResponse", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewChecklistItemResponse", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1220,7 +1220,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("review_checklist_item_responses", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistSubmission", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewChecklistSubmission", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1304,7 +1304,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("review_checklist_submissions", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewSchedulePublication", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSchedulePublication", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1357,7 +1357,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("review_schedule_publications", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewSession", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSession", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1445,7 +1445,7 @@ namespace DataAccessLayer.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.RuleKeyword", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.RuleKeyword", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1496,7 +1496,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("rule_keywords", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Score", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Score", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1551,7 +1551,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("scores", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ScoreSubmissionHistory", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ScoreSubmissionHistory", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1638,7 +1638,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("score_submission_histories", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Semester", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Semester", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1689,7 +1689,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("semesters", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Student", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Student", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1747,7 +1747,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("students", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Syllabus", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Syllabus", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1800,7 +1800,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("syllabuses", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.SystemAdministrator", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.SystemAdministrator", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1833,7 +1833,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("system_administrators", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Topic", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Topic", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1874,7 +1874,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("topics", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.TrainingDepartment", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.TrainingDepartment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1912,7 +1912,7 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("training_departments", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.User", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1986,32 +1986,32 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.AuditLog", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.AuditLog", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_audit_logs_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CapstoneDocument", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CapstoneDocument", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_documents_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.Syllabus", null)
+                    b.HasOne("CPMS.DAL.Entities.Syllabus", null)
                         .WithMany()
                         .HasForeignKey("SyllabusId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_documents_syllabuses_syllabus_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UploadedById")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2019,23 +2019,23 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_documents_users_uploaded_by_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CapstoneGroup", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CapstoneGroup", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("LecturerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_capstone_groups_lecturers_lecturer_id");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_capstone_groups_semesters_semester_id");
 
-                    b.HasOne("CPMS.Core.Entities.Topic", null)
+                    b.HasOne("CPMS.DAL.Entities.Topic", null)
                         .WithMany()
                         .HasForeignKey("TopicId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2043,9 +2043,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_capstone_groups_topics_topic_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Clo", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Clo", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Syllabus", null)
+                    b.HasOne("CPMS.DAL.Entities.Syllabus", null)
                         .WithMany()
                         .HasForeignKey("SyllabusId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2053,29 +2053,29 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_clos_syllabuses_syllabus_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Council", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Council", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("ChairmanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_councils_lecturers_chairman_id");
 
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("ManagedByTrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_councils_training_departments_managed_by_training_departmen");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("SecretaryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_councils_lecturers_secretary_id");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2083,16 +2083,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_councils_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CouncilGroup", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CouncilGroup", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Council", null)
+                    b.HasOne("CPMS.DAL.Entities.Council", null)
                         .WithMany()
                         .HasForeignKey("CouncilId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_council_groups_councils_council_id");
 
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2100,16 +2100,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_council_groups_capstone_groups_group_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.CouncilMember", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.CouncilMember", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Council", null)
+                    b.HasOne("CPMS.DAL.Entities.Council", null)
                         .WithMany()
                         .HasForeignKey("CouncilId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_council_members_councils_council_id");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("LecturerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2117,23 +2117,23 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_council_members_lecturers_lecturer_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseEvidence", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseEvidence", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("CapturedByLecturerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_evidences_lecturers_captured_by_lecturer_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("CapturedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_evidences_users_captured_by_user_id");
 
-                    b.HasOne("CPMS.Core.Entities.DefenseSession", null)
+                    b.HasOne("CPMS.DAL.Entities.DefenseSession", null)
                         .WithMany()
                         .HasForeignKey("DefenseSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2141,16 +2141,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_defense_evidences_defense_sessions_defense_session_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseRound", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseRound", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("CreatedByTrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_rounds_training_departments_created_by_training_dep");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2158,67 +2158,67 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_defense_rounds_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.DefenseSession", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseSession", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("AssignedByTrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_defense_sessions_training_departments_assigned_by_training_");
 
-                    b.HasOne("CPMS.Core.Entities.Council", null)
+                    b.HasOne("CPMS.DAL.Entities.Council", null)
                         .WithMany()
                         .HasForeignKey("CouncilId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_sessions_councils_council_id");
 
-                    b.HasOne("CPMS.Core.Entities.DefenseRound", null)
+                    b.HasOne("CPMS.DAL.Entities.DefenseRound", null)
                         .WithMany()
                         .HasForeignKey("DefenseRoundId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_sessions_defense_rounds_defense_round_id");
 
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_defense_sessions_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("StartedById")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_defense_sessions_users_started_by_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EmailDeliveryLog", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EmailDeliveryLog", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.ReviewSchedulePublication", null)
+                    b.HasOne("CPMS.DAL.Entities.ReviewSchedulePublication", null)
                         .WithMany()
                         .HasForeignKey("PublicationId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_email_delivery_logs_review_schedule_publications_publicatio");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("RecipientUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_email_delivery_logs_users_recipient_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationDetail", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationDetail", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Clo", null)
+                    b.HasOne("CPMS.DAL.Entities.Clo", null)
                         .WithMany()
                         .HasForeignKey("CloId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_evaluation_details_clos_clo_id");
 
-                    b.HasOne("CPMS.Core.Entities.EvaluationReport", null)
+                    b.HasOne("CPMS.DAL.Entities.EvaluationReport", null)
                         .WithMany()
                         .HasForeignKey("ReportId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2226,9 +2226,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_evaluation_details_evaluation_reports_report_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationPanel", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationPanel", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2236,16 +2236,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_evaluation_panels_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.EvaluationReport", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationReport", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneDocument", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneDocument", null)
                         .WithMany()
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_evaluation_reports_documents_document_id");
 
-                    b.HasOne("CPMS.Core.Entities.EvaluationPanel", null)
+                    b.HasOne("CPMS.DAL.Entities.EvaluationPanel", null)
                         .WithMany()
                         .HasForeignKey("ReviewedById")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2253,16 +2253,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_evaluation_reports_evaluation_panels_reviewed_by_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.GroupResult", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.GroupResult", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_group_results_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2270,16 +2270,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_group_results_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.GroupReviewSlot", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.GroupReviewSlot", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_group_review_slots_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.ReviewSession", null)
+                    b.HasOne("CPMS.DAL.Entities.ReviewSession", null)
                         .WithMany()
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2287,32 +2287,32 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_group_review_slots_review_sessions_session_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.InlineComment", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.InlineComment", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inline_comments_users_author_id");
 
-                    b.HasOne("CPMS.Core.Entities.CapstoneDocument", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneDocument", null)
                         .WithMany()
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inline_comments_documents_document_id");
 
-                    b.HasOne("CPMS.Core.Entities.InlineComment", null)
+                    b.HasOne("CPMS.DAL.Entities.InlineComment", null)
                         .WithMany()
                         .HasForeignKey("ParentCommentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_inline_comments_inline_comments_parent_comment_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Lecturer", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Lecturer", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2320,25 +2320,25 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_lecturers_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Notification", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Notification", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("RecipientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_notifications_users_recipient_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("SenderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_notifications_users_sender_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.RefreshToken", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.RefreshToken", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2346,16 +2346,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_refresh_tokens_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewAvailability", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewAvailability", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("LecturerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_availabilities_lecturers_lecturer_id");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2363,9 +2363,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_review_availabilities_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistItemResponse", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewChecklistItemResponse", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.ReviewChecklistSubmission", null)
+                    b.HasOne("CPMS.DAL.Entities.ReviewChecklistSubmission", null)
                         .WithMany()
                         .HasForeignKey("SubmissionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2373,23 +2373,23 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_review_checklist_item_responses_review_checklist_submission");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewChecklistSubmission", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewChecklistSubmission", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_checklist_submissions_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("ReviewerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_checklist_submissions_lecturers_reviewer_id");
 
-                    b.HasOne("CPMS.Core.Entities.ReviewSession", null)
+                    b.HasOne("CPMS.DAL.Entities.ReviewSession", null)
                         .WithMany()
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2397,16 +2397,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_review_checklist_submissions_review_sessions_session_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewSchedulePublication", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSchedulePublication", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("PublishedByTrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_schedule_publications_training_departments_published");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2414,27 +2414,27 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_review_schedule_publications_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ReviewSession", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSession", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("PublishedByTrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_review_sessions_training_departments_published_by_training_");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("Reviewer1Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_review_sessions_lecturers_reviewer1id");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("Reviewer2Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_review_sessions_lecturers_reviewer2id");
 
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2442,16 +2442,16 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_review_sessions_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.RuleKeyword", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.RuleKeyword", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Clo", null)
+                    b.HasOne("CPMS.DAL.Entities.Clo", null)
                         .WithMany()
                         .HasForeignKey("CloId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_rule_keywords_clos_clo_id");
 
-                    b.HasOne("CPMS.Core.Entities.SystemAdministrator", null)
+                    b.HasOne("CPMS.DAL.Entities.SystemAdministrator", null)
                         .WithMany()
                         .HasForeignKey("CreatedByAdminId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2459,23 +2459,23 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_rule_keywords_system_administrators_created_by_admin_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Score", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Score", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.DefenseSession", null)
+                    b.HasOne("CPMS.DAL.Entities.DefenseSession", null)
                         .WithMany()
                         .HasForeignKey("DefenseSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_scores_defense_sessions_defense_session_id");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("ScorerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_scores_lecturers_scorer_id");
 
-                    b.HasOne("CPMS.Core.Entities.Student", null)
+                    b.HasOne("CPMS.DAL.Entities.Student", null)
                         .WithMany()
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2483,36 +2483,36 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_scores_students_student_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.ScoreSubmissionHistory", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.ScoreSubmissionHistory", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.DefenseSession", null)
+                    b.HasOne("CPMS.DAL.Entities.DefenseSession", null)
                         .WithMany()
                         .HasForeignKey("DefenseSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_score_submission_histories_defense_sessions_defense_session");
 
-                    b.HasOne("CPMS.Core.Entities.Score", null)
+                    b.HasOne("CPMS.DAL.Entities.Score", null)
                         .WithMany()
                         .HasForeignKey("ScoreId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_score_submission_histories_scores_score_id");
 
-                    b.HasOne("CPMS.Core.Entities.Lecturer", null)
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("ScorerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_score_submission_histories_lecturers_scorer_id");
 
-                    b.HasOne("CPMS.Core.Entities.Student", null)
+                    b.HasOne("CPMS.DAL.Entities.Student", null)
                         .WithMany()
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_score_submission_histories_students_student_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("SubmittedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2520,15 +2520,15 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_score_submission_histories_users_submitted_by_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Student", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Student", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.CapstoneGroup", null)
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
                         .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_students_capstone_groups_group_id");
 
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2536,9 +2536,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_students_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Syllabus", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Syllabus", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.TrainingDepartment", null)
+                    b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("TrainingDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2546,9 +2546,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_syllabuses_training_departments_training_department_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.SystemAdministrator", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.SystemAdministrator", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2556,9 +2556,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_system_administrators_users_user_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.Topic", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.Topic", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.Semester", null)
+                    b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2566,9 +2566,9 @@ namespace DataAccessLayer.Migrations
                         .HasConstraintName("fk_topics_semesters_semester_id");
                 });
 
-            modelBuilder.Entity("CPMS.Core.Entities.TrainingDepartment", b =>
+            modelBuilder.Entity("CPMS.DAL.Entities.TrainingDepartment", b =>
                 {
-                    b.HasOne("CPMS.Core.Entities.User", null)
+                    b.HasOne("CPMS.DAL.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)

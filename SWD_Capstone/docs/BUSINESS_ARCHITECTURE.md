@@ -121,7 +121,7 @@ CPMS.API must not own business decisions such as conflict rules, score lock rule
 
 ### CPMS.BLL
 
-Contains application services and business workflows.
+Contains application services, business workflows, enums, business models, validation rules and persistence interfaces.
 
 Examples:
 
@@ -132,15 +132,9 @@ Examples:
 - `ExcelImportService`: parse official Excel files into validated import commands.
 - `TefExportService`: generate TEF files from locked scores.
 
-### CPMS.Domain
-
-Contains entities, enums, domain rules, interfaces and pure business concepts.
-
-CPMS.Domain must stay free of EF Core, ASP.NET and external infrastructure dependencies.
-
 ### CPMS.DAL
 
-Contains EF Core persistence, repositories, unit of work, migrations, cache, messaging and external services.
+Contains EF Core entities and persistence, repositories, unit of work, migrations, cache, messaging and external services.
 
 CPMS.DAL must enforce low-level integrity such as unique indexes, FK constraints, append-only audit protection and locked score immutability.
 

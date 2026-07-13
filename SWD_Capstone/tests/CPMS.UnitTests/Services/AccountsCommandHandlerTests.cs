@@ -4,10 +4,9 @@ using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.DTOs.Accounts;
 using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
-using CPMS.Core.Services;
-using CPMS.Shared.Models;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Services;
+using CPMS.BLL.Models;
 
 namespace CPMS.UnitTests.Services;
 
@@ -34,14 +33,9 @@ public sealed class AccountsCommandHandlerTests
     public async Task CreateAccount_RejectsDuplicateEmail()
     {
         var repository = new InMemoryAccountRepository();
-        repository.Users.Add(new User
-        {
-            Id = 1,
-            Username = "Existing",
-            Email = "lecturer@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Lecturer
-        });
+        repository.Users.Add(new CreatedAccountState(
+            1, "Existing", "lecturer@example.com", UserRole.Lecturer,
+            true, null, null));
         var handler = new CreateAccountCommandHandler(
             repository,
             new InMemoryUnitOfWork(),
@@ -82,9 +76,7 @@ public sealed class AccountsCommandHandlerTests
 
     private sealed class InMemoryAccountRepository : IAccountRepository
     {
-        public List<User> Users { get; } = [];
-
-        public IQueryable<User> QueryUsers() => Users.AsQueryable();
+        public List<CreatedAccountState> Users { get; } = [];
 
         public Task<PagedResult<AccountResponse>> GetPagedAsync(PagedRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(new PagedResult<AccountResponse>([], request.SafePage, request.SafePageSize, Users.Count));
@@ -92,11 +84,15 @@ public sealed class AccountsCommandHandlerTests
         public Task<bool> UsernameOrEmailExistsAsync(string username, string email, CancellationToken cancellationToken) =>
             Task.FromResult(Users.Any(user => user.Username == username || user.Email == email));
 
-        public Task AddUserWithProfileAsync(User user, object profile, AuditLog auditLog, CancellationToken cancellationToken)
+        public Task<CreatedAccountState> AddUserWithProfileAsync(
+            CreateAccountPersistenceData account,
+            CancellationToken cancellationToken)
         {
-            user.Id = Users.Count + 1;
+            var user = new CreatedAccountState(
+                Users.Count + 1, account.Username, account.Email, account.Role,
+                true, null, null);
             Users.Add(user);
-            return Task.CompletedTask;
+            return Task.FromResult(user);
         }
     }
 

@@ -1,5 +1,5 @@
 using CPMS.BLL.Reviews.Scheduling;
-using CPMS.Core.Enums;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,7 +1,7 @@
 using CPMS.API.Contracts.Academic;
 using CPMS.BLL.Academic;
-using CPMS.Core.Exceptions;
-using CPMS.Shared.Models;
+using CPMS.BLL.Exceptions;
+using CPMS.BLL.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

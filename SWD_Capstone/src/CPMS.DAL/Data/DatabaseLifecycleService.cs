@@ -1,8 +1,8 @@
 using CPMS.BLL.Abstractions.Persistence;
 using CPMS.BLL.Testing;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
-using CPMS.Core.Services;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace CPMS.DAL.Data;

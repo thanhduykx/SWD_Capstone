@@ -2,8 +2,8 @@ using System.Text.RegularExpressions;
 using CPMS.BLL.Abstractions.Identity;
 using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Accounts;
-using CPMS.Core.Enums;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Enums;
+using CPMS.BLL.Exceptions;
 
 namespace CPMS.BLL.Academic.Import;
 

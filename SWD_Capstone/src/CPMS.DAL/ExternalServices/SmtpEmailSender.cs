@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Text;
 using CPMS.BLL.Abstractions.Messaging;
-using CPMS.Core.Exceptions;
+using CPMS.BLL.Exceptions;
 using Microsoft.Extensions.Configuration;
 
 namespace CPMS.DAL.ExternalServices;

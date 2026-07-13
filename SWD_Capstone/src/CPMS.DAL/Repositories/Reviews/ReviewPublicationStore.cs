@@ -1,8 +1,8 @@
 using System.Data;
 using CPMS.BLL.Abstractions.Messaging;
 using CPMS.BLL.Reviews.Publication;
-using CPMS.Core.Entities;
-using CPMS.Core.Enums;
+using CPMS.DAL.Entities;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 

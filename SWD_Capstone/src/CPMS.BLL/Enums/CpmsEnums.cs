@@ -1,4 +1,4 @@
-namespace CPMS.Core.Enums;
+namespace CPMS.BLL.Enums;
 
 public enum UserRole
 {
