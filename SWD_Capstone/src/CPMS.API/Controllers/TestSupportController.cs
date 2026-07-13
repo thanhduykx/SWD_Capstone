@@ -118,8 +118,9 @@ public sealed class TestSupportController(
         var sql = $"TRUNCATE TABLE {string.Join(", ", tableNames.Select(t => $"\"{t}\""))} RESTART IDENTITY CASCADE;";
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
 
-        await global::Program.SeedAdminAccountAsync(configuration, dbContext);
         await global::Program.SeedModeratorAccountAsync(dbContext);
+        await global::Program.SeedTestAccountsAsync(dbContext);
+        await global::Program.SeedTestAcademicDataAsync(dbContext);
 
         return Ok(new { message = "All database tables truncated successfully and default seed data restored." });
     }
