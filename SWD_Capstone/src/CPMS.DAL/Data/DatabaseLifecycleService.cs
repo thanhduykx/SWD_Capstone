@@ -30,7 +30,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE capstone_groups ALTER COLUMN lecturer_id DROP NOT NULL;", cancellationToken);
         if (seedBaselineDataset)
             await SeedBaselineDatasetAsync(cancellationToken);
-        await SeedDevelopmentDataAsync(cancellationToken);
+        else
+            await SeedTestAccountsAsync(cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE username IN ('Admin@gmail.com', 'test.training', 'test.lecturer', 'test.student');", cancellationToken);
     }
 
