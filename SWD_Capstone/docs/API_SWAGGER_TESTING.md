@@ -27,13 +27,13 @@ These accounts are for local development only.
 | Lecturer | `namlh.gv24003@fpt.edu.vn` | `Test@123456` |
 | Student | `maunv.se199999@fpt.edu.vn` | `Test@123456` |
 
-After startup seed **only in Development** (or when `Swagger:ExposeTestSupport=true`), shared academic data on the **active semester** is filled for the three lecturer accounts so **web + mobile use the same workflow data**.
+After each deploy/restart, the API **idempotently upserts** shared academic data on the **active semester** for the three lecturer accounts (web + mobile use the same workflow data). No truncate; existing site passwords are not reset.
 
 - **6 groups** `SE2601`…`SE2606` on the active term (usually `SU2026`)
 - Review sessions `SU26_R1_S01`…`SU26_R3_S02`, councils, defense sessions
 - `/api/review-sessions/my` and website scheduling boards see the same published assignments
 
-Opt-in: `POST /api/test-support/ensure-dataset` (Dev or `ExposeTestSupport` only). Does not truncate existing site data.
+Optional manual re-run: `POST /api/test-support/ensure-dataset` (Dev or `ExposeTestSupport` only).
 
 | Email login | Hồ sơ |
 | --- | --- |

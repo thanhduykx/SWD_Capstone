@@ -24,20 +24,19 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         "refresh_tokens", "users"
     ];
 
-    public async Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken)
+    public async Task InitializeAsync(bool seedBaselineDataset, CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
-        // Only seed in Dev / explicit test-support. Never mutate shared website data on normal Production starts.
-        if (seedDevelopmentData)
-            await SeedDevelopmentDataAsync(cancellationToken);
+        if (seedBaselineDataset)
+            await SeedBaselineDatasetAsync(cancellationToken);
     }
 
     /// <summary>
-    /// Opt-in upsert of shared lecturer personas/dataset on the active semester (web + mobile).
-    /// Must not be called from normal Production startup; use Dev / ExposeTestSupport only.
+    /// Idempotent upsert of shared lecturer personas and workflow data on the active semester (web + mobile).
+    /// Safe for Production: no truncate, does not reset passwords of existing shared-site accounts.
     /// </summary>
     public Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken) =>
-        SeedDevelopmentDataAsync(cancellationToken);
+        SeedBaselineDatasetAsync(cancellationToken);
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken) =>
         dbContext.Database.CanConnectAsync(cancellationToken);
@@ -46,10 +45,10 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     {
         var sql = $"TRUNCATE TABLE {string.Join(", ", ResetTables.Select(x => $"\"{x}\""))} RESTART IDENTITY CASCADE;";
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
-        await SeedDevelopmentDataAsync(cancellationToken);
+        await SeedBaselineDatasetAsync(cancellationToken);
     }
 
-    private async Task SeedDevelopmentDataAsync(CancellationToken cancellationToken)
+    private async Task SeedBaselineDatasetAsync(CancellationToken cancellationToken)
     {
         await SeedModeratorAsync(cancellationToken);
         await SeedTestAccountsAsync(cancellationToken);

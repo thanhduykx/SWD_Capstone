@@ -224,9 +224,8 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseLifecycleService>();
-        var seedDevelopmentData = app.Environment.IsDevelopment() ||
-                                  app.Configuration.GetValue<bool>("Swagger:ExposeTestSupport");
-        await database.InitializeAsync(seedDevelopmentData, CancellationToken.None);
+        // Idempotent upsert on every deploy/restart (no truncate, no password reset for existing accounts).
+        await database.InitializeAsync(seedBaselineDataset: true, CancellationToken.None);
     }
     catch (NpgsqlException exception)
     {
