@@ -52,8 +52,8 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                 x.Id, x.Code,
                 dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn)
                     .FirstOrDefault() ?? "Chưa đăng ký đề tài",
-                x.LecturerId,
-                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.LecturerId).Select(lecturer => lecturer.Code)
+                x.LecturerId ?? 0,
+                dbContext.Lecturers.Where(lecturer => x.LecturerId != null && lecturer.Id == x.LecturerId).Select(lecturer => lecturer.Code)
                     .FirstOrDefault() ?? "Chưa có GVHD",
                 dbContext.Students.Count(student => student.GroupId == x.Id)))
             .ToListAsync(cancellationToken);

@@ -122,7 +122,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.Status).HasConversion<string>();
             entity.HasOne<Topic>().WithMany().HasForeignKey(x => x.TopicId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<Syllabus>(entity =>
         {

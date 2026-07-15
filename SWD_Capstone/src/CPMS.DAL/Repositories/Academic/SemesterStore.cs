@@ -88,7 +88,7 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
                 x.Id, x.Code,
                 dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn)
                     .SingleOrDefault() ?? "No Topic",
-                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.LecturerId)
+                dbContext.Lecturers.Where(lecturer => x.LecturerId != null && lecturer.Id == x.LecturerId)
                     .Select(lecturer => lecturer.FullName).SingleOrDefault() ?? "No Supervisor",
                 x.Status,
                 dbContext.Students.Where(student => student.GroupId == x.Id).OrderBy(student => student.Code)

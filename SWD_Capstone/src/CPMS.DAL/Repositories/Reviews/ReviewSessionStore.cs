@@ -19,7 +19,7 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
 
     public Task<ReviewGroupState?> FindGroupAsync(int groupId, CancellationToken cancellationToken) =>
         dbContext.CapstoneGroups.Where(x => x.Id == groupId)
-            .Select(x => new ReviewGroupState(x.Id, x.SemesterId, x.LecturerId))
+            .Select(x => new ReviewGroupState(x.Id, x.SemesterId, x.LecturerId ?? 0))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<ReviewSessionEditState?> FindSessionForEditAsync(
@@ -35,7 +35,7 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
             .ToListAsync(cancellationToken);
         return new ReviewSessionEditState(
             session.Id, session.SemesterId, session.Type, session.Status,
-            groups.Select(x => x.Id).ToArray(), groups.Select(x => x.LecturerId).ToArray());
+            groups.Select(x => x.Id).ToArray(), groups.Select(x => x.LecturerId ?? 0).ToArray());
     }
 
     public async Task<ReviewRoundEditState?> AcquireRoundAsync(

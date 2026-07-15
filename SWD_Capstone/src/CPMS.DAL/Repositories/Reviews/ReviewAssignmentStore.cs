@@ -65,7 +65,7 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
                         dbContext.Students.Any(student => student.GroupId == x.Id) &&
                         !scheduledGroupIds.Contains(x.Id))
             .OrderBy(x => x.Code)
-            .Select(x => new AssignmentGroup(x.Id, x.Code, x.LecturerId))
+            .Select(x => new AssignmentGroup(x.Id, x.Code, x.LecturerId ?? 0))
             .ToListAsync(cancellationToken);
         var groupIds = groups.Select(x => x.Id).ToArray();
         var previousReviewers = groupIds.ToDictionary<int, int, IReadOnlySet<int>>(

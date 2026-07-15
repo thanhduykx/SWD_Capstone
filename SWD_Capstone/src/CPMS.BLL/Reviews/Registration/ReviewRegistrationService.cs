@@ -189,7 +189,8 @@ public sealed class ReviewRegistrationService(
 
     private static void EnsureOpen(ReviewRoundData round, string message)
     {
-        if (round.Status != ReviewRoundStatus.Open) throw new BusinessRuleException(message);
+        if (round.Status != ReviewRoundStatus.Open && round.Status != ReviewRoundStatus.Draft)
+            throw new BusinessRuleException(message);
     }
 
     private static ReviewAvailabilityWeekResult MapLecturerAvailability(

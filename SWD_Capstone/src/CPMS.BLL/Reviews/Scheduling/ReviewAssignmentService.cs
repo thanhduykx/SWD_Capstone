@@ -68,13 +68,9 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
 
         foreach (var group in Shuffle(snapshot.Groups, random))
         {
-            if (!snapshot.StudentAvailabilityByGroup.TryGetValue(group.Id, out var groupAvailability) ||
-                groupAvailability.Count != AssignmentRules.RequiredStudentAvailabilityCount)
-            {
-                unassignedGroups.Add(new UnassignedReviewGroup(
-                    group.Id, group.Code, "The group leader did not submit exactly five available slots."));
-                continue;
-            }
+            var groupAvailability = snapshot.StudentAvailabilityByGroup.TryGetValue(group.Id, out var ga)
+                ? ga
+                : new HashSet<string>();
 
             var previousReviewerIds = snapshot.PreviousReviewerIdsByGroup.TryGetValue(group.Id, out var previous)
                 ? previous
@@ -82,7 +78,7 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
             var selectedPanel = panels
                 .Where(panel => panel.GroupCount < 3 &&
                                 panel.ReviewerIds.Count == reviewersPerSession &&
-                                groupAvailability.Contains(SlotKey(panel.DayOfWeek, panel.Slot)) &&
+                                (groupAvailability.Count == 0 || groupAvailability.Contains(SlotKey(panel.DayOfWeek, panel.Slot))) &&
                                 !panel.ReviewerIds.Contains(group.SupervisorId) &&
                                 !panel.ReviewerIds.Any(previousReviewerIds.Contains))
                 .OrderByDescending(panel => panel.GroupCount)
@@ -92,7 +88,7 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
             {
                 var eligibleSlots = snapshot.SubmittedAvailability
                     .Where(slot => slot.LecturerId != group.SupervisorId &&
-                                   groupAvailability.Contains(SlotKey(slot.DayOfWeek, slot.Slot)) &&
+                                   (groupAvailability.Count == 0 || groupAvailability.Contains(SlotKey(slot.DayOfWeek, slot.Slot))) &&
                                    !previousReviewerIds.Contains(slot.LecturerId) &&
                                    !occupiedSlots.Contains(OccupiedKey(
                                        slot.LecturerId,
@@ -101,10 +97,27 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
                     .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
                     .Where(slotGroup => slotGroup.Select(slot => slot.LecturerId).Distinct().Count() >= reviewersPerSession)
                     .ToArray();
+
+                if (eligibleSlots.Length == 0 && groupAvailability.Count > 0)
+                {
+                    // Fallback: try any slot where enough reviewers are available, ignoring student preference if needed
+                    eligibleSlots = snapshot.SubmittedAvailability
+                        .Where(slot => slot.LecturerId != group.SupervisorId &&
+                                       !previousReviewerIds.Contains(slot.LecturerId) &&
+                                       !occupiedSlots.Contains(OccupiedKey(
+                                           slot.LecturerId,
+                                           SessionDate(scope.WeekStart, slot.DayOfWeek),
+                                           slot.Slot)))
+                        .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
+                        .Where(slotGroup => slotGroup.Select(slot => slot.LecturerId).Distinct().Count() >= reviewersPerSession)
+                        .ToArray();
+                }
+
                 if (eligibleSlots.Length == 0)
                 {
+                    var availableLecturersCount = snapshot.SubmittedAvailability.Select(s => s.LecturerId).Distinct().Count();
                     unassignedGroups.Add(new UnassignedReviewGroup(
-                        group.Id, group.Code, "No shared student/lecturer slot satisfies reviewer conflict rules."));
+                        group.Id, group.Code, $"Chưa đủ giảng viên rảnh trong cùng 1 slot (cần tối thiểu {reviewersPerSession} giảng viên rảnh khác GVHD để lập hội đồng, hiện mới có {availableLecturersCount} giảng viên khai báo rảnh)."));
                     continue;
                 }
 

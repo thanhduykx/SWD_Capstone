@@ -255,7 +255,7 @@ namespace CPMS.DAL.Data.Migrations
                     code = table.Column<string>(type: "text", nullable: false),
                     topic_id = table.Column<int>(type: "integer", nullable: false),
                     semester_id = table.Column<int>(type: "integer", nullable: false),
-                    lecturer_id = table.Column<int>(type: "integer", nullable: false),
+                    lecturer_id = table.Column<int>(type: "integer", nullable: true),
                     status = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>

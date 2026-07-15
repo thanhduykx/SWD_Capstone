@@ -99,10 +99,14 @@ public sealed class AssignmentRules
 
     public void EnsureReviewRoundTransition(ReviewRoundStatus current, ReviewRoundStatus next)
     {
+        if (current == next) return;
         var valid = (current, next) switch
         {
             (ReviewRoundStatus.Draft, ReviewRoundStatus.Open) => true,
+            (ReviewRoundStatus.Draft, ReviewRoundStatus.Closed) => true,
             (ReviewRoundStatus.Open, ReviewRoundStatus.Closed) => true,
+            (ReviewRoundStatus.Closed, ReviewRoundStatus.Open) => true,
+            (ReviewRoundStatus.Open, ReviewRoundStatus.Draft) => true,
             _ => false
         };
         if (!valid)
