@@ -79,6 +79,17 @@ Configure the Google OAuth Client ID in `Authentication:Google:ClientId`.
 
 Configure SMTP and Google OAuth in `src/CPMS.API/appsettings.json`.
 
+## Gemini Project Suggestions
+
+Lecturers can call `POST /api/project-suggestions/summary` to generate Vietnamese
+reference text containing a project-content summary, strengths, and areas for
+improvement. Configure `Gemini:ApiKey`, `Gemini:Model`, and
+`Gemini:TimeoutSeconds` directly in `src/CPMS.API/appsettings.json`.
+
+The API key must be an empty string in every commit and before every push. A
+developer may temporarily fill it in only in the tracked working copy for local
+execution, then clear it before staging the file.
+
 ## Deploy to Render
 
 Render automatically detects the repository-root `Dockerfile`. Add the GitHub
