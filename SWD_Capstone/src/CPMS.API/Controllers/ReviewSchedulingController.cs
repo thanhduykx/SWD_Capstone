@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using CPMS.API.Contracts.Reviews;
+using CPMS.BLL.Abstractions.Persistence;
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Scheduling;
 using CPMS.BLL.Enums;
@@ -16,8 +17,31 @@ namespace CPMS.API.Controllers;
 public sealed class ReviewSchedulingController(
     IReviewRoundService roundService,
     IReviewSchedulingBoardService boardService,
-    IReviewAssignmentService assignmentService) : ControllerBase
+    IReviewAssignmentService assignmentService,
+    IDatabaseLifecycleService databaseLifecycle) : ControllerBase
 {
+    /// <summary>
+    /// Idempotent upsert of shared lecturer review/defense sample rows on the active semester.
+    /// Training Department only — does not require ExposeTestSupport and does not truncate site data.
+    /// </summary>
+    [HttpPost("ensure-lecturer-dataset")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<IActionResult> EnsureLecturerDataset(CancellationToken cancellationToken)
+    {
+        await databaseLifecycle.EnsureMobileLecturerDatasetAsync(cancellationToken);
+        return Ok(new
+        {
+            message = "Lecturer dataset ensured on the active semester (web + mobile share the same rows).",
+            loginEmail = "minhnd.gv24001@fpt.edu.vn",
+            password = "Test@123456",
+            check = new[]
+            {
+                "GET /api/review-sessions/my",
+                "GET /api/defense-management/my-board-sessions"
+            }
+        });
+    }
+
     [HttpGet("board")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult<ReviewSchedulingBoardResponse>> GetBoard(
