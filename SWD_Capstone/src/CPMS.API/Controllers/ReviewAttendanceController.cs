@@ -101,7 +101,7 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
 
     private static ReviewAttendanceListResponse Map(ReviewAttendanceResult result) =>
         new(result.SessionId, result.SessionCode, result.GroupId, result.GroupCode,
-            result.SessionDate, result.Slot, result.Room,
+            result.GroupStatus.ToString(), result.SessionDate, result.Slot, result.Room,
             result.Students.Select(x => new AttendanceStudentResponse(
                 x.StudentId, x.StudentCode, x.FullName, x.IsPresent, x.Note)).ToArray());
     private static ReviewCommentResponse MapComment(ReviewCommentResult result) =>

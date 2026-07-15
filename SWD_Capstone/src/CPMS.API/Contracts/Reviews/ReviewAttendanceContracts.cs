@@ -5,6 +5,7 @@ public sealed record ReviewAttendanceListResponse(
     string SessionCode,
     int GroupId,
     string GroupCode,
+    string GroupStatus,
     DateTime SessionDate,
     int Slot,
     string Room,
