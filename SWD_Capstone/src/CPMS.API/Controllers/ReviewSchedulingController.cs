@@ -78,8 +78,12 @@ public sealed class ReviewSchedulingController(
         }
     }
 
+    /// <summary>
+    /// Lecturers need round list to register availability (keyed by roundId).
+    /// Write endpoints remain TrainingDepartment/Admin only.
+    /// </summary>
     [HttpGet("rounds")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Lecturer")]
     public async Task<IReadOnlyList<ReviewRoundManagementResponse>> GetRounds(
         int semesterId,
         CancellationToken cancellationToken)
