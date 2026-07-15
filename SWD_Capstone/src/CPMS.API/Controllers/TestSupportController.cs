@@ -75,6 +75,37 @@ public sealed class TestSupportController(
         return Ok(new { message = "All database tables truncated successfully and default seed data restored." });
     }
 
+    /// <summary>
+    /// Opt-in upsert of shared lecturer sample data on the active semester (same domain as website workflows).
+    /// Additive only — does not truncate and does not change review/defense business rules.
+    /// </summary>
+    [HttpPost("ensure-dataset")]
+    public async Task<IActionResult> EnsureDataset(
+        [FromServices] CPMS.BLL.Abstractions.Persistence.IDatabaseLifecycleService lifecycle,
+        CancellationToken cancellationToken)
+    {
+        if (!IsEnabled())
+        {
+            return NotFound();
+        }
+
+        await lifecycle.EnsureMobileLecturerDatasetAsync(cancellationToken);
+        return Ok(new
+        {
+            message = "Shared lecturer dataset ensured on the active semester (same data space as website).",
+            loginEmail = "minhnd.gv24001@fpt.edu.vn",
+            password = "Test@123456",
+            note = "Groups SE2601–SE2606, published review/defense rows are visible to both web and mobile APIs.",
+            check = new[]
+            {
+                "GET /api/review-sessions/my",
+                "GET /api/review-submissions/my",
+                "GET /api/defense-management/my-board-sessions",
+                "GET /api/review-scheduling/rounds?semesterId={activeSemesterId}"
+            }
+        });
+    }
+
     private bool IsEnabled() =>
         environment.IsDevelopment() || configuration.GetValue<bool>("Swagger:ExposeTestSupport");
 

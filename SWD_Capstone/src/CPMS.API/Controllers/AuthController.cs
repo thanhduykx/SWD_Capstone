@@ -24,9 +24,7 @@ public sealed class AuthController(
         {
             var result = await authenticationService.LoginAsync(
                 request.Username, request.Password, Request.Headers.UserAgent, cancellationToken);
-            return result is null
-                ? Unauthorized(new { error = "Invalid username or password." })
-                : Ok(Map(result));
+            return result is null ? Unauthorized() : Ok(Map(result));
         }
         catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
@@ -41,9 +39,7 @@ public sealed class AuthController(
         {
             var result = await authenticationService.GoogleLoginAsync(
                 request.IdToken, Request.Headers.UserAgent, cancellationToken);
-            return result is null
-                ? Unauthorized(new { error = "Google sign-in failed or account not found." })
-                : Ok(Map(result));
+            return result is null ? Unauthorized() : Ok(Map(result));
         }
         catch (InvalidOperationException exception)
         {
@@ -59,9 +55,7 @@ public sealed class AuthController(
         ArgumentNullException.ThrowIfNull(request);
         var result = await authenticationService.RefreshAsync(
             request.RefreshToken, Request.Headers.UserAgent, cancellationToken);
-        return result is null
-            ? Unauthorized(new { error = "Refresh token is invalid or expired." })
-            : Ok(Map(result));
+        return result is null ? Unauthorized() : Ok(Map(result));
     }
 
     [AllowAnonymous]

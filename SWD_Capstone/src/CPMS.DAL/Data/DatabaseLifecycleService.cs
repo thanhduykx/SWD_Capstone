@@ -27,18 +27,17 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     public async Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
+        // Only seed in Dev / explicit test-support. Never mutate shared website data on normal Production starts.
         if (seedDevelopmentData)
-        {
-            await SeedDevelopmentDataAsync(cancellationToken);
-            return;
-        }
-
-        // Keep seeded persona emails/usernames current even when the rich dataset already exists.
-        await SeedModeratorAsync(cancellationToken);
-        await SeedTestAccountsAsync(cancellationToken);
-        if (!await dbContext.ReviewSessions.AnyAsync(x => x.Code == "SU26_R3_S02", cancellationToken))
             await SeedDevelopmentDataAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Opt-in upsert of shared lecturer personas/dataset on the active semester (web + mobile).
+    /// Must not be called from normal Production startup; use Dev / ExposeTestSupport only.
+    /// </summary>
+    public Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken) =>
+        SeedDevelopmentDataAsync(cancellationToken);
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken) =>
         dbContext.Database.CanConnectAsync(cancellationToken);
@@ -80,14 +79,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         }
         else
         {
-            user.Username = username;
-            user.Email = email;
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345", workFactor: 12);
-            user.Role = UserRole.TrainingDepartment;
-            user.IsActive = true;
-            user.LockedUntil = null;
-            user.FailedLoginAttempts = 0;
-            user.UpdatedAt = DateTime.UtcNow;
+            // Existing shared-site moderator: never reset password/role here.
         }
         if (!await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == user.Id, cancellationToken))
             dbContext.TrainingDepartments.Add(new TrainingDepartment
@@ -160,14 +152,21 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             }
             else
             {
-                user.Username = account.Username;
-                user.Email = account.Email;
-                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12);
-                user.Role = account.Role;
-                user.IsActive = true;
-                user.LockedUntil = null;
-                user.FailedLoginAttempts = 0;
-                user.UpdatedAt = DateTime.UtcNow;
+                // Migrate legacy logins only; do not overwrite passwords of existing shared-site accounts.
+                var isLegacy = account.LegacyLogins.Contains(user.Username)
+                    || account.LegacyLogins.Contains(user.Email);
+                if (isLegacy
+                    || string.Equals(user.Username, account.Username, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(user.Email, account.Email, StringComparison.OrdinalIgnoreCase))
+                {
+                    user.Username = account.Username;
+                    user.Email = account.Email;
+                    user.Role = account.Role;
+                    user.IsActive = true;
+                    user.LockedUntil = null;
+                    user.FailedLoginAttempts = 0;
+                    user.UpdatedAt = DateTime.UtcNow;
+                }
             }
 
             if (account.Role == UserRole.TrainingDepartment)
@@ -242,6 +241,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         var lecturer2 = await dbContext.Lecturers.SingleAsync(x => x.Code == "GV24002", cancellationToken);
         var lecturer3 = await dbContext.Lecturers.SingleAsync(x => x.Code == "GV24003", cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        // Shared semester with website workflows (prefer current active term).
         var semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
             ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026", cancellationToken);
         if (semester is null)
@@ -256,28 +257,6 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
                 IsActive = true
             };
             dbContext.Semesters.Add(semester);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        else
-        {
-            semester.IsActive = true;
-            semester.Name = "Học kỳ Summer 2026";
-            semester.AcademicYear = "2025-2026";
-        }
-
-        // Also keep previous semester for list density on mobile semester picker.
-        var spring = await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SP2026", cancellationToken);
-        if (spring is null)
-        {
-            dbContext.Semesters.Add(new Semester
-            {
-                Code = "SP2026",
-                Name = "Học kỳ Spring 2026",
-                AcademicYear = "2025-2026",
-                StartDate = new DateOnly(2026, 1, 5),
-                EndDate = new DateOnly(2026, 4, 30),
-                IsActive = false
-            });
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -416,15 +395,6 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
                 {
                     throw new InvalidOperationException($"Student {seed.Code} conflicts with a non-student account.");
                 }
-                else
-                {
-                    user.Username = username;
-                    user.Email = seed.Email;
-                    user.PasswordHash = passwordHash;
-                    user.IsActive = true;
-                    user.LockedUntil = null;
-                    user.FailedLoginAttempts = 0;
-                }
 
                 if (student is null)
                 {
@@ -488,15 +458,17 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             .Where(x => lecturers.Select(l => l.UserId).Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         var training = await dbContext.TrainingDepartments.OrderBy(x => x.Id).FirstAsync(cancellationToken);
-        var semester = await dbContext.Semesters.SingleAsync(x => x.Code == "SU2026", cancellationToken);
-        semester.IsActive = true;
+        var semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
+            ?? await dbContext.Semesters.SingleAsync(x => x.Code == "SU2026", cancellationToken);
 
         var groups = await dbContext.CapstoneGroups
             .Where(x => x.SemesterId == semester.Id && x.Code.StartsWith("SE26"))
             .OrderBy(x => x.Code)
             .ToListAsync(cancellationToken);
-        if (groups.Count < 6)
-            throw new InvalidOperationException("Expected at least 6 SE26xx capstone groups before workflow seed.");
+        if (groups.Count == 0)
+            throw new InvalidOperationException("No shared SE26xx capstone groups available for lecturer workflow seed.");
+        if (groups.Count < 2)
+            throw new InvalidOperationException("Need at least 2 shared groups for lecturer workflow seed.");
 
         var studentsByGroup = new Dictionary<int, List<Student>>();
         foreach (var group in groups)
@@ -574,13 +546,16 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
         foreach (var plan in sessionPlans)
         {
+            var groupIndexes = plan.GroupIndexes.Where(i => i >= 0 && i < groups.Count).Distinct().ToArray();
+            if (groupIndexes.Length == 0) continue;
+
             var session = await EnsurePublishedReviewSessionAsync(
                 plan.Code, semester.Id, plan.Type, plan.Day, plan.Slot, plan.Room, plan.Date,
                 plan.R1, plan.R2, training.Id, now.AddDays(-7), cancellationToken);
 
-            for (var pos = 0; pos < plan.GroupIndexes.Length; pos++)
+            for (var pos = 0; pos < groupIndexes.Length; pos++)
             {
-                var group = groups[plan.GroupIndexes[pos]];
+                var group = groups[groupIndexes[pos]];
                 await EnsureGroupReviewSlotAsync(session.Id, group.Id, pos + 1, cancellationToken);
 
                 var product = $"{group.Code} — {plan.Type} deliverable";
@@ -595,7 +570,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
                 await EnsureReviewCommentAsync(
                     session.Id, group.Id, lecturerUsers[lecturer1.UserId].Id,
-                    comments[(plan.GroupIndexes[pos] + plan.Day) % comments.Length],
+                    comments[(groupIndexes[pos] + plan.Day) % comments.Length],
                     now.AddDays(-3 - pos), cancellationToken);
 
                 await EnsureReviewAttendancesAsync(
@@ -622,7 +597,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         await EnsureCouncilMemberAsync(council1.Id, lecturer1.Id, CouncilMemberRole.Chairman, cancellationToken);
         await EnsureCouncilMemberAsync(council1.Id, lecturer2.Id, CouncilMemberRole.Secretary, cancellationToken);
         await EnsureCouncilMemberAsync(council1.Id, lecturer3.Id, CouncilMemberRole.Member, cancellationToken);
-        for (var i = 0; i < 3; i++)
+        var council1GroupCount = Math.Min(3, groups.Count);
+        for (var i = 0; i < council1GroupCount; i++)
             await EnsureCouncilGroupAsync(council1.Id, groups[i].Id, i + 1, cancellationToken);
 
         var council2 = await EnsureCouncilAsync(
@@ -631,8 +607,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         await EnsureCouncilMemberAsync(council2.Id, lecturer2.Id, CouncilMemberRole.Chairman, cancellationToken);
         await EnsureCouncilMemberAsync(council2.Id, lecturer3.Id, CouncilMemberRole.Secretary, cancellationToken);
         await EnsureCouncilMemberAsync(council2.Id, lecturer1.Id, CouncilMemberRole.Member, cancellationToken);
-        for (var i = 3; i < 6; i++)
-            await EnsureCouncilGroupAsync(council2.Id, groups[i].Id, i - 2, cancellationToken);
+        for (var i = council1GroupCount; i < groups.Count; i++)
+            await EnsureCouncilGroupAsync(council2.Id, groups[i].Id, i - council1GroupCount + 1, cancellationToken);
 
         var defenseRound = await EnsureDefenseRoundAsync(
             "SU26_BV_DOT1", "Đợt bảo vệ lần 1 — Summer 2026", semester.Id, training.Id,
@@ -650,11 +626,12 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             ("SU26_BV1_S05", defenseRound.Id, council2.Id, 4, new DateTime(2026, 8, 12, 8, 0, 0, DateTimeKind.Utc), 1, "Phòng hội thảo C", false),
             ("SU26_BV1_S06", defenseRound.Id, council2.Id, 5, new DateTime(2026, 8, 12, 13, 30, 0, DateTimeKind.Utc), 2, "Phòng hội thảo C", false),
             ("SU26_BV2_S01", defenseRound2.Id, council1.Id, 0, new DateTime(2026, 8, 17, 9, 0, 0, DateTimeKind.Utc), 1, "Hội trường A", false),
-            ("SU26_BV2_S02", defenseRound2.Id, council2.Id, 3, new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc), 1, "Hội trường B", false)
+            ("SU26_BV2_S02", defenseRound2.Id, council2.Id, Math.Min(3, groups.Count - 1), new DateTime(2026, 8, 18, 9, 0, 0, DateTimeKind.Utc), 1, "Hội trường B", false)
         };
 
         foreach (var plan in defensePlans)
         {
+            if (plan.GroupIndex < 0 || plan.GroupIndex >= groups.Count) continue;
             await EnsureDefenseSessionAsync(
                 plan.Code, plan.RoundId, plan.CouncilId, groups[plan.GroupIndex].Id,
                 plan.Date, plan.Slot, plan.Room, training.Id, plan.Locked, cancellationToken);
