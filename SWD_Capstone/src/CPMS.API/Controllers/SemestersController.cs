@@ -26,7 +26,7 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
     [AllowAnonymous]
     public async Task<ActionResult<SemesterResponse>> Resolve(
         DateOnly date, CancellationToken cancellationToken) =>
-        Ok(Map(await semesterService.ResolveAsync(date, cancellationToken)));
+        Ok(Map(await semesterService.ResolveAsync(date == default ? DateOnly.FromDateTime(DateTime.Today) : date, cancellationToken)));
 
     [HttpPost]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]

@@ -122,7 +122,9 @@ builder.Services.AddRateLimiter(options =>
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
     .SetIsOriginAllowed(origin => origins.Length == 0 || origins.Contains(origin) ||
-        origin.StartsWith("http://localhost:") || origin.StartsWith("http://127.0.0.1:"))
+        origin.StartsWith("http://localhost:") || origin.StartsWith("http://127.0.0.1:") ||
+        origin.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
+        origin.StartsWith("https://swd-capstone", StringComparison.OrdinalIgnoreCase))
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -172,8 +174,8 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 await InitializeDatabaseAsync(app);
 
-app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseSerilogRequestLogging();
+app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment() || swaggerEnabled)
 {
     app.UseSwagger();

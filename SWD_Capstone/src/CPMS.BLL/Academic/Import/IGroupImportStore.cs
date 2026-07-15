@@ -10,10 +10,11 @@ public interface IGroupImportStore
     Task<TResult> ExecuteInTransactionAsync<TResult>(
         Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken);
     Task<bool> LecturerExistsAsync(int lecturerId, CancellationToken cancellationToken);
+    Task<int> FindDefaultLecturerIdAsync(CancellationToken cancellationToken);
     Task<(int Id, bool Created)> UpsertTopicAsync(
         int semesterId, string code, string projectTitle, CancellationToken cancellationToken);
     Task<(int Id, bool Created)> UpsertGroupAsync(
-        int semesterId, string code, int topicId, int lecturerId, CancellationToken cancellationToken);
+        int semesterId, string code, int topicId, int? lecturerId, CancellationToken cancellationToken);
     Task<ImportUserState?> FindUserAsync(
         string username, string email, CancellationToken cancellationToken);
     Task<ImportUserState> CreateStudentUserAsync(

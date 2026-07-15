@@ -18,6 +18,8 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
     }
     public Task<bool> LecturerExistsAsync(int lecturerId, CancellationToken cancellationToken) =>
         dbContext.Lecturers.AnyAsync(x => x.Id == lecturerId, cancellationToken);
+    public Task<int> FindDefaultLecturerIdAsync(CancellationToken cancellationToken) =>
+        dbContext.Lecturers.OrderBy(x => x.Id).Select(x => x.Id).FirstOrDefaultAsync(cancellationToken);
     public async Task<(int Id, bool Created)> UpsertTopicAsync(
         int semesterId, string code, string title, CancellationToken cancellationToken)
     {
@@ -35,7 +37,7 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
         return (topic.Id, created);
     }
     public async Task<(int Id, bool Created)> UpsertGroupAsync(
-        int semesterId, string code, int topicId, int lecturerId, CancellationToken cancellationToken)
+        int semesterId, string code, int topicId, int? lecturerId, CancellationToken cancellationToken)
     {
         var group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
             x.SemesterId == semesterId && x.Code == code, cancellationToken);

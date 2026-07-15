@@ -15,7 +15,7 @@ namespace CPMS.API.Controllers;
 public sealed class ReviewSessionsController(IReviewSessionService sessionService) : ControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<ReviewSessionResponse>> Create(
         CreateReviewSessionRequest request,
         CancellationToken cancellationToken)
@@ -37,7 +37,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
     }
 
     [HttpPost("bulk-assign")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<BulkAssignReviewSessionsResponse>> BulkAssign(
         BulkAssignReviewSessionsRequest request,
         CancellationToken cancellationToken)
@@ -55,7 +55,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
     }
 
     [HttpPatch("{sessionId:int}")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<ReviewSessionResponse>> Update(
         int sessionId,
         UpdateReviewSessionRequest request,

@@ -19,7 +19,7 @@ public sealed class ReviewSchedulingController(
     IReviewAssignmentService assignmentService) : ControllerBase
 {
     [HttpGet("board")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator,Lecturer")]
     public async Task<ActionResult<ReviewSchedulingBoardResponse>> GetBoard(
         int semesterId,
         ReviewType reviewType,
@@ -42,7 +42,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPost("random-assign")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<RandomAssignReviewSessionsResponse>> RandomAssign(
         RandomAssignReviewSessionsRequest request,
         CancellationToken cancellationToken)
@@ -79,7 +79,6 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpGet("rounds")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<IReadOnlyList<ReviewRoundManagementResponse>> GetRounds(
         int semesterId,
         CancellationToken cancellationToken)
@@ -89,7 +88,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPost("rounds")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<ReviewRoundManagementResponse>> CreateRound(
         CreateReviewRoundRequest request,
         CancellationToken cancellationToken)
@@ -106,7 +105,7 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpPatch("rounds/{roundId:int}/status")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
     public async Task<ActionResult<ReviewRoundManagementResponse>> UpdateRoundStatus(
         int roundId,
         UpdateRoundStatusRequest request,
@@ -133,7 +132,6 @@ public sealed class ReviewSchedulingController(
     }
 
     [HttpGet("student-registrations")]
-    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<IReadOnlyList<StudentSlotRegistrationResponse>> GetStudentRegistrations(
         int roundId,
         CancellationToken cancellationToken)

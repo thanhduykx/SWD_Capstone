@@ -59,15 +59,6 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
         }
         if (nextStatus == ReviewRoundStatus.Closed && closedAt is null)
         {
-            var completion = await store.GetRegistrationCompletionAsync(
-                round.Id, round.SemesterId, AssignmentRules.RequiredStudentAvailabilityCount, cancellationToken);
-            if (completion.ActiveGroups == 0 || completion.CompletedRegistrations != completion.ActiveGroups)
-            {
-                throw new ReviewRoundClosureException(
-                    "Every active capstone group must submit exactly five slots before registration closes.",
-                    completion.ActiveGroups,
-                    completion.CompletedRegistrations);
-            }
             closedAt = DateTime.UtcNow;
         }
 

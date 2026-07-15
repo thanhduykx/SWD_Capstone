@@ -27,7 +27,9 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     public async Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
-        if (seedDevelopmentData) await SeedDevelopmentDataAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE capstone_groups ALTER COLUMN lecturer_id DROP NOT NULL;", cancellationToken);
+        await SeedDevelopmentDataAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE username IN ('Admin@gmail.com', 'test.training', 'test.lecturer', 'test.student');", cancellationToken);
     }
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken) =>
@@ -136,25 +138,27 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
                 user.FailedLoginAttempts = 0;
                 user.UpdatedAt = DateTime.UtcNow;
             }
-            if (account.Item3 == UserRole.TrainingDepartment &&
-                !await dbContext.TrainingDepartments.AnyAsync(x => x.UserId == user.Id, cancellationToken))
-                dbContext.TrainingDepartments.Add(new TrainingDepartment
-                {
-                    UserId = user.Id, DepartmentName = "Training Dept", StaffCode = "TD_TEST", Position = "Officer"
-                });
-            else if (account.Item3 == UserRole.Lecturer &&
-                     !await dbContext.Lecturers.AnyAsync(x => x.UserId == user.Id, cancellationToken))
-                dbContext.Lecturers.Add(new Lecturer
-                {
-                    UserId = user.Id, Code = "LEC_TEST", FullName = "Dr. Test Lecturer", Department = "SWD"
-                });
-            else if (account.Item3 == UserRole.Student &&
-                     !await dbContext.Students.AnyAsync(x => x.UserId == user.Id, cancellationToken))
-                dbContext.Students.Add(new Student
-                {
-                    UserId = user.Id, Code = "SE190000", FullName = "Test Student",
-                    ClassCode = "SE1901", Major = "SWD", IsLeader = false
-                });
+            if (account.Item3 == UserRole.TrainingDepartment)
+            {
+                var td = await dbContext.TrainingDepartments.FirstOrDefaultAsync(x => x.UserId == user.Id || x.StaffCode == "TD_TEST", cancellationToken);
+                if (td is null)
+                    dbContext.TrainingDepartments.Add(new TrainingDepartment { UserId = user.Id, DepartmentName = "Training Dept", StaffCode = "TD_TEST", Position = "Officer" });
+                else td.UserId = user.Id;
+            }
+            else if (account.Item3 == UserRole.Lecturer)
+            {
+                var lec = await dbContext.Lecturers.FirstOrDefaultAsync(x => x.UserId == user.Id || x.Code == "LEC_TEST", cancellationToken);
+                if (lec is null)
+                    dbContext.Lecturers.Add(new Lecturer { UserId = user.Id, Code = "LEC_TEST", FullName = "Dr. Test Lecturer", Department = "SWD" });
+                else lec.UserId = user.Id;
+            }
+            else if (account.Item3 == UserRole.Student)
+            {
+                var stu = await dbContext.Students.FirstOrDefaultAsync(x => x.UserId == user.Id || x.Code == "SE190000", cancellationToken);
+                if (stu is null)
+                    dbContext.Students.Add(new Student { UserId = user.Id, Code = "SE190000", FullName = "Test Student", ClassCode = "SE1901", Major = "SWD", IsLeader = false });
+                else stu.UserId = user.Id;
+            }
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }

@@ -12,7 +12,7 @@ namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/review-schedules")]
-[Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+[Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
 public sealed class ReviewSchedulesController(IReviewPublicationService publicationService) : ControllerBase
 {
     [HttpPost("publish")]

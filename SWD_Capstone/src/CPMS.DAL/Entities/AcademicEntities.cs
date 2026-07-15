@@ -29,7 +29,7 @@ public sealed class CapstoneGroup
     public required string Code { get; set; }
     public int TopicId { get; set; }
     public int SemesterId { get; set; }
-    public int LecturerId { get; set; }
+    public int? LecturerId { get; set; }
     public GroupStatus Status { get; set; } = GroupStatus.Active;
 }
 
