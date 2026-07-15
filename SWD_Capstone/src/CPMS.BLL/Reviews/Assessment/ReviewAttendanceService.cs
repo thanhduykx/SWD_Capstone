@@ -105,11 +105,23 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
                 sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
         var counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
-        if (counts.StudentCount == 0 || counts.AttendanceCount != counts.StudentCount ||
-            counts.SubmittedCount != context.ReviewerIds.Count)
+        var reviewerCount = context.ReviewerIds.Count;
+        if (counts.StudentCount == 0)
+        {
+            throw new ConflictException("Nhóm chưa có sinh viên để điểm danh.");
+        }
+        if (counts.AttendanceCount != counts.StudentCount)
         {
             throw new ConflictException(
-                "Cần điểm danh đủ sinh viên và đủ bài chấm của các reviewer trước khi hoàn tất.");
+                $"Chưa điểm danh đủ sinh viên ({counts.AttendanceCount}/{counts.StudentCount}). " +
+                "Hãy bấm Lưu điểm danh trước khi kết thúc.");
+        }
+        if (counts.SubmittedCount != reviewerCount)
+        {
+            throw new ConflictException(
+                $"Chưa đủ bài chấm checklist từ các giảng viên được phân công " +
+                $"({counts.SubmittedCount}/{reviewerCount}). " +
+                "Mỗi giảng viên cần gửi bài chấm ở tab Dự án review trước khi kết thúc buổi.");
         }
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
@@ -121,7 +133,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         var lookup = await store.LoadContextAsync(sessionId, groupId, userId, cancellationToken);
         if (!lookup.SessionExists) throw new KeyNotFoundException("Không tìm thấy phiên review.");
         return lookup.Context ?? throw new KeyNotFoundException(
-            "Phiên này có nhiều nhóm — cần truyền groupId để xem điểm danh.");
+            "Buổi review này có nhiều nhóm. Vui lòng mở lại đúng nhóm từ lịch chấm.");
     }
 
     private static void EnsureCanViewAttendance(ReviewAttendanceContext context, ReviewActor actor)
@@ -151,6 +163,6 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     private async Task<ReviewAttendanceResult> BuildAttendanceAsync(
         ReviewAttendanceContext context, CancellationToken cancellationToken) =>
         new(context.SessionId, context.SessionCode, context.GroupId, context.GroupCode,
-            context.SessionDate, context.Slot, context.Room,
+            context.GroupStatus, context.SessionDate, context.Slot, context.Room,
             await store.GetStudentsAsync(context.SessionId, context.GroupId, cancellationToken));
 }

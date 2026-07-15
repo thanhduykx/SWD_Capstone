@@ -89,7 +89,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         var results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new MyReviewSessionResponse(
             x.SessionId, x.SubmissionId, x.Code, x.Type, x.SessionStatus, x.GroupId, x.GroupCode,
-            x.SessionDate, x.Slot, x.Room, x.SubmissionStatus, x.LastSavedAt)).ToArray();
+            x.TopicName, x.SessionDate, x.Slot, x.Room, x.SubmissionStatus, x.LastSavedAt)).ToArray();
     }
 
     private int CurrentUserId() =>

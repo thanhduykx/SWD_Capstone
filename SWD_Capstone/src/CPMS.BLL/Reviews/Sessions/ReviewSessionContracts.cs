@@ -42,6 +42,7 @@ public sealed record MyReviewSessionResult(
     ReviewSessionStatus SessionStatus,
     int GroupId,
     string GroupCode,
+    string? TopicName,
     DateTime SessionDate,
     int Slot,
     string Room,
