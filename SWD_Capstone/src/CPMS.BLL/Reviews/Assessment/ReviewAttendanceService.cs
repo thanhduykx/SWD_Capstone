@@ -27,24 +27,24 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             context.SessionStatus != ReviewSessionStatus.Published ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
         {
-            throw new UnauthorizedAccessException("Only an assigned reviewer can submit attendance.");
+            throw new UnauthorizedAccessException("Chỉ giảng viên được phân công mới được lưu điểm danh.");
         }
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
-            throw new ConflictException("Attendance is locked after the group's review is completed.");
+            throw new ConflictException("Điểm danh đã khóa sau khi nhóm hoàn tất review.");
         }
         if (entries.Count == 0 || entries.Select(x => x.StudentId).Distinct().Count() != entries.Count)
         {
-            throw new BusinessRuleException("Attendance entries must contain distinct students.");
+            throw new BusinessRuleException("Danh sách điểm danh phải gồm các sinh viên khác nhau.");
         }
         if (entries.Any(x => x.Note?.Length > 1000))
         {
-            throw new BusinessRuleException("Attendance notes cannot exceed 1000 characters.");
+            throw new BusinessRuleException("Ghi chú điểm danh không được vượt quá 1000 ký tự.");
         }
         var validStudentIds = await store.GetStudentIdsAsync(context.GroupId, cancellationToken);
         if (entries.Any(x => !validStudentIds.Contains(x.StudentId)))
         {
-            throw new BusinessRuleException("Every attendance entry must belong to the selected group.");
+            throw new BusinessRuleException("Mỗi dòng điểm danh phải thuộc đúng nhóm đã chọn.");
         }
         await store.SaveAttendanceAsync(
             sessionId, context.LecturerId.Value, entries, DateTime.UtcNow, cancellationToken);
@@ -71,16 +71,16 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             context.SessionStatus != ReviewSessionStatus.Published ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
         {
-            throw new UnauthorizedAccessException("Only an assigned reviewer can add comments.");
+            throw new UnauthorizedAccessException("Chỉ giảng viên được phân công mới được thêm nhận xét.");
         }
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
-            throw new ConflictException("Comments are locked after the group's review is completed.");
+            throw new ConflictException("Nhận xét đã khóa sau khi nhóm hoàn tất review.");
         }
         var normalizedContent = content?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedContent) || normalizedContent.Length > 2000)
         {
-            throw new BusinessRuleException("Comment content is required and cannot exceed 2000 characters.");
+            throw new BusinessRuleException("Nội dung nhận xét bắt buộc và không được vượt quá 2000 ký tự.");
         }
         return await store.AddCommentAsync(
             sessionId, context.GroupId, actor.UserId, normalizedContent, cancellationToken);
@@ -93,11 +93,11 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         if (actor.Role != UserRole.Lecturer || context.LecturerId is null ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
         {
-            throw new UnauthorizedAccessException("Only an assigned reviewer can complete the review.");
+            throw new UnauthorizedAccessException("Chỉ giảng viên được phân công mới được hoàn tất review.");
         }
         if (context.SessionStatus != ReviewSessionStatus.Published)
         {
-            throw new ConflictException("Only a published review session can be completed.");
+            throw new ConflictException("Chỉ phiên review đã công bố mới có thể hoàn tất.");
         }
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
@@ -109,7 +109,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             counts.SubmittedCount != context.ReviewerIds.Count)
         {
             throw new ConflictException(
-                "Attendance for every student and all reviewer submissions are required before completion.");
+                "Cần điểm danh đủ sinh viên và đủ bài chấm của các reviewer trước khi hoàn tất.");
         }
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
@@ -119,21 +119,22 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         int sessionId, int? groupId, int userId, CancellationToken cancellationToken)
     {
         var lookup = await store.LoadContextAsync(sessionId, groupId, userId, cancellationToken);
-        if (!lookup.SessionExists) throw new KeyNotFoundException("Review session not found.");
-        return lookup.Context ?? throw new KeyNotFoundException("No group assigned to this session.");
+        if (!lookup.SessionExists) throw new KeyNotFoundException("Không tìm thấy phiên review.");
+        return lookup.Context ?? throw new KeyNotFoundException(
+            "Phiên này có nhiều nhóm — cần truyền groupId để xem điểm danh.");
     }
 
     private static void EnsureCanViewAttendance(ReviewAttendanceContext context, ReviewActor actor)
     {
         if (context.SessionStatus != ReviewSessionStatus.Published)
-            throw new UnauthorizedAccessException("The review session is not published.");
+            throw new UnauthorizedAccessException("Phiên review chưa được công bố.");
         var allowed = actor.Role switch
         {
             UserRole.Lecturer => context.LecturerId.HasValue && context.ReviewerIds.Contains(context.LecturerId.Value),
             UserRole.Student => context.StudentGroupId == context.GroupId && context.GroupStatus == ReviewGroupStatus.Completed,
             _ => false
         };
-        if (!allowed) throw new UnauthorizedAccessException("You cannot view this attendance.");
+        if (!allowed) throw new UnauthorizedAccessException("Bạn không có quyền xem điểm danh này.");
     }
 
     private static void EnsureCanViewComments(ReviewAttendanceContext context, ReviewActor actor)
@@ -144,7 +145,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
               context.ReviewerIds.Contains(context.LecturerId.Value)) ||
              (actor.Role == UserRole.Student && context.StudentGroupId == context.GroupId &&
               context.GroupStatus == ReviewGroupStatus.Completed))) return;
-        throw new UnauthorizedAccessException("You cannot view these comments.");
+        throw new UnauthorizedAccessException("Bạn không có quyền xem các nhận xét này.");
     }
 
     private async Task<ReviewAttendanceResult> BuildAttendanceAsync(

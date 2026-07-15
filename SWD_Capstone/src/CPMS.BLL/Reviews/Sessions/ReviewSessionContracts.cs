@@ -40,6 +40,7 @@ public sealed record MyReviewSessionResult(
     string Code,
     ReviewType Type,
     ReviewSessionStatus SessionStatus,
+    int GroupId,
     string GroupCode,
     DateTime SessionDate,
     int Slot,

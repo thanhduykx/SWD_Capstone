@@ -196,6 +196,7 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
                 submission.Type,
                 dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId)
                     .Select(session => session.Status).Single(),
+                submission.GroupId,
                 dbContext.CapstoneGroups.Where(group => group.Id == submission.GroupId)
                     .Select(group => group.Code).Single(),
                 dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId)
