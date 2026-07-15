@@ -139,7 +139,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     private static readonly Dictionary<string, IOpenApiAny> RequestExamples = new(StringComparer.OrdinalIgnoreCase)
     {
         ["POST /api/auth/login"] = Obj(
-            ("username", Str("test.lecturer")),
+            ("username", Str("minhnd.gv24001@fpt.edu.vn")),
             ("password", Str("Test@123456"))),
         ["POST /api/auth/refresh"] = Obj(
             ("refreshToken", Str("paste-refresh-token-from-login"))),

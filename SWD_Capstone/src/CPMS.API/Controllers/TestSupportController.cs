@@ -75,15 +75,47 @@ public sealed class TestSupportController(
         return Ok(new { message = "All database tables truncated successfully and default seed data restored." });
     }
 
+    /// <summary>
+    /// Opt-in upsert of shared lecturer sample data on the active semester (same domain as website workflows).
+    /// Additive only — does not truncate and does not change review/defense business rules.
+    /// </summary>
+    [HttpPost("ensure-dataset")]
+    public async Task<IActionResult> EnsureDataset(
+        [FromServices] CPMS.BLL.Abstractions.Persistence.IDatabaseLifecycleService lifecycle,
+        CancellationToken cancellationToken)
+    {
+        if (!IsEnabled())
+        {
+            return NotFound();
+        }
+
+        await lifecycle.EnsureMobileLecturerDatasetAsync(cancellationToken);
+        return Ok(new
+        {
+            message = "Shared lecturer dataset ensured on the active semester (same data space as website).",
+            loginEmail = "minhnd.gv24001@fpt.edu.vn",
+            password = "Test@123456",
+            note = "Groups SE2601–SE2606, published review/defense rows are visible to both web and mobile APIs.",
+            check = new[]
+            {
+                "GET /api/review-sessions/my",
+                "GET /api/review-submissions/my",
+                "GET /api/defense-management/my-board-sessions",
+                "GET /api/review-scheduling/rounds?semesterId={activeSemesterId}"
+            }
+        });
+    }
+
     private bool IsEnabled() =>
         environment.IsDevelopment() || configuration.GetValue<bool>("Swagger:ExposeTestSupport");
 
     private static IReadOnlyCollection<TestAccountResponse> TestAccounts() =>
     [
-        new("TrainingDepartment", "test.training", "Test@123456", "Use for moderator/training workflows."),
-        new("Lecturer", "test.lecturer", "Test@123456", "Use for lecturer review/defense workflows."),
-        new("Lecturer", "test.lecturer.nodept", "Test@123456", "Lecturer account created without department."),
-        new("Student", "test.student", "Test@123456", "Use for student visibility checks.")
+        new("TrainingDepartment", "pdt.dieuphoi@fpt.edu.vn", "Test@123456", "Phòng Đào tạo — điều phối đồ án."),
+        new("Lecturer", "minhnd.gv24001@fpt.edu.vn", "Test@123456", "GV24001 Nguyễn Đức Minh — review + hội đồng (chairman)."),
+        new("Lecturer", "hapt.gv24002@fpt.edu.vn", "Test@123456", "GV24002 Phạm Thu Hà — reviewer / thư ký hội đồng."),
+        new("Lecturer", "namlh.gv24003@fpt.edu.vn", "Test@123456", "GV24003 Lê Hoàng Nam — reviewer / thành viên hội đồng."),
+        new("Student", "maunv.se199999@fpt.edu.vn", "Test@123456", "Use for student visibility checks.")
     ];
 
     private static IReadOnlyCollection<RoleEndpointGroupResponse> RoleGroups() =>

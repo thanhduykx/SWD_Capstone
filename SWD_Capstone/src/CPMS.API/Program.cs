@@ -222,19 +222,23 @@ app.Run();
 
 static async Task InitializeDatabaseAsync(WebApplication app)
 {
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
     try
     {
         using var scope = app.Services.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseLifecycleService>();
-        var seedDevelopmentData = app.Environment.IsDevelopment() ||
-                                  app.Configuration.GetValue<bool>("Swagger:ExposeTestSupport");
-        await database.InitializeAsync(seedDevelopmentData, CancellationToken.None);
+        // Idempotent upsert on every deploy/restart (no truncate, no password reset for existing accounts).
+        await database.InitializeAsync(seedBaselineDataset: true, CancellationToken.None);
     }
     catch (NpgsqlException exception)
     {
-        var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
         logger.LogWarning(exception,
             "PostgreSQL is not reachable. DB-backed APIs will fail until PostgreSQL is reachable.");
+    }
+    catch (Exception exception)
+    {
+        // Never block API boot if baseline seed fails (e.g. partial conflict with live website data).
+        logger.LogError(exception, "Baseline dataset seed failed during startup.");
     }
 }
 

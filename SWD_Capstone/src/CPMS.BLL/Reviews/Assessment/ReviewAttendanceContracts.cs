@@ -10,6 +10,7 @@ public sealed record ReviewAttendanceResult(
     string SessionCode,
     int GroupId,
     string GroupCode,
+    ReviewGroupStatus GroupStatus,
     DateTime SessionDate,
     int Slot,
     string Room,
