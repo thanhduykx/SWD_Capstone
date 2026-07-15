@@ -80,10 +80,11 @@ public sealed class TestSupportController(
 
     private static IReadOnlyCollection<TestAccountResponse> TestAccounts() =>
     [
-        new("TrainingDepartment", "test.training", "Test@123456", "Use for moderator/training workflows."),
-        new("Lecturer", "test.lecturer", "Test@123456", "Use for lecturer review/defense workflows."),
-        new("Lecturer", "test.lecturer.nodept", "Test@123456", "Lecturer account created without department."),
-        new("Student", "test.student", "Test@123456", "Use for student visibility checks.")
+        new("TrainingDepartment", "pdt.dieuphoi@fpt.edu.vn", "Test@123456", "Phòng Đào tạo — điều phối đồ án."),
+        new("Lecturer", "minhnd.gv24001@fpt.edu.vn", "Test@123456", "GV24001 Nguyễn Đức Minh — review + hội đồng (chairman)."),
+        new("Lecturer", "hapt.gv24002@fpt.edu.vn", "Test@123456", "GV24002 Phạm Thu Hà — reviewer / thư ký hội đồng."),
+        new("Lecturer", "namlh.gv24003@fpt.edu.vn", "Test@123456", "GV24003 Lê Hoàng Nam — reviewer / thành viên hội đồng."),
+        new("Student", "maunv.se199999@fpt.edu.vn", "Test@123456", "Use for student visibility checks.")
     ];
 
     private static IReadOnlyCollection<RoleEndpointGroupResponse> RoleGroups() =>

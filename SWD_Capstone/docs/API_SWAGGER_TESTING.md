@@ -19,12 +19,27 @@ The `api/test-support/*` endpoints are intended for local testing. They run in `
 
 These accounts are for local development only.
 
-| Role | Username | Password |
+| Role | Email (login) | Password |
 | --- | --- | --- |
-| TrainingDepartment | `test.training` | `Test@123456` |
-| Lecturer | `test.lecturer` | `Test@123456` |
-| Lecturer | `test.lecturer.nodept` | `Test@123456` |
-| Student | `test.student` | `Test@123456` |
+| TrainingDepartment | `pdt.dieuphoi@fpt.edu.vn` | `Test@123456` |
+| Lecturer | `minhnd.gv24001@fpt.edu.vn` | `Test@123456` |
+| Lecturer | `hapt.gv24002@fpt.edu.vn` | `Test@123456` |
+| Lecturer | `namlh.gv24003@fpt.edu.vn` | `Test@123456` |
+| Student | `maunv.se199999@fpt.edu.vn` | `Test@123456` |
+
+After startup seed (Dev, or Production until `SU26_R3_S02` exists), the three lecturer accounts share a dense Summer 2026 dataset:
+
+- **6 groups** `SE2601`…`SE2606` (~30 students)
+- **11 review sessions** across Review 1/2/3 (`SU26_R1_S01`…`SU26_R3_S02`)
+- **2 councils** `SU26_HD01` / `SU26_HD02`
+- **8 defense sessions** across 2 rounds (`SU26_BV_DOT1`, `SU26_BV_DOT2`)
+- Checklist drafts/submissions, attendance, comments, sample scores
+
+| Email login | Hồ sơ |
+| --- | --- |
+| `minhnd.gv24001@fpt.edu.vn` | GV24001 — Nguyễn Đức Minh |
+| `hapt.gv24002@fpt.edu.vn` | GV24002 — Phạm Thu Hà |
+| `namlh.gv24003@fpt.edu.vn` | GV24003 — Lê Hoàng Nam |
 
 Moderator is the main operator for account management. `SystemAdministrator` is kept only for compatibility with old local data and is not part of the normal FE test flow.
 
@@ -48,7 +63,7 @@ If one account is missing in a fresh database, login as moderator and create it 
 
 ### Account Flow
 
-1. Login as `test.training`.
+1. Login as `pdt.dieuphoi@fpt.edu.vn`.
 2. Authorize Swagger.
 3. Call `GET /api/accounts`.
 4. Call `POST /api/accounts`.
@@ -57,7 +72,7 @@ If one account is missing in a fresh database, login as moderator and create it 
 ### Lecturer Availability Flow
 
 1. Login as moderator and create/open the review round.
-2. Login as `test.lecturer` and authorize Swagger.
+2. Login as `minhnd.gv24001@fpt.edu.vn` and authorize Swagger.
 3. Obtain the open `roundId` from the moderator's review-round response.
 4. Call `PUT /api/review-availability/week?roundId={roundId}` to save a draft.
 5. Call `POST /api/review-availability/week/submit?roundId={roundId}`.
@@ -82,7 +97,7 @@ Only these Excel columns are imported: `Tên dự án (có thể trùng tên nh�
 
 ### Review Scheduling Flow
 
-1. Login as `test.training`.
+1. Login as `pdt.dieuphoi@fpt.edu.vn`.
 2. Authorize Swagger.
 3. Close the round with `PATCH /api/review-scheduling/rounds/{roundId}/status`; all active groups must already have five slots.
 4. Call `GET /api/review-scheduling/board`.
@@ -105,7 +120,7 @@ Only these Excel columns are imported: `Tên dự án (có thể trùng tên nh�
 
 ### Defense Flow
 
-1. Login as `test.training`.
+1. Login as `pdt.dieuphoi@fpt.edu.vn`.
 2. Create defense round.
 3. Create defense board.
 4. Assign project to board.

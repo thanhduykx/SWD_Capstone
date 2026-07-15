@@ -115,11 +115,11 @@ static async Task SeedAsync(CpmsDbContext db)
     db.InlineComments.Add(new InlineComment { DocumentId = document.Id, AuthorId = studentUsers[0].Id, ParagraphIndex = 3, Content = marker + ": architecture diagram updated.", ParentCommentId = comment.Id, Status = CommentStatus.Resolved, CreatedById = studentUsers[0].Id });
 
     var week = new DateOnly(2026, 7, 6);
-    db.ReviewAvailabilities.AddRange(lecturers.Select((x, i) => new ReviewAvailability { SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, DayOfWeek = i + 2, Slot = 2, CreatedAt = now.AddDays(-30) }));
-    db.ReviewAvailabilitySubmissions.AddRange(lecturers.Select(x => new ReviewAvailabilitySubmission { SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, UpdatedAt = now.AddDays(-30), SubmittedAt = now.AddDays(-29) }));
     var reviewRound = new ReviewRound { SemesterId = semester.Id, Type = ReviewType.Review1, WeekStartDate = week, WeekEndDate = week.AddDays(5), Status = ReviewRoundStatus.Published, CreatedByModeratorId = training.Id, CreatedAt = now.AddDays(-35), OpenedAt = now.AddDays(-34), ClosedAt = now.AddDays(-28) };
     db.ReviewRounds.Add(reviewRound);
     await db.SaveChangesAsync();
+    db.ReviewAvailabilities.AddRange(lecturers.Select((x, i) => new ReviewAvailability { ReviewRoundId = reviewRound.Id, SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, DayOfWeek = i + 2, Slot = 2, CreatedAt = now.AddDays(-30) }));
+    db.ReviewAvailabilitySubmissions.AddRange(lecturers.Select(x => new ReviewAvailabilitySubmission { ReviewRoundId = reviewRound.Id, SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, UpdatedAt = now.AddDays(-30), SubmittedAt = now.AddDays(-29) }));
     db.StudentSlotRegistrations.AddRange(groups.Select((x, i) => new StudentSlotRegistration { ReviewRoundId = reviewRound.Id, GroupId = x.Id, RegisteredByStudentId = students[i * 3].Id, DayOfWeek = i + 2, Slot = 2, CreatedAt = now.AddDays(-33) }));
     var reviewSession = new ReviewSession { Code = marker + "_REV01", SemesterId = semester.Id, DayOfWeek = 2, Slot = 2, Room = "DEMO-R101", Type = ReviewType.Review1, Reviewer1Id = lecturers[0].Id, Reviewer2Id = lecturers[1].Id, SessionDate = new DateTime(2026, 7, 7, 9, 0, 0, DateTimeKind.Utc), Status = ReviewSessionStatus.Published, PublishedAt = now.AddDays(-27), PublishedByTrainingDepartmentId = training.Id };
     db.ReviewSessions.Add(reviewSession);
