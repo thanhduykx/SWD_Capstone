@@ -22,6 +22,7 @@ using CPMS.BLL.Defense.Management;
 using CPMS.DAL.Repositories.Defense;
 using CPMS.BLL.Defense.Sessions;
 using CPMS.BLL.Academic.Import;
+using CPMS.BLL.AI.ProjectSuggestions;
 using CPMS.DAL.UnitOfWork;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddDALServices(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IConfigurationSection? geminiConfiguration = null)
     {
         services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
         services.AddScoped<IAccountRepository, AccountRepository>();
@@ -61,6 +63,25 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped(typeof(IRepository<,>), typeof(GenericRepository<,>));
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+
+        var geminiOptions = (geminiConfiguration ?? configuration.GetSection(GeminiOptions.SectionName))
+            .Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        if (string.IsNullOrWhiteSpace(geminiOptions.Model))
+            geminiOptions = new GeminiOptions
+            {
+                ApiKey = geminiOptions.ApiKey,
+                TimeoutSeconds = geminiOptions.TimeoutSeconds
+            };
+        if (geminiOptions.TimeoutSeconds is < 5 or > 120)
+            throw new InvalidOperationException("Gemini:TimeoutSeconds must be between 5 and 120.");
+
+        services.AddSingleton(geminiOptions);
+        services.AddHttpClient<IProjectSuggestionGenerator, GeminiProjectSuggestionGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+            client.Timeout = TimeSpan.FromSeconds(geminiOptions.TimeoutSeconds);
+        });
 
         var redisConnection = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redisConnection))

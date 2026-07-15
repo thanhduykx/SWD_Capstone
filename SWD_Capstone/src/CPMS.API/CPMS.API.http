@@ -113,3 +113,14 @@ Accept: application/json
   "roomPrefix": "AUTO",
   "seed": null
 }
+
+### Generate Gemini project review suggestions (lecturer token required)
+POST {{CPMS_API_HostAddress}}/api/project-suggestions/summary
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "projectName": "Checkpoint Management System",
+  "projectContent": "A web application for managing capstone review schedules, lecturer availability, attendance, comments, and review results."
+}

@@ -15,6 +15,7 @@ using CPMS.BLL.Reviews.Assessment;
 using CPMS.BLL.Services;
 using CPMS.DAL;
 using CPMS.DAL.Data;
+using CPMS.DAL.ExternalServices;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -27,8 +28,12 @@ using Npgsql;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+var appSettingsConfiguration = new ConfigurationBuilder()
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .Build();
 builder.Configuration.Sources.Clear();
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+builder.Configuration.AddConfiguration(appSettingsConfiguration);
 ApplicationConfiguration.AddDeploymentOverrides(builder.Configuration);
 
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
@@ -45,7 +50,9 @@ builder.Services.AddDbContext<CpmsDbContext>(options =>
     options.UseNpgsql(cpmsConnectionString).UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<CpmsDbContext>());
 builder.Services.AddBLLServices();
-builder.Services.AddDALServices(builder.Configuration);
+builder.Services.AddDALServices(
+    builder.Configuration,
+    appSettingsConfiguration.GetSection(GeminiOptions.SectionName));
 builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddSingleton<ReviewChecklistTemplateService>();
 builder.Services.AddSingleton<IReviewChecklistTemplateProvider>(provider =>
@@ -117,6 +124,16 @@ builder.Services.AddRateLimiter(options =>
         limiter.QueueLimit = 0;
         limiter.AutoReplenishment = true;
     });
+    options.AddPolicy("ai-suggestions", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 });
 
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];

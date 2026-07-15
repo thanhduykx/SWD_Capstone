@@ -91,6 +91,9 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
         ["POST /api/review-submissions/{submissionId}/submit"] = new(
             "Submit review checklist",
             "Reviewer-only. Marks the checklist submitted."),
+        ["POST /api/project-suggestions/summary"] = new(
+            "Generate AI project review suggestions",
+            "Lecturer-only. Uses Gemini to return Vietnamese reference text for the project content summary, strengths, and areas for improvement. The lecturer remains responsible for the final review."),
         ["GET /api/review-submissions/{submissionId}/export.xlsx"] = new(
             "Export one checklist workbook",
             "Returns an .xlsx file for a single review submission."),
@@ -236,6 +239,9 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
                 ("itemKey", Str("sample-item-key-from-get-response")),
                 ("answer", Str("Yes")),
                 ("comment", Str("Meets the expected evidence.")))))),
+        ["POST /api/project-suggestions/summary"] = Obj(
+            ("projectName", Str("Checkpoint Management System")),
+            ("projectContent", Str("A web application for managing capstone review schedules, lecturer availability, attendance, comments, and review results."))),
 
         ["POST /api/defense-management/rounds"] = Obj(
             ("code", Str("DEF1-SU26")),
