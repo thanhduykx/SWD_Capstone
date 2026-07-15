@@ -54,6 +54,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         await SeedTestAccountsAsync(cancellationToken);
         await SeedAcademicDataAsync(cancellationToken);
         await SeedLecturerWorkflowDataAsync(cancellationToken);
+        await EnsureOpenAvailabilityRoundAsync(cancellationToken);
     }
 
     private async Task SeedModeratorAsync(CancellationToken cancellationToken)
@@ -447,7 +448,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     /// </summary>
     private async Task SeedLecturerWorkflowDataAsync(CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        // No ambient transaction: commit each Ensure* so a late defense/council conflict
+        // cannot roll back already-created published review sessions.
         var now = DateTime.UtcNow;
         var lecturer1 = await dbContext.Lecturers.SingleAsync(x => x.Code == "GV24001", cancellationToken);
         var lecturer2 = await dbContext.Lecturers.SingleAsync(x => x.Code == "GV24002", cancellationToken);
@@ -589,9 +591,50 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             "Lịch Review 3 (dự kiến) — Học kỳ Summer 2026",
             "Review 3 đang mở đăng ký lịch; vui lòng cập nhật availability trước hạn.",
             now.AddDays(-2), cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var defenseSessionCount = 0;
+        try
+        {
+            defenseSessionCount = await SeedDefenseWorkflowAsync(
+                semester, training.Id, lecturers, groups, studentsByGroup, now, cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Keep published review sessions even if defense/council seed conflicts with live data.
+            dbContext.ChangeTracker.Clear();
+        }
+
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            UserId = lecturer1.UserId,
+            Action = "SEED_LECTURER_WORKFLOW_DATA",
+            EntityType = "LecturerWorkflow",
+            EntityId = semester.Id,
+            NewValue =
+                $"groups={groups.Count}; reviewSessions={sessionPlans.Length}; defenseSessions={defenseSessionCount}",
+            UserAgent = "ApplicationStartup",
+            CreatedAt = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<int> SeedDefenseWorkflowAsync(
+        Semester semester,
+        int trainingId,
+        Lecturer[] lecturers,
+        List<CapstoneGroup> groups,
+        Dictionary<int, List<Student>> studentsByGroup,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var lecturer1 = lecturers[0];
+        var lecturer2 = lecturers[1];
+        var lecturer3 = lecturers[2];
 
         var council1 = await EnsureCouncilAsync(
-            "SU26_HD01", semester.Id, training.Id, lecturer1.Id, lecturer2.Id,
+            "SU26_HD01", semester.Id, trainingId, lecturer1.Id, lecturer2.Id,
             CouncilType.Defense1, CouncilStatus.Active, cancellationToken);
         await EnsureCouncilMemberAsync(council1.Id, lecturer1.Id, CouncilMemberRole.Chairman, cancellationToken);
         await EnsureCouncilMemberAsync(council1.Id, lecturer2.Id, CouncilMemberRole.Secretary, cancellationToken);
@@ -601,7 +644,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             await EnsureCouncilGroupAsync(council1.Id, groups[i].Id, i + 1, cancellationToken);
 
         var council2 = await EnsureCouncilAsync(
-            "SU26_HD02", semester.Id, training.Id, lecturer2.Id, lecturer3.Id,
+            "SU26_HD02", semester.Id, trainingId, lecturer2.Id, lecturer3.Id,
             CouncilType.Defense1, CouncilStatus.Active, cancellationToken);
         await EnsureCouncilMemberAsync(council2.Id, lecturer2.Id, CouncilMemberRole.Chairman, cancellationToken);
         await EnsureCouncilMemberAsync(council2.Id, lecturer3.Id, CouncilMemberRole.Secretary, cancellationToken);
@@ -610,10 +653,10 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             await EnsureCouncilGroupAsync(council2.Id, groups[i].Id, i - council1GroupCount + 1, cancellationToken);
 
         var defenseRound = await EnsureDefenseRoundAsync(
-            "SU26_BV_DOT1", "Đợt bảo vệ lần 1 — Summer 2026", semester.Id, training.Id,
+            "SU26_BV_DOT1", "Đợt bảo vệ lần 1 — Summer 2026", semester.Id, trainingId,
             new DateOnly(2026, 8, 10), new DateOnly(2026, 8, 14), DefenseRoundStatus.InProgress, cancellationToken);
         var defenseRound2 = await EnsureDefenseRoundAsync(
-            "SU26_BV_DOT2", "Đợt bảo vệ lần 2 — Summer 2026", semester.Id, training.Id,
+            "SU26_BV_DOT2", "Đợt bảo vệ lần 2 — Summer 2026", semester.Id, trainingId,
             new DateOnly(2026, 8, 17), new DateOnly(2026, 8, 21), DefenseRoundStatus.Published, cancellationToken);
 
         var defensePlans = new (string Code, int RoundId, int CouncilId, int GroupIndex, DateTime Date, int Slot, string Room, bool Locked)[]
@@ -633,34 +676,66 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             if (plan.GroupIndex < 0 || plan.GroupIndex >= groups.Count) continue;
             await EnsureDefenseSessionAsync(
                 plan.Code, plan.RoundId, plan.CouncilId, groups[plan.GroupIndex].Id,
-                plan.Date, plan.Slot, plan.Room, training.Id, plan.Locked, cancellationToken);
+                plan.Date, plan.Slot, plan.Room, trainingId, plan.Locked, cancellationToken);
             await EnsureGroupResultAsync(groups[plan.GroupIndex].Id, semester.Id, cancellationToken);
         }
 
-        // Sample scores on first defense session for realism.
-        var firstDefense = await dbContext.DefenseSessions.SingleAsync(x => x.Code == "SU26_BV1_S01", cancellationToken);
-        var firstGroupStudents = studentsByGroup[groups[0].Id].Take(4).ToList();
-        foreach (var lecturer in lecturers)
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var firstDefense = await dbContext.DefenseSessions.FirstOrDefaultAsync(
+            x => x.Code == "SU26_BV1_S01", cancellationToken);
+        if (firstDefense is not null && groups.Count > 0)
         {
-            foreach (var student in firstGroupStudents)
+            var firstGroupStudents = studentsByGroup[groups[0].Id].Take(4).ToList();
+            foreach (var lecturer in lecturers)
             {
-                await EnsureScoreAsync(firstDefense.Id, lecturer.Id, student.Id, 7.5m + (student.Id % 20) / 10m, now, cancellationToken);
+                foreach (var student in firstGroupStudents)
+                {
+                    await EnsureScoreAsync(
+                        firstDefense.Id, lecturer.Id, student.Id,
+                        7.5m + (student.Id % 20) / 10m, now, cancellationToken);
+                }
             }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        dbContext.AuditLogs.Add(new AuditLog
-        {
-            UserId = lecturer1.UserId,
-            Action = "SEED_LECTURER_WORKFLOW_DATA",
-            EntityType = "LecturerWorkflow",
-            EntityId = semester.Id,
-            NewValue = $"groups={groups.Count}; reviewSessions={sessionPlans.Length}; defenseSessions={defensePlans.Length}",
-            UserAgent = "ApplicationStartup",
-            CreatedAt = now
-        });
+        return defensePlans.Length;
+    }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+    /// <summary>
+    /// Guarantees lecturers can register availability: at least one Open round on the active semester.
+    /// Prefers promoting an existing Draft round; otherwise creates Review3 Open.
+    /// </summary>
+    private async Task EnsureOpenAvailabilityRoundAsync(CancellationToken cancellationToken)
+    {
+        var semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
+            ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026", cancellationToken);
+        if (semester is null) return;
+
+        if (await dbContext.ReviewRounds.AnyAsync(
+                x => x.SemesterId == semester.Id && x.Status == ReviewRoundStatus.Open, cancellationToken))
+            return;
+
+        var training = await dbContext.TrainingDepartments.OrderBy(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+        if (training is null) return;
+
+        var draft = await dbContext.ReviewRounds
+            .Where(x => x.SemesterId == semester.Id && x.Status == ReviewRoundStatus.Draft)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (draft is not null)
+        {
+            draft.Status = ReviewRoundStatus.Open;
+            draft.OpenedAt ??= DateTime.UtcNow;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var weekStart = new DateOnly(2026, 8, 3);
+        await EnsureReviewRoundAsync(
+            semester.Id, ReviewType.Review3, weekStart, ReviewRoundStatus.Open,
+            training.Id, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow, null, cancellationToken);
     }
 
     private async Task EnsurePublicationAsync(
@@ -996,9 +1071,11 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             return round;
         }
 
-        round.Status = status;
+        // Never downgrade a live Open registration window during idempotent seed.
+        if (!(round.Status == ReviewRoundStatus.Open && status == ReviewRoundStatus.Published))
+            round.Status = status;
         round.OpenedAt ??= openedAt;
-        if (status is ReviewRoundStatus.Closed or ReviewRoundStatus.Published)
+        if (round.Status is ReviewRoundStatus.Closed or ReviewRoundStatus.Published)
             round.ClosedAt ??= closedAt;
         await dbContext.SaveChangesAsync(cancellationToken);
         return round;
