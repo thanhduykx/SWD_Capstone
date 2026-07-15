@@ -31,6 +31,16 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
         {
             await WriteErrorAsync(context, StatusCodes.Status409Conflict, exception.Message, "conflict");
         }
+        catch (ExternalServiceUnavailableException exception)
+        {
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable,
+                exception.Message, "external_service_unavailable");
+        }
+        catch (ExternalServiceException exception)
+        {
+            await WriteErrorAsync(context, StatusCodes.Status502BadGateway,
+                exception.Message, "external_service_error");
+        }
         catch (UnauthorizedAccessException exception)
         {
             await WriteErrorAsync(context, StatusCodes.Status403Forbidden, exception.Message, "forbidden");
