@@ -4,6 +4,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Reviews;
 
@@ -14,12 +15,14 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
         Func<CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(operation);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
         var lockKey = $"review-round:{scope.SemesterId}:{scope.ReviewType}:{scope.WeekStart:yyyy-MM-dd}";
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
-        var result = await operation(cancellationToken);
+        TResult? result = await operation(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
@@ -27,6 +30,7 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
     public async Task<ReviewAssignmentSnapshot> LoadSnapshotAsync(
         ReviewAssignmentScope scope, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(scope);
         var semesterCode = await dbContext.Semesters.Where(x => x.Id == scope.SemesterId)
             .Select(x => x.Code).SingleOrDefaultAsync(cancellationToken);
         if (semesterCode is null)
@@ -46,21 +50,21 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
 
         var weekStartDate = DateTime.SpecifyKind(
             scope.WeekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var weekEndDate = weekStartDate.AddDays(7);
-        var availability = await dbContext.ReviewAvailabilities
+        DateTime weekEndDate = weekStartDate.AddDays(7);
+        List<LecturerSlot> availability = await dbContext.ReviewAvailabilities
             .Where(x => x.ReviewRoundId == round.Id &&
                         dbContext.ReviewAvailabilitySubmissions.Any(submission =>
                             submission.ReviewRoundId == x.ReviewRoundId &&
                             submission.LecturerId == x.LecturerId && submission.SubmittedAt != null))
             .Select(x => new LecturerSlot(x.LecturerId, x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
-        var scheduledGroupIds = await dbContext.GroupReviewSlots
+        List<int> scheduledGroupIds = await dbContext.GroupReviewSlots
             .Where(slot => dbContext.ReviewSessions.Any(session =>
                 session.Id == slot.SessionId && session.SemesterId == scope.SemesterId &&
                 session.Type == scope.ReviewType && session.SessionDate >= weekStartDate &&
                 session.SessionDate < weekEndDate && session.Status != ReviewSessionStatus.Cancelled))
             .Select(slot => slot.GroupId).ToListAsync(cancellationToken);
-        var groups = await dbContext.CapstoneGroups
+        List<AssignmentGroup> groups = await dbContext.CapstoneGroups
             .Where(x => x.SemesterId == scope.SemesterId && x.Status == GroupStatus.Active &&
                         dbContext.Students.Any(student => student.GroupId == x.Id) &&
                         !scheduledGroupIds.Contains(x.Id))
@@ -68,26 +72,8 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
             .Select(x => new AssignmentGroup(x.Id, x.Code, x.LecturerId ?? 0))
             .ToListAsync(cancellationToken);
         var groupIds = groups.Select(x => x.Id).ToArray();
-        var previousReviewers = groupIds.ToDictionary<int, int, IReadOnlySet<int>>(
-            groupId => groupId, _ => new HashSet<int>());
-        if (scope.ReviewType == ReviewType.Review2 && groupIds.Length > 0)
-        {
-            var previousRows = await dbContext.GroupReviewSlots.Where(slot => groupIds.Contains(slot.GroupId))
-                .Join(
-                    dbContext.ReviewSessions.Where(session =>
-                        session.SemesterId == scope.SemesterId && session.Type == ReviewType.Review1),
-                    slot => slot.SessionId,
-                    session => session.Id,
-                    (slot, session) => new { slot.GroupId, session.Reviewer1Id, session.Reviewer2Id })
-                .ToListAsync(cancellationToken);
-            var mutable = groupIds.ToDictionary(groupId => groupId, _ => new HashSet<int>());
-            foreach (var row in previousRows)
-            {
-                if (row.Reviewer1Id.HasValue) mutable[row.GroupId].Add(row.Reviewer1Id.Value);
-                if (row.Reviewer2Id.HasValue) mutable[row.GroupId].Add(row.Reviewer2Id.Value);
-            }
-            previousReviewers = mutable.ToDictionary(x => x.Key, x => (IReadOnlySet<int>)x.Value);
-        }
+        Dictionary<int, IReadOnlySet<int>> previousReviewers = await LoadPreviousReviewersAsync(
+            scope, groupIds, cancellationToken);
 
         var occupiedRows = await dbContext.ReviewSessions
             .Where(session => session.SemesterId == scope.SemesterId &&
@@ -95,7 +81,7 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
                               session.Status != ReviewSessionStatus.Cancelled)
             .Select(session => new { session.SessionDate, session.Slot, session.Reviewer1Id, session.Reviewer2Id })
             .ToListAsync(cancellationToken);
-        var occupied = occupiedRows.SelectMany(row => new[] { row.Reviewer1Id, row.Reviewer2Id }
+        OccupiedReviewerSlot[] occupied = occupiedRows.SelectMany(row => new[] { row.Reviewer1Id, row.Reviewer2Id }
                 .Where(id => id.HasValue)
                 .Select(id => new OccupiedReviewerSlot(id!.Value, row.SessionDate, row.Slot)))
             .ToArray();
@@ -128,7 +114,7 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
                 GroupCount = dbContext.GroupReviewSlots.Count(slot => slot.SessionId == x.Id)
             })
             .ToListAsync(cancellationToken);
-        var panels = panelRows.Where(x => x.GroupCount < 3)
+        AssignmentPanel[] panels = panelRows.Where(x => x.GroupCount < 3)
             .Select(x => new AssignmentPanel(
                 x.Id, x.Code, x.Type, x.Status,
                 new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
@@ -140,9 +126,36 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
             occupied, usedCodes, studentAvailability, panels);
     }
 
+    private async Task<Dictionary<int, IReadOnlySet<int>>> LoadPreviousReviewersAsync(
+        ReviewAssignmentScope scope,
+        int[] groupIds,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<int, IReadOnlySet<int>> empty = groupIds.ToDictionary<int, int, IReadOnlySet<int>>(
+            groupId => groupId, _ => new HashSet<int>());
+        if (scope.ReviewType != ReviewType.Review2 || groupIds.Length == 0) return empty;
+
+        var previousRows = await dbContext.GroupReviewSlots.Where(slot => groupIds.Contains(slot.GroupId))
+            .Join(
+                dbContext.ReviewSessions.Where(session =>
+                    session.SemesterId == scope.SemesterId && session.Type == ReviewType.Review1),
+                slot => slot.SessionId,
+                session => session.Id,
+                (slot, session) => new { slot.GroupId, session.Reviewer1Id, session.Reviewer2Id })
+            .ToListAsync(cancellationToken);
+        Dictionary<int, HashSet<int>> mutable = groupIds.ToDictionary(groupId => groupId, _ => new HashSet<int>());
+        foreach (var row in previousRows)
+        {
+            if (row.Reviewer1Id.HasValue) mutable[row.GroupId].Add(row.Reviewer1Id.Value);
+            if (row.Reviewer2Id.HasValue) mutable[row.GroupId].Add(row.Reviewer2Id.Value);
+        }
+        return mutable.ToDictionary(x => x.Key, x => (IReadOnlySet<int>)x.Value);
+    }
+
     public async Task<AssignmentPanel> CreatePanelAsync(
         CreateAssignmentPanel panel, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(panel);
         var session = new ReviewSession
         {
             Code = panel.Code,
@@ -172,6 +185,7 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
         DateTime changedAt,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(reviewerIds);
         dbContext.GroupReviewSlots.Add(new GroupReviewSlot
         {
             SessionId = sessionId,

@@ -11,12 +11,12 @@ public sealed class AuthenticationServiceTests
     {
         var store = new AuthenticationStoreFake
         {
-            User = User(lockedUntil: DateTime.UtcNow.AddMinutes(1))
+            CurrentUser = User(lockedUntil: DateTime.UtcNow.AddMinutes(1))
         };
         var hasher = new PasswordHasherFake { Matches = true };
-        var service = CreateService(store, hasher);
+        AuthenticationService service = CreateService(store, hasher);
 
-        var result = await service.LoginAsync("lecturer", "secret", null, CancellationToken.None);
+        AuthenticationResult? result = await service.LoginAsync("lecturer", "secret", null, CancellationToken.None);
 
         Assert.Null(result);
         Assert.False(hasher.VerifyCalled);
@@ -26,10 +26,10 @@ public sealed class AuthenticationServiceTests
     [Fact]
     public async Task Login_TenthFailedAttemptTemporarilyLocksAccount()
     {
-        var store = new AuthenticationStoreFake { User = User(failedAttempts: 9) };
-        var service = CreateService(store, new PasswordHasherFake { Matches = false });
+        var store = new AuthenticationStoreFake { CurrentUser = User(failedAttempts: 9) };
+        AuthenticationService service = CreateService(store, new PasswordHasherFake { Matches = false });
 
-        var result = await service.LoginAsync("lecturer", "wrong", null, CancellationToken.None);
+        AuthenticationResult? result = await service.LoginAsync("lecturer", "wrong", null, CancellationToken.None);
 
         Assert.Null(result);
         Assert.Equal(10, store.RecordedFailedAttempts);
@@ -39,10 +39,10 @@ public sealed class AuthenticationServiceTests
     [Fact]
     public async Task Login_WithValidPasswordPersistsRefreshToken()
     {
-        var store = new AuthenticationStoreFake { User = User() };
-        var service = CreateService(store, new PasswordHasherFake { Matches = true });
+        var store = new AuthenticationStoreFake { CurrentUser = User() };
+        AuthenticationService service = CreateService(store, new PasswordHasherFake { Matches = true });
 
-        var result = await service.LoginAsync(" lecturer ", "secret", "browser", CancellationToken.None);
+        AuthenticationResult? result = await service.LoginAsync(" lecturer ", "secret", "browser", CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("access", result.AccessToken);
@@ -57,12 +57,12 @@ public sealed class AuthenticationServiceTests
     {
         var store = new AuthenticationStoreFake
         {
-            User = User(lockedUntil: DateTime.UtcNow.AddMinutes(1)),
+            CurrentUser = User(lockedUntil: DateTime.UtcNow.AddMinutes(1)),
             RefreshToken = new RefreshTokenState(3, 7, false, DateTime.UtcNow.AddHours(1))
         };
-        var service = CreateService(store, new PasswordHasherFake());
+        AuthenticationService service = CreateService(store, new PasswordHasherFake());
 
-        var result = await service.RefreshAsync("refresh", null, CancellationToken.None);
+        AuthenticationResult? result = await service.RefreshAsync("refresh", null, CancellationToken.None);
 
         Assert.Null(result);
         Assert.Null(store.RotatedToken);
@@ -103,7 +103,7 @@ public sealed class AuthenticationServiceTests
 
     private sealed class AuthenticationStoreFake : IAuthenticationStore
     {
-        public AuthenticationUser? User { get; init; }
+        public AuthenticationUser? CurrentUser { get; init; }
         public RefreshTokenState? RefreshToken { get; init; }
         public int? RecordedFailedAttempts { get; private set; }
         public DateTime? RecordedLockedUntil { get; private set; }
@@ -112,9 +112,9 @@ public sealed class AuthenticationServiceTests
         public PersistRefreshToken? RotatedToken { get; private set; }
 
         public Task<AuthenticationUser?> FindByLoginAsync(string login, CancellationToken cancellationToken) =>
-            Task.FromResult(User);
+            Task.FromResult(CurrentUser);
         public Task<AuthenticationUser?> FindByEmailAsync(string email, CancellationToken cancellationToken) =>
-            Task.FromResult(User);
+            Task.FromResult(CurrentUser);
         public Task RecordFailedLoginAsync(
             int userId, int failedAttempts, DateTime? lockedUntil, CancellationToken cancellationToken)
         {
@@ -136,7 +136,7 @@ public sealed class AuthenticationServiceTests
         public Task<RefreshTokenState?> FindRefreshTokenAsync(
             string tokenHash, CancellationToken cancellationToken) => Task.FromResult(RefreshToken);
         public Task<AuthenticationUser?> FindUserAsync(int userId, CancellationToken cancellationToken) =>
-            Task.FromResult(User);
+            Task.FromResult(CurrentUser);
         public Task RotateRefreshTokenAsync(
             int existingTokenId, PersistRefreshToken replacement, CancellationToken cancellationToken)
         {

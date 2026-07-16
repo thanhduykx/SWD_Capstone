@@ -18,7 +18,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
         [FromQuery] int? semesterId,
         CancellationToken cancellationToken)
     {
-        var results = await registrationService.GetStudentRoundsAsync(CurrentUserId(), semesterId, cancellationToken);
+        IReadOnlyList<StudentReviewRoundResult> results = await registrationService.GetStudentRoundsAsync(CurrentUserId(), semesterId, cancellationToken);
         return results.Select(Map).ToArray();
     }
 
@@ -28,7 +28,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
         int roundId,
         CancellationToken cancellationToken)
     {
-        var result = await registrationService.GetStudentSlotGridAsync(CurrentUserId(), roundId, cancellationToken);
+        StudentSlotGridResult result = await registrationService.GetStudentSlotGridAsync(CurrentUserId(), roundId, cancellationToken);
         return Ok(Map(result));
     }
 
@@ -39,7 +39,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await registrationService.SaveStudentAvailabilityAsync(
+        StudentSlotGridResult result = await registrationService.SaveStudentAvailabilityAsync(
             CurrentUserId(),
             request.RoundId,
             request.Slots?.Select(x => new ReviewAvailabilitySlot(x.DayOfWeek, x.Slot)).ToArray(),
@@ -59,7 +59,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
     [HttpGet("/api/review-schedules/my")]
     public async Task<IReadOnlyList<StudentScheduleResponse>> GetMySchedule(CancellationToken cancellationToken)
     {
-        var results = await registrationService.GetStudentScheduleAsync(CurrentUserId(), cancellationToken);
+        IReadOnlyList<StudentScheduleResult> results = await registrationService.GetStudentScheduleAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new StudentScheduleResponse(
             x.SessionId, x.SessionCode, x.Type, x.SessionDate, x.Slot, x.Room,
             x.Status, x.GroupStatus, x.CompletedAt)).ToArray();
@@ -68,7 +68,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
     [HttpGet("attendance")]
     public async Task<IReadOnlyList<StudentAttendanceResponse>> GetMyAttendance(CancellationToken cancellationToken)
     {
-        var results = await registrationService.GetStudentAttendanceAsync(CurrentUserId(), cancellationToken);
+        IReadOnlyList<StudentAttendanceResult> results = await registrationService.GetStudentAttendanceAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new StudentAttendanceResponse(
             x.SessionId, x.SessionCode, x.IsPresent, x.Note, x.MarkedAt)).ToArray();
     }
@@ -78,7 +78,7 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
         int sessionId,
         CancellationToken cancellationToken)
     {
-        var results = await registrationService.GetStudentCommentsAsync(CurrentUserId(), sessionId, cancellationToken);
+        IReadOnlyList<StudentReviewCommentResult> results = await registrationService.GetStudentCommentsAsync(CurrentUserId(), sessionId, cancellationToken);
         return results.Select(x => new ReviewCommentResponse(
             x.Id, x.AuthorUserId, x.AuthorName, x.Content, x.CreatedAt, x.UpdatedAt)).ToArray();
     }

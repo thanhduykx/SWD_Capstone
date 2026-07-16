@@ -11,7 +11,7 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
     {
         ArgumentNullException.ThrowIfNull(request);
         await ResolveAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
-        var result = await store.GetAllAsync(new SemesterQuery(
+        (IReadOnlyList<SemesterResult> Items, int Total) result = await store.GetAllAsync(new SemesterQuery(
             request.SafePage, request.SafePageSize, request.Search?.Trim(), request.FilterBy?.Trim(),
             request.FilterValue?.Trim(), request.SortBy?.Trim(), request.Desc), cancellationToken);
         return new PagedResult<SemesterResult>(
@@ -42,7 +42,7 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
     private static SemesterTermData ResolveTerm(DateOnly date)
     {
         var year = date.Year;
-        var (prefix, name, startMonth, endMonth) = date.Month switch
+        (string? prefix, string? name, int startMonth, int endMonth) = date.Month switch
         {
             >= 1 and <= 4 => ("SP", "Spring", 1, 4),
             >= 5 and <= 8 => ("SU", "Summer", 5, 8),

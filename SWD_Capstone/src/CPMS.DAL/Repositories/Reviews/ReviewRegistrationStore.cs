@@ -20,12 +20,12 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
     public async Task<LecturerAvailabilityData> GetLecturerAvailabilityAsync(
         int roundId, int lecturerId, CancellationToken cancellationToken)
     {
-        var slots = await dbContext.ReviewAvailabilities
+        List<ReviewAvailabilitySlot> slots = await dbContext.ReviewAvailabilities
             .Where(x => x.ReviewRoundId == roundId && x.LecturerId == lecturerId)
             .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
             .Select(x => new ReviewAvailabilitySlot(x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
-        var submittedAt = await dbContext.ReviewAvailabilitySubmissions
+        DateTime? submittedAt = await dbContext.ReviewAvailabilitySubmissions
             .Where(x => x.ReviewRoundId == roundId && x.LecturerId == lecturerId)
             .Select(x => x.SubmittedAt)
             .SingleOrDefaultAsync(cancellationToken);
@@ -39,12 +39,13 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
         DateTime changedAt,
         CancellationToken cancellationToken)
     {
-        var existing = await dbContext.ReviewAvailabilities
+        ArgumentNullException.ThrowIfNull(round);
+        List<ReviewAvailability> existing = await dbContext.ReviewAvailabilities
             .Where(x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId)
             .ToListAsync(cancellationToken);
         dbContext.ReviewAvailabilities.RemoveRange(existing);
 
-        var submission = await dbContext.ReviewAvailabilitySubmissions.SingleOrDefaultAsync(
+        ReviewAvailabilitySubmission? submission = await dbContext.ReviewAvailabilitySubmissions.SingleOrDefaultAsync(
             x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId, cancellationToken);
         if (submission is null)
         {
@@ -78,7 +79,8 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
     public async Task SubmitLecturerAvailabilityAsync(
         ReviewRoundData round, int lecturerId, DateTime submittedAt, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewAvailabilitySubmissions.SingleOrDefaultAsync(
+        ArgumentNullException.ThrowIfNull(round);
+        ReviewAvailabilitySubmission? submission = await dbContext.ReviewAvailabilitySubmissions.SingleOrDefaultAsync(
             x => x.ReviewRoundId == round.Id && x.LecturerId == lecturerId, cancellationToken);
         if (submission is null)
         {
@@ -145,7 +147,7 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
         IReadOnlyCollection<ReviewAvailabilitySlot> slots,
         CancellationToken cancellationToken)
     {
-        var existing = await dbContext.StudentSlotRegistrations
+        List<StudentSlotRegistration> existing = await dbContext.StudentSlotRegistrations
             .Where(x => x.ReviewRoundId == roundId && x.GroupId == groupId)
             .ToListAsync(cancellationToken);
         dbContext.StudentSlotRegistrations.RemoveRange(existing);
@@ -162,7 +164,7 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
 
     public async Task<bool> ClearStudentAvailabilityAsync(int roundId, int groupId, CancellationToken cancellationToken)
     {
-        var registrations = await dbContext.StudentSlotRegistrations
+        List<StudentSlotRegistration> registrations = await dbContext.StudentSlotRegistrations
             .Where(x => x.ReviewRoundId == roundId && x.GroupId == groupId)
             .ToListAsync(cancellationToken);
         if (registrations.Count == 0) return false;

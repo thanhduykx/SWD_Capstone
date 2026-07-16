@@ -38,7 +38,7 @@ public sealed class ReviewSessionServiceTests
         var store = new FakeStore();
         var service = new ReviewSessionService(store, new AssignmentRules());
 
-        var result = await service.CreateAsync(Command(), CancellationToken.None);
+        ReviewSessionResult result = await service.CreateAsync(Command(), CancellationToken.None);
 
         Assert.True(store.Created);
         Assert.Equal(ReviewSessionStatus.Draft, result.Status);
@@ -97,12 +97,12 @@ public sealed class ReviewSessionServiceTests
             int? excludedSessionId, DateTime sessionDate, int slot, IReadOnlyCollection<int> reviewerIds,
             CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<ReviewSessionResult> CreateSessionAsync(
-            PersistReviewSession session, CancellationToken cancellationToken)
+            PersistReviewSession input, CancellationToken cancellationToken)
         {
             Created = true;
             return Task.FromResult(new ReviewSessionResult(
-                1, session.Code, session.SemesterId, [], session.Type, ReviewSessionStatus.Draft,
-                session.ReviewerIds, session.SessionDate, session.Slot, session.Room));
+                1, input.Code, input.SemesterId, [], input.Type, ReviewSessionStatus.Draft,
+                input.ReviewerIds, input.SessionDate, input.Slot, input.Room));
         }
         public Task<ReviewSessionResult> UpdateSessionAsync(
             int sessionId, PersistReviewSessionUpdate update, CancellationToken cancellationToken) =>

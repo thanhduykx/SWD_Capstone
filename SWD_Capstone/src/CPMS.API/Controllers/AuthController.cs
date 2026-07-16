@@ -22,7 +22,7 @@ public sealed class AuthController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await authenticationService.LoginAsync(
+            AuthenticationResult? result = await authenticationService.LoginAsync(
                 request.Username, request.Password, Request.Headers.UserAgent, cancellationToken);
             return result is null ? Unauthorized() : Ok(Map(result));
         }
@@ -37,7 +37,7 @@ public sealed class AuthController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await authenticationService.GoogleLoginAsync(
+            AuthenticationResult? result = await authenticationService.GoogleLoginAsync(
                 request.IdToken, Request.Headers.UserAgent, cancellationToken);
             return result is null ? Unauthorized() : Ok(Map(result));
         }
@@ -53,7 +53,7 @@ public sealed class AuthController(
         RefreshRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await authenticationService.RefreshAsync(
+        AuthenticationResult? result = await authenticationService.RefreshAsync(
             request.RefreshToken, Request.Headers.UserAgent, cancellationToken);
         return result is null ? Unauthorized() : Ok(Map(result));
     }
@@ -67,7 +67,7 @@ public sealed class AuthController(
         if (!environment.IsDevelopment()) return NotFound();
         try
         {
-            var result = await authenticationService.BootstrapAdminAsync(
+            BootstrapAdminResult result = await authenticationService.BootstrapAdminAsync(
                 request.Username, request.Email, request.Password,
                 HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent, cancellationToken);
             return CreatedAtAction(nameof(BootstrapAdmin), new { result.Id }, result);

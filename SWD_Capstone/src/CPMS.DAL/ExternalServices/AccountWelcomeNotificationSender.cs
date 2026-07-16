@@ -13,8 +13,8 @@ public sealed class AccountWelcomeNotificationSender(IEmailSender emailSender) :
         string initialPassword,
         CancellationToken cancellationToken)
     {
-        var body = string.Join(Environment.NewLine,
-        [
+        var body = string.Join(
+            Environment.NewLine,
             $"Hello {fullName},",
             string.Empty,
             "Your CPMS account has been created successfully.",
@@ -22,8 +22,7 @@ public sealed class AccountWelcomeNotificationSender(IEmailSender emailSender) :
             $"Username / Account: {username}",
             $"Initial password: {initialPassword}",
             string.Empty,
-            "Keep this account information private and contact the moderator if it is unexpected."
-        ]);
+            "Keep this account information private and contact the moderator if it is unexpected.");
         try
         {
             await emailSender.SendAsync(email, "CPMS account login information", body, cancellationToken);

@@ -4,36 +4,36 @@ namespace CPMS.API.Contracts.Reviews;
 
 public sealed record CreateReviewSessionRequest(
     string Code,
-    int GroupId,
-    int GroupPosition,
-    ReviewType Type,
-    int Reviewer1Id,
-    int Reviewer2Id,
+    [property: JsonRequired] int GroupId,
+    [property: JsonRequired] int GroupPosition,
+    [property: JsonRequired] ReviewType Type,
+    [property: JsonRequired] int Reviewer1Id,
+    [property: JsonRequired] int Reviewer2Id,
     int[] PreviousReviewerIds,
-    int Slot,
+    [property: JsonRequired] int Slot,
     string Room,
-    DateTime SessionDate);
+    [property: JsonRequired] DateTime SessionDate);
 public sealed record BulkAssignReviewSessionsRequest(IReadOnlyCollection<BulkAssignReviewSessionRequest> Sessions);
 public sealed record BulkAssignReviewSessionsResponse(
     int SentEmailCount, int FailedEmailCount, IReadOnlyCollection<ReviewSessionResponse> Sessions);
 public sealed record BulkAssignReviewSessionRequest(
     string Code,
-    int GroupId,
-    int GroupPosition,
-    ReviewType Type,
+    [property: JsonRequired] int GroupId,
+    [property: JsonRequired] int GroupPosition,
+    [property: JsonRequired] ReviewType Type,
     IReadOnlyCollection<int> ReviewerIds,
     IReadOnlyCollection<int> PreviousReviewerIds,
-    int Slot,
+    [property: JsonRequired] int Slot,
     string Room,
-    DateTime SessionDate);
+    [property: JsonRequired] DateTime SessionDate);
 public sealed record UpdateReviewSessionRequest(
     string Code,
     IReadOnlyCollection<int> ReviewerIds,
     IReadOnlyCollection<int> PreviousReviewerIds,
-    int Slot,
+    [property: JsonRequired] int Slot,
     string Room,
-    DateTime SessionDate,
-    ReviewSessionStatus Status);
+    [property: JsonRequired] DateTime SessionDate,
+    [property: JsonRequired] ReviewSessionStatus Status);
 public sealed record ReviewSessionResponse(
     int Id,
     string Code,

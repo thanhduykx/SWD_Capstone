@@ -68,7 +68,7 @@ public interface IReviewSessionStore
         IReadOnlyCollection<int> reviewerIds,
         CancellationToken cancellationToken);
     Task<ReviewSessionResult> CreateSessionAsync(
-        PersistReviewSession session, CancellationToken cancellationToken);
+        PersistReviewSession input, CancellationToken cancellationToken);
     Task<ReviewSessionResult> UpdateSessionAsync(
         int sessionId, PersistReviewSessionUpdate update, CancellationToken cancellationToken);
     Task<int?> FindLecturerIdByUserIdAsync(int userId, CancellationToken cancellationToken);

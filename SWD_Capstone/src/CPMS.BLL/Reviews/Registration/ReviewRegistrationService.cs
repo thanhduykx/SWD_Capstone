@@ -12,8 +12,8 @@ public sealed class ReviewRegistrationService(
         int userId, int roundId, CancellationToken cancellationToken)
     {
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
-        var state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
+        LecturerAvailabilityData state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
         return MapLecturerAvailability(round, lecturerId, state);
     }
 
@@ -28,11 +28,11 @@ public sealed class ReviewRegistrationService(
             throw new BusinessRuleException("Slots is required.");
         }
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
         EnsureOpen(round, "Lecturer availability can only be changed while registration is Open.");
 
-        var distinctSlots = slots.Distinct().OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot).ToArray();
-        foreach (var slot in distinctSlots)
+        ReviewAvailabilitySlot[] distinctSlots = slots.Distinct().OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot).ToArray();
+        foreach (ReviewAvailabilitySlot? slot in distinctSlots)
         {
             if (slot.DayOfWeek is < 1 or > 6)
             {
@@ -50,15 +50,15 @@ public sealed class ReviewRegistrationService(
         int userId, int roundId, CancellationToken cancellationToken)
     {
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
         EnsureOpen(round, "Lecturer availability can only be submitted while registration is Open.");
-        var state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
+        LecturerAvailabilityData state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
         if (state.Slots.Count == 0)
         {
             throw new BusinessRuleException("At least one availability slot is required before submitting to moderator.");
         }
 
-        var submittedAt = DateTime.UtcNow;
+        DateTime submittedAt = DateTime.UtcNow;
         await store.SubmitLecturerAvailabilityAsync(round, lecturerId, submittedAt, cancellationToken);
         return new ReviewAvailabilityWeekResult(
             round.Id, round.SemesterId, lecturerId, round.WeekStartDate, true, submittedAt, state.Slots);
@@ -67,11 +67,11 @@ public sealed class ReviewRegistrationService(
     public async Task<IReadOnlyList<StudentReviewRoundResult>> GetStudentRoundsAsync(
         int userId, int? semesterId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
         IReadOnlyCollection<int> semesterIds = semesterId.HasValue
             ? [semesterId.Value]
             : await store.GetActiveSemesterIdsAsync(cancellationToken);
-        var rows = await store.GetStudentRoundsAsync(semesterIds, student?.GroupId, cancellationToken);
+        IReadOnlyList<StudentRoundData> rows = await store.GetStudentRoundsAsync(semesterIds, student?.GroupId, cancellationToken);
         return rows.Select(x => new StudentReviewRoundResult(
             x.Round.Id, x.Round.SemesterId, x.Round.Type, x.Round.Status,
             x.Round.WeekStartDate, x.Round.WeekEndDate,
@@ -81,9 +81,9 @@ public sealed class ReviewRegistrationService(
     public async Task<StudentSlotGridResult> GetStudentSlotGridAsync(
         int userId, int roundId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
-        var registrations = student?.GroupId is int groupId
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
+        IReadOnlyList<StudentRegistrationData> registrations = student?.GroupId is int groupId
             ? await store.GetStudentRegistrationsAsync(roundId, groupId, cancellationToken)
             : [];
         return MapGrid(round, registrations);
@@ -99,8 +99,8 @@ public sealed class ReviewRegistrationService(
         {
             throw new BusinessRuleException("Slots are required.");
         }
-        var student = await RequireGroupedStudentAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
+        StudentProfileData student = await RequireGroupedStudentAsync(userId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
         EnsureOpen(round, "Registration is not open for this review round.");
         rules.ValidateStudentAvailability(slots.Select(x => (x.DayOfWeek, x.Slot)).ToArray());
         if (!student.IsLeader)
@@ -114,14 +114,14 @@ public sealed class ReviewRegistrationService(
 
         await store.ReplaceStudentAvailabilityAsync(
             roundId, student.GroupId!.Value, student.Id, slots.Distinct().ToArray(), cancellationToken);
-        var registrations = await store.GetStudentRegistrationsAsync(roundId, student.GroupId.Value, cancellationToken);
+        IReadOnlyList<StudentRegistrationData> registrations = await store.GetStudentRegistrationsAsync(roundId, student.GroupId.Value, cancellationToken);
         return MapGrid(round, registrations);
     }
 
     public async Task ClearStudentAvailabilityAsync(int userId, int roundId, CancellationToken cancellationToken)
     {
-        var student = await RequireGroupedStudentAsync(userId, cancellationToken);
-        var round = await RequireRoundAsync(roundId, cancellationToken);
+        StudentProfileData student = await RequireGroupedStudentAsync(userId, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
         EnsureOpen(round, "Registration is not open for this review round.");
         if (!student.IsLeader)
         {
@@ -135,9 +135,9 @@ public sealed class ReviewRegistrationService(
 
     public async Task<IReadOnlyList<StudentScheduleResult>> GetStudentScheduleAsync(int userId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
         if (student?.GroupId is not int groupId) return [];
-        var rows = await store.GetStudentScheduleAsync(groupId, cancellationToken);
+        IReadOnlyList<StudentScheduleData> rows = await store.GetStudentScheduleAsync(groupId, cancellationToken);
         return rows.Where(x => x.SessionStatus == ReviewSessionStatus.Published)
             .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
             .Select(x => new StudentScheduleResult(
@@ -147,9 +147,9 @@ public sealed class ReviewRegistrationService(
 
     public async Task<IReadOnlyList<StudentAttendanceResult>> GetStudentAttendanceAsync(int userId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
         if (student is null) return [];
-        var rows = await store.GetStudentAttendanceAsync(student.Id, cancellationToken);
+        IReadOnlyList<StudentAttendanceData> rows = await store.GetStudentAttendanceAsync(student.Id, cancellationToken);
         return rows.Where(x => x.GroupStatus == ReviewGroupStatus.Completed)
             .OrderByDescending(x => x.MarkedAt)
             .Select(x => new StudentAttendanceResult(x.SessionId, x.SessionCode, x.IsPresent, x.Note, x.MarkedAt))
@@ -159,14 +159,14 @@ public sealed class ReviewRegistrationService(
     public async Task<IReadOnlyList<StudentReviewCommentResult>> GetStudentCommentsAsync(
         int userId, int sessionId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
         if (student?.GroupId is not int groupId) return [];
-        var access = await store.GetStudentCommentAccessAsync(sessionId, groupId, cancellationToken);
+        StudentCommentAccessData? access = await store.GetStudentCommentAccessAsync(sessionId, groupId, cancellationToken);
         if (access is null || access.SessionStatus != ReviewSessionStatus.Published || access.GroupStatus != ReviewGroupStatus.Completed)
         {
             return [];
         }
-        var comments = await store.GetStudentCommentsAsync(sessionId, groupId, cancellationToken);
+        IReadOnlyList<StudentCommentData> comments = await store.GetStudentCommentsAsync(sessionId, groupId, cancellationToken);
         return comments.Select(x => new StudentReviewCommentResult(
             x.Id, x.AuthorUserId, x.AuthorName, x.Content, x.CreatedAt, x.UpdatedAt)).ToArray();
     }
@@ -181,7 +181,7 @@ public sealed class ReviewRegistrationService(
 
     private async Task<StudentProfileData> RequireGroupedStudentAsync(int userId, CancellationToken cancellationToken)
     {
-        var student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
         return student?.GroupId is not null
             ? student
             : throw new BusinessRuleException("You must be a member of a capstone group to register.");

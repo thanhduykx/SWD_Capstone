@@ -10,12 +10,24 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
     public async Task<(IReadOnlyList<SemesterResult> Items, int Total)> GetAllAsync(
         SemesterQuery request, CancellationToken cancellationToken)
     {
-        var query = dbContext.Semesters.AsNoTracking();
+        ArgumentNullException.ThrowIfNull(request);
+        IQueryable<Semester> query = ApplyFilters(dbContext.Semesters.AsNoTracking(), request);
+        query = ApplySort(query, request);
+        var total = await query.CountAsync(cancellationToken);
+        List<SemesterResult> items = await query.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize)
+            .Select(x => MapProjection(x)).ToListAsync(cancellationToken);
+        return (items, total);
+    }
+
+    private static IQueryable<Semester> ApplyFilters(IQueryable<Semester> query, SemesterQuery request)
+    {
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var search = request.Search.ToLowerInvariant();
-            query = query.Where(x => x.Code.ToLower().Contains(search) || x.Name.ToLower().Contains(search) ||
-                                     x.AcademicYear.ToLower().Contains(search));
+            var searchPattern = PostgreSqlSearchPattern.Contains(request.Search);
+            query = query.Where(x =>
+                EF.Functions.ILike(x.Code, searchPattern, PostgreSqlSearchPattern.EscapeCharacter) ||
+                EF.Functions.ILike(x.Name, searchPattern, PostgreSqlSearchPattern.EscapeCharacter) ||
+                EF.Functions.ILike(x.AcademicYear, searchPattern, PostgreSqlSearchPattern.EscapeCharacter));
         }
         if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
         {
@@ -26,7 +38,11 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
                 _ => query
             };
         }
-        query = request.SortBy?.ToLowerInvariant() switch
+        return query;
+    }
+
+    private static IQueryable<Semester> ApplySort(IQueryable<Semester> query, SemesterQuery request) =>
+        request.SortBy?.ToLowerInvariant() switch
         {
             "code" => request.Desc ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
             "name" => request.Desc ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
@@ -35,11 +51,6 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
             "isactive" => request.Desc ? query.OrderByDescending(x => x.IsActive) : query.OrderBy(x => x.IsActive),
             _ => request.Desc ? query.OrderByDescending(x => x.StartDate) : query.OrderBy(x => x.StartDate)
         };
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize)
-            .Select(x => MapProjection(x)).ToListAsync(cancellationToken);
-        return (items, total);
-    }
 
     public Task<SemesterResult?> FindByCodeAsync(string code, CancellationToken cancellationToken) =>
         dbContext.Semesters.Where(x => x.Code == code).Select(x => MapProjection(x))
@@ -48,7 +59,8 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
     public async Task<SemesterResult> UpsertResolvedAsync(
         SemesterTermData term, CancellationToken cancellationToken)
     {
-        var semester = await dbContext.Semesters.SingleOrDefaultAsync(x => x.Code == term.Code, cancellationToken);
+        ArgumentNullException.ThrowIfNull(term);
+        Semester? semester = await dbContext.Semesters.SingleOrDefaultAsync(x => x.Code == term.Code, cancellationToken);
         if (term.IsActive)
             await dbContext.Semesters.Where(x => x.IsActive && (semester == null || x.Id != semester.Id))
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsActive, false), cancellationToken);
@@ -72,10 +84,11 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
     public async Task<SemesterResult> CreateAsync(
         SemesterTermData input, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(input);
         if (input.IsActive)
             await dbContext.Semesters.Where(x => x.IsActive)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsActive, false), cancellationToken);
-        var semester = NewEntity(input);
+        Semester semester = NewEntity(input);
         dbContext.Semesters.Add(semester);
         await dbContext.SaveChangesAsync(cancellationToken);
         return Map(semester);

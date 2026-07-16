@@ -25,14 +25,14 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
         CancellationToken cancellationToken)
     {
         var weekStartDate = DateTime.SpecifyKind(weekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var weekEndDate = weekStartDate.AddDays(7);
-        var lecturers = await dbContext.Lecturers.OrderBy(x => x.Code)
+        DateTime weekEndDate = weekStartDate.AddDays(7);
+        List<ReviewSchedulingLecturer> lecturers = await dbContext.Lecturers.OrderBy(x => x.Code)
             .Select(x => new ReviewSchedulingLecturer(
                 x.Id, x.Code, x.FullName, x.Department,
                 dbContext.Users.Where(user => user.Id == x.UserId).Select(user => user.Email)
                     .FirstOrDefault() ?? "unknown@fpt.edu.vn"))
             .ToListAsync(cancellationToken);
-        var availability = await dbContext.ReviewAvailabilities
+        List<ReviewSchedulingAvailability> availability = await dbContext.ReviewAvailabilities
             .Where(x => x.ReviewRoundId == roundId &&
                         dbContext.ReviewAvailabilitySubmissions.Any(submission =>
                             submission.ReviewRoundId == x.ReviewRoundId &&
@@ -40,14 +40,14 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
             .OrderBy(x => x.LecturerId).ThenBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
             .Select(x => new ReviewSchedulingAvailability(x.LecturerId, x.DayOfWeek, x.Slot))
             .ToListAsync(cancellationToken);
-        var submissions = await dbContext.ReviewAvailabilitySubmissions
+        List<ReviewSchedulingAvailabilitySubmission> submissions = await dbContext.ReviewAvailabilitySubmissions
             .Where(x => x.ReviewRoundId == roundId).OrderBy(x => x.LecturerId)
             .Select(x => new ReviewSchedulingAvailabilitySubmission(
                 x.LecturerId, x.SubmittedAt != null, x.SubmittedAt,
                 dbContext.ReviewAvailabilities.Count(slot =>
                     slot.ReviewRoundId == x.ReviewRoundId && slot.LecturerId == x.LecturerId)))
             .ToListAsync(cancellationToken);
-        var groups = await dbContext.CapstoneGroups.Where(x => x.SemesterId == semesterId).OrderBy(x => x.Code)
+        List<ReviewSchedulingGroup> groups = await dbContext.CapstoneGroups.Where(x => x.SemesterId == semesterId).OrderBy(x => x.Code)
             .Select(x => new ReviewSchedulingGroup(
                 x.Id, x.Code,
                 dbContext.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameEn)
@@ -82,7 +82,7 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                 })
             .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot).ThenBy(x => x.GroupPosition)
             .ToListAsync(cancellationToken);
-        var sessions = sessionRows.Select(x => new ReviewSchedulingSession(
+        ReviewSchedulingSession[] sessions = sessionRows.Select(x => new ReviewSchedulingSession(
             x.Id, x.Code, x.GroupId, x.GroupCode, x.Type, x.Status,
             new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
             x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty)).ToArray();

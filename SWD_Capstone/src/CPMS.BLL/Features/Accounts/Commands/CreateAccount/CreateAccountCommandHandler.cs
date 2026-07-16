@@ -17,6 +17,7 @@ public sealed class CreateAccountCommandHandler(
         CreateAccountCommand command,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(command);
         var fullName = Required(command.FullName, "Full name is required.");
         var identityCode = Required(command.IdentityCode, "Identity code is required.");
         var email = Required(command.Email, "Email is required.");
@@ -28,7 +29,7 @@ public sealed class CreateAccountCommandHandler(
         }
 
         EnsureSupportedRole(command.Role, username);
-        var account = await accounts.AddUserWithProfileAsync(
+        CreatedAccountState account = await accounts.AddUserWithProfileAsync(
             new CreateAccountPersistenceData(
                 username,
                 email,

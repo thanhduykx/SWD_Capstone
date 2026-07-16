@@ -9,6 +9,7 @@ using CPMS.BLL.Models;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using CPMS.BLL.DTOs.Accounts;
 
 namespace CPMS.API.Controllers.V1;
 
@@ -27,8 +28,8 @@ public sealed class AccountsController(
         [FromQuery] PagedRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await getAccounts.HandleAsync(request, cancellationToken);
-        return Ok(ApiResponse<PagedResult<CPMS.BLL.DTOs.Accounts.AccountResponse>>.Ok(
+        PagedResult<AccountResponse> result = await getAccounts.HandleAsync(request, cancellationToken);
+        return Ok(ApiResponse.Ok(
             result,
             HttpContext.TraceIdentifier));
     }
@@ -39,6 +40,7 @@ public sealed class AccountsController(
         CreateAccountRequest request,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
         var command = new CreateAccountCommand(
             request.IdentityCode,
             request.Email,
@@ -57,11 +59,11 @@ public sealed class AccountsController(
             Request.Headers.UserAgent);
 
         await createValidator.ValidateAndThrowAsync(command, cancellationToken);
-        var response = await createAccount.HandleAsync(command, cancellationToken);
+        AccountCreatedResponse response = await createAccount.HandleAsync(command, cancellationToken);
 
         return StatusCode(
             StatusCodes.Status201Created,
-            ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>.Created(
+            ApiResponse.Created(
                 response,
                 HttpContext.TraceIdentifier));
     }
@@ -77,12 +79,12 @@ public sealed record CreateAccountRequest(
     string? IdentityCode,
     string Email,
     string Password,
-    UserRole Role,
+    [property: JsonRequired] UserRole Role,
     string? FullName,
     string? Department,
     string? Position,
     string? PermissionScope,
-    bool IsPartTime,
+    [property: JsonRequired] bool IsPartTime,
     string? ClassCode,
     string? Batch,
     string? Major);

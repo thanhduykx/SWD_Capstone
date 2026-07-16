@@ -280,7 +280,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
         ArgumentNullException.ThrowIfNull(context);
 
         var key = OperationKey(context);
-        if (OperationDocs.TryGetValue(key, out var doc))
+        if (OperationDocs.TryGetValue(key, out OperationDoc? doc))
         {
             operation.Summary = doc.Summary;
             operation.Description = AppendParagraph(operation.Description, doc.Description);
@@ -297,7 +297,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
 
     private static void ApplyAuthorization(OpenApiOperation operation, OperationFilterContext context)
     {
-        if (!TryGetAuthorization(context, out var roles))
+        if (!TryGetAuthorization(context, out IReadOnlyCollection<string>? roles))
         {
             operation.Description = AppendParagraph(
                 operation.Description,
@@ -348,7 +348,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             return false;
         }
 
-        var authorizeAttributes = actionDescriptor.ControllerTypeInfo
+        AuthorizeAttribute[] authorizeAttributes = actionDescriptor.ControllerTypeInfo
             .GetCustomAttributes<AuthorizeAttribute>(inherit: true)
             .Concat(actionDescriptor.MethodInfo.GetCustomAttributes<AuthorizeAttribute>(inherit: true))
             .ToArray();
@@ -385,12 +385,12 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     private static void ApplyRequestExample(OpenApiOperation operation, string key)
     {
         if (operation.RequestBody?.Content is null ||
-            !RequestExamples.TryGetValue(key, out var example))
+            !RequestExamples.TryGetValue(key, out IOpenApiAny? example))
         {
             return;
         }
 
-        foreach (var mediaType in operation.RequestBody.Content.Values)
+        foreach (OpenApiMediaType? mediaType in operation.RequestBody.Content.Values)
         {
             mediaType.Example = example;
         }
@@ -432,7 +432,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     private static OpenApiObject Obj(params (string Key, IOpenApiAny Value)[] properties)
     {
         var value = new OpenApiObject();
-        foreach (var property in properties)
+        foreach ((string Key, IOpenApiAny Value) property in properties)
         {
             value[property.Key] = property.Value;
         }
@@ -443,7 +443,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     private static OpenApiArray Arr(params IOpenApiAny[] items)
     {
         var value = new OpenApiArray();
-        foreach (var item in items)
+        foreach (IOpenApiAny item in items)
         {
             value.Add(item);
         }

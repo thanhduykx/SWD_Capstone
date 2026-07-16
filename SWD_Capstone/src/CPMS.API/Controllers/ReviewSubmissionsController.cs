@@ -68,7 +68,7 @@ public sealed class ReviewSubmissionsController(
     {
         try
         {
-            var data = await submissionService.GetExportDataAsync(
+            ReviewChecklistExportData data = await submissionService.GetExportDataAsync(
                 submissionId, CurrentActor(), cancellationToken);
             return File(templateService.ExportWorkbook(data),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -84,16 +84,16 @@ public sealed class ReviewSubmissionsController(
     {
         try
         {
-            var exports = await submissionService.GetBulkExportDataAsync(
+            IReadOnlyList<ReviewChecklistExportData> exports = await submissionService.GetBulkExportDataAsync(
                 semesterId, reviewType, cancellationToken);
             using var archiveStream = new MemoryStream();
             using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                foreach (var data in exports)
+                foreach (ReviewChecklistExportData data in exports)
                 {
-                    var entry = archive.CreateEntry(SafeFileName(
+                    ZipArchiveEntry entry = archive.CreateEntry(SafeFileName(
                         $"{data.GroupCode}_{data.Type}_{data.SessionId}.xlsx"));
-                    await using var entryStream = entry.Open();
+                    await using Stream entryStream = entry.Open();
                     await entryStream.WriteAsync(templateService.ExportWorkbook(data), cancellationToken);
                 }
             }

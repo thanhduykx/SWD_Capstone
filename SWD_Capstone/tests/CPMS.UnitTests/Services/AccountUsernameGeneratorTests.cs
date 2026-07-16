@@ -25,7 +25,7 @@ public sealed class AccountUsernameGeneratorTests
     [InlineData("   ")]
     public void Generate_RejectsMissingFullName(string fullName)
     {
-        var action = () => AccountUsernameGenerator.Generate(fullName, "SE194673");
+        Func<string> action = () => AccountUsernameGenerator.Generate(fullName, "SE194673");
 
         Assert.Throws<BusinessRuleException>(action);
     }
@@ -35,7 +35,7 @@ public sealed class AccountUsernameGeneratorTests
     [InlineData("   ")]
     public void Generate_RejectsMissingIdentityCode(string identityCode)
     {
-        var action = () => AccountUsernameGenerator.Generate("Dương Thành Thanh Duy", identityCode);
+        Func<string> action = () => AccountUsernameGenerator.Generate("Dương Thành Thanh Duy", identityCode);
 
         Assert.Throws<BusinessRuleException>(action);
     }

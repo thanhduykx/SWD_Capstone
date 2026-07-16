@@ -75,7 +75,7 @@ public sealed class ReviewRoundStore(CpmsDbContext dbContext) : IReviewRoundStor
     public async Task<(int ActiveGroups, int CompletedRegistrations)> GetRegistrationCompletionAsync(
         int roundId, int semesterId, int requiredSlotCount, CancellationToken cancellationToken)
     {
-        var activeGroupIds = await dbContext.CapstoneGroups
+        List<int> activeGroupIds = await dbContext.CapstoneGroups
             .Where(x => x.SemesterId == semesterId && x.Status == GroupStatus.Active)
             .Select(x => x.Id).ToListAsync(cancellationToken);
         var completed = await dbContext.StudentSlotRegistrations
@@ -92,7 +92,7 @@ public sealed class ReviewRoundStore(CpmsDbContext dbContext) : IReviewRoundStor
         DateTime? closedAt,
         CancellationToken cancellationToken)
     {
-        var round = await dbContext.ReviewRounds.SingleAsync(x => x.Id == roundId, cancellationToken);
+        ReviewRound round = await dbContext.ReviewRounds.SingleAsync(x => x.Id == roundId, cancellationToken);
         round.Status = status;
         round.OpenedAt = openedAt;
         round.ClosedAt = closedAt;

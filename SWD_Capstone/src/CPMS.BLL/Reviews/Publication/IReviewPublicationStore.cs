@@ -46,7 +46,7 @@ public interface IReviewPublicationStore
         ReviewPublicationScope scope, int requiredSlotCount, CancellationToken cancellationToken);
     Task<int> PersistAsync(
         ReviewPublicationScope scope,
-        PersistReviewPublication publication,
+        PersistReviewPublication input,
         CancellationToken cancellationToken);
     Task<(int Sent, int Failed)> DispatchEmailsAsync(
         int publicationId, CancellationToken cancellationToken);

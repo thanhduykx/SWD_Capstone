@@ -12,13 +12,14 @@ public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountReposit
 {
     public async Task<PagedResult<AccountResponse>> GetPagedAsync(PagedRequest request, CancellationToken cancellationToken)
     {
-        var query = dbContext.Users.AsNoTracking();
+        ArgumentNullException.ThrowIfNull(request);
+        IQueryable<User> query = dbContext.Users.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var search = request.Search.Trim().ToLowerInvariant();
+            var searchPattern = PostgreSqlSearchPattern.Contains(request.Search);
             query = query.Where(x =>
-                x.Username.ToLower().Contains(search) ||
-                x.Email.ToLower().Contains(search));
+                EF.Functions.ILike(x.Username, searchPattern, PostgreSqlSearchPattern.EscapeCharacter) ||
+                EF.Functions.ILike(x.Email, searchPattern, PostgreSqlSearchPattern.EscapeCharacter));
         }
 
         if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
@@ -27,7 +28,7 @@ public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountReposit
             var filterValue = request.FilterValue.Trim();
             query = filterBy switch
             {
-                "role" when Enum.TryParse<UserRole>(filterValue, true, out var role) => query.Where(x => x.Role == role),
+                "role" when Enum.TryParse<UserRole>(filterValue, true, out UserRole role) => query.Where(x => x.Role == role),
                 "isactive" when bool.TryParse(filterValue, out var isActive) => query.Where(x => x.IsActive == isActive),
                 _ => query
             };
@@ -42,7 +43,7 @@ public sealed class AccountRepository(CpmsDbContext dbContext) : IAccountReposit
         };
 
         var total = await query.CountAsync(cancellationToken);
-        var items = await query
+        List<AccountResponse> items = await query
             .Skip((request.SafePage - 1) * request.SafePageSize)
             .Take(request.SafePageSize)
             .Select(x => new AccountResponse(

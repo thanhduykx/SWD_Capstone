@@ -38,7 +38,7 @@ public sealed class ApplicationConfigurationTests
     [Fact]
     public void AddDALServices_UsesAppSettingsOnlySnapshotForGemini()
     {
-        var appSettings = new ConfigurationBuilder()
+        IConfigurationRoot appSettings = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Gemini:ApiKey"] = "appsettings-key",
@@ -46,7 +46,7 @@ public sealed class ApplicationConfigurationTests
                 ["Gemini:TimeoutSeconds"] = "30"
             })
             .Build();
-        var mergedConfiguration = new ConfigurationBuilder()
+        IConfigurationRoot mergedConfiguration = new ConfigurationBuilder()
             .AddConfiguration(appSettings)
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -59,8 +59,8 @@ public sealed class ApplicationConfigurationTests
             mergedConfiguration,
             appSettings.GetSection(GeminiOptions.SectionName));
 
-        using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<GeminiOptions>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        GeminiOptions options = provider.GetRequiredService<GeminiOptions>();
 
         Assert.Equal("appsettings-key", options.ApiKey);
     }

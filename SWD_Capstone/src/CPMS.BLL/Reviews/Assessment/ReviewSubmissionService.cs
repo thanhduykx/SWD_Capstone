@@ -11,6 +11,7 @@ public sealed class ReviewSubmissionService(
     public async Task<IReadOnlyList<ReviewSubmissionSummary>> GetMySubmissionsAsync(
         ReviewActor actor, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         if (actor.Role == UserRole.Lecturer)
         {
             var lecturerId = await store.FindLecturerIdAsync(actor.UserId, cancellationToken);
@@ -29,7 +30,8 @@ public sealed class ReviewSubmissionService(
     public async Task<ReviewSubmissionResult> GetAsync(
         int submissionId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var state = await RequireStateAsync(submissionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanViewAsync(state, actor, cancellationToken);
         return Map(await store.GetDataAsync(submissionId, cancellationToken));
     }
@@ -39,7 +41,8 @@ public sealed class ReviewSubmissionService(
     {
         ArgumentNullException.ThrowIfNull(draft);
         ArgumentNullException.ThrowIfNull(draft.Items);
-        var state = await RequireStateAsync(submissionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanEditAsync(state, actor, cancellationToken);
         if (state.Status == ReviewSubmissionStatus.Submitted)
             throw new ConflictException("A submitted review cannot be moved back to Draft.");
@@ -47,11 +50,11 @@ public sealed class ReviewSubmissionService(
             throw new ConflictException("Review feedback can only be edited after the schedule is published.");
         var allowedKeys = templateProvider.GetItems(state.Type).Where(x => !x.IsSection)
             .Select(x => x.ItemKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in draft.Items)
+        SaveReviewItem? invalidItem = draft.Items.FirstOrDefault(item => !allowedKeys.Contains(item.ItemKey));
+        if (invalidItem is not null)
         {
-            if (!allowedKeys.Contains(item.ItemKey))
-                throw new BusinessRuleException(
-                    $"Checklist item '{item.ItemKey}' does not belong to this review template.");
+            throw new BusinessRuleException(
+                $"Checklist item '{invalidItem.ItemKey}' does not belong to this review template.");
         }
         await store.SaveDraftAsync(
             submissionId,
@@ -66,7 +69,8 @@ public sealed class ReviewSubmissionService(
     public async Task<ReviewSubmissionResult> SubmitAsync(
         int submissionId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var state = await RequireStateAsync(submissionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanEditAsync(state, actor, cancellationToken);
         if (state.Status == ReviewSubmissionStatus.Submitted)
             throw new ConflictException("This review submission has already been submitted.");
@@ -85,7 +89,8 @@ public sealed class ReviewSubmissionService(
     public async Task<ReviewChecklistExportData> GetExportDataAsync(
         int submissionId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var state = await RequireStateAsync(submissionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanViewAsync(state, actor, cancellationToken);
         return await store.GetExportDataAsync(state.SessionId, state.GroupId, cancellationToken);
     }
@@ -93,10 +98,10 @@ public sealed class ReviewSubmissionService(
     public async Task<IReadOnlyList<ReviewChecklistExportData>> GetBulkExportDataAsync(
         int semesterId, ReviewType reviewType, CancellationToken cancellationToken)
     {
-        var scheduled = await store.GetScheduledExportsAsync(semesterId, reviewType, cancellationToken);
+        IReadOnlyList<ScheduledReviewExport> scheduled = await store.GetScheduledExportsAsync(semesterId, reviewType, cancellationToken);
         if (scheduled.Count == 0) throw new KeyNotFoundException("No review sessions were found for export.");
         var results = new List<ReviewChecklistExportData>(scheduled.Count);
-        foreach (var item in scheduled)
+        foreach (ScheduledReviewExport item in scheduled)
             results.Add(await store.GetExportDataAsync(item.SessionId, item.GroupId, cancellationToken));
         return results;
     }
@@ -127,9 +132,9 @@ public sealed class ReviewSubmissionService(
 
     private ReviewSubmissionResult Map(ReviewSubmissionData data)
     {
-        var items = templateProvider.GetItems(data.Type).Select(item =>
+        ReviewSubmissionItemResult[] items = templateProvider.GetItems(data.Type).Select(item =>
         {
-            data.ItemResponses.TryGetValue(item.ItemKey, out var response);
+            data.ItemResponses.TryGetValue(item.ItemKey, out (ReviewChecklistAnswer? Answer, string? Comment) response);
             return new ReviewSubmissionItemResult(
                 item.ItemKey, item.Label, item.Description, item.Priority, item.IsSection,
                 item.CriteriaCode, response.Answer, response.Comment);

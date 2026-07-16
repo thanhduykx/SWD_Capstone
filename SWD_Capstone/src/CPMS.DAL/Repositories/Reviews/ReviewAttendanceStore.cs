@@ -18,7 +18,7 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
                 x.SessionDate, x.Slot, x.Room
             }).SingleOrDefaultAsync(cancellationToken);
         if (session is null) return new ReviewAttendanceContextLookup(false, null);
-        var groupQuery = dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId);
+        IQueryable<GroupReviewSlot> groupQuery = dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId);
         GroupReviewSlot? groupSlot;
         if (groupId.HasValue)
         {
@@ -26,7 +26,7 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
         }
         else
         {
-            var slots = await groupQuery.Take(2).ToListAsync(cancellationToken);
+            List<GroupReviewSlot> slots = await groupQuery.Take(2).ToListAsync(cancellationToken);
             groupSlot = slots.Count == 1 ? slots[0] : null;
         }
         if (groupSlot is null) return new ReviewAttendanceContextLookup(true, null);
@@ -65,13 +65,14 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
         DateTime markedAt,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(entries);
         var studentIds = entries.Select(x => x.StudentId).ToArray();
-        var existing = await dbContext.ReviewAttendances
+        Dictionary<int, ReviewAttendance> existing = await dbContext.ReviewAttendances
             .Where(x => x.SessionId == sessionId && studentIds.Contains(x.StudentId))
             .ToDictionaryAsync(x => x.StudentId, cancellationToken);
-        foreach (var entry in entries)
+        foreach (AttendanceEntry entry in entries)
         {
-            if (existing.TryGetValue(entry.StudentId, out var attendance))
+            if (existing.TryGetValue(entry.StudentId, out ReviewAttendance? attendance))
             {
                 attendance.IsPresent = entry.IsPresent;
                 attendance.Note = entry.Note;
@@ -146,7 +147,7 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
         DateTime completedAt,
         CancellationToken cancellationToken)
     {
-        var slot = await dbContext.GroupReviewSlots.SingleAsync(
+        GroupReviewSlot slot = await dbContext.GroupReviewSlots.SingleAsync(
             x => x.SessionId == sessionId && x.GroupId == groupId, cancellationToken);
         slot.Status = ReviewGroupStatus.Completed;
         slot.CompletedAt = completedAt;

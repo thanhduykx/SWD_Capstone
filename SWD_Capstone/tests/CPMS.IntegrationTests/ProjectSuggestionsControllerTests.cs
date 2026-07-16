@@ -16,10 +16,10 @@ public sealed class ProjectSuggestionsControllerTests
         var expected = new ProjectSuggestionResult("Nội dung", "Điểm mạnh", "Cần cải thiện");
         var service = new StubSuggestionService(expected);
         var controller = new ProjectSuggestionsController(service);
-        var method = typeof(ProjectSuggestionsController).GetMethod(
+        MethodInfo? method = typeof(ProjectSuggestionsController).GetMethod(
             nameof(ProjectSuggestionsController.GenerateSummary));
 
-        var result = await controller.GenerateSummary(
+        ActionResult<ProjectSuggestionResponse> result = await controller.GenerateSummary(
             new GenerateProjectSuggestionRequest("CPMS", "Project content"),
             CancellationToken.None);
 
@@ -34,7 +34,7 @@ public sealed class ProjectSuggestionsControllerTests
             "ai-suggestions",
             method?.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
 
-        var response = Assert.IsType<ProjectSuggestionResponse>(
+        ProjectSuggestionResponse response = Assert.IsType<ProjectSuggestionResponse>(
             Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal(expected.ContentSummary, response.ContentSummary);
         Assert.Equal(expected.StrengthsSummary, response.StrengthsSummary);
