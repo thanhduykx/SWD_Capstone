@@ -8,10 +8,10 @@ public sealed class ReviewPublicationServiceTests
     [Fact]
     public async Task Publish_RejectsIncompleteScheduleWithoutPersisting()
     {
-        var store = new FakeStore { Snapshot = Snapshot(active: 3, registered: 3, scheduled: 2) };
+        var store = new FakeStore { PublicationSnapshot = Snapshot(active: 3, registered: 3, scheduled: 2) };
         var service = new ReviewPublicationService(store);
 
-        var exception = await Assert.ThrowsAsync<IncompleteReviewScheduleException>(() =>
+        IncompleteReviewScheduleException exception = await Assert.ThrowsAsync<IncompleteReviewScheduleException>(() =>
             service.PublishAsync(Command(), CancellationToken.None));
 
         Assert.Equal(3, exception.ActiveGroups);
@@ -22,10 +22,10 @@ public sealed class ReviewPublicationServiceTests
     [Fact]
     public async Task Publish_PersistsThenDispatchesNotifications()
     {
-        var store = new FakeStore { Snapshot = Snapshot(active: 1, registered: 1, scheduled: 1) };
+        var store = new FakeStore { PublicationSnapshot = Snapshot(active: 1, registered: 1, scheduled: 1) };
         var service = new ReviewPublicationService(store);
 
-        var result = await service.PublishAsync(Command(), CancellationToken.None);
+        ReviewSchedulePublicationResult result = await service.PublishAsync(Command(), CancellationToken.None);
 
         Assert.True(store.Persisted);
         Assert.Single(store.PersistedPublication!.Emails);
@@ -55,7 +55,7 @@ public sealed class ReviewPublicationServiceTests
 
     private sealed class FakeStore : IReviewPublicationStore
     {
-        public required ReviewPublicationSnapshot Snapshot { get; init; }
+        public required ReviewPublicationSnapshot PublicationSnapshot { get; init; }
         public bool Persisted { get; private set; }
         public PersistReviewPublication? PersistedPublication { get; private set; }
 
@@ -69,15 +69,15 @@ public sealed class ReviewPublicationServiceTests
 
         public Task<ReviewPublicationSnapshot> LoadSnapshotAsync(
             ReviewPublicationScope scope, int requiredSlotCount, CancellationToken cancellationToken) =>
-            Task.FromResult(Snapshot);
+            Task.FromResult(PublicationSnapshot);
 
         public Task<int> PersistAsync(
             ReviewPublicationScope scope,
-            PersistReviewPublication publication,
+            PersistReviewPublication input,
             CancellationToken cancellationToken)
         {
             Persisted = true;
-            PersistedPublication = publication;
+            PersistedPublication = input;
             return Task.FromResult(8);
         }
 

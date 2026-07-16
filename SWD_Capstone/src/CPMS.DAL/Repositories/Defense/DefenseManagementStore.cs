@@ -4,6 +4,7 @@ using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using CPMS.BLL.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Defense;
 
@@ -12,11 +13,27 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
     public async Task<PagedResult<DefenseRoundResult>> GetRoundsAsync(
         PagedRequest request, CancellationToken cancellationToken)
     {
-        var query = dbContext.DefenseRounds.AsNoTracking();
+        ArgumentNullException.ThrowIfNull(request);
+        IQueryable<DefenseRound> query = ApplyFilters(dbContext.DefenseRounds.AsNoTracking(), request);
+        query = ApplySort(query, request);
+        var total = await query.CountAsync(cancellationToken);
+        List<DefenseRoundResult> items = await query.Skip((request.SafePage - 1) * request.SafePageSize).Take(request.SafePageSize)
+            .Select(x => new DefenseRoundResult(
+                x.Id, x.Code, x.Name, x.SemesterId, x.Type, x.StartDate, x.EndDate, x.Status))
+            .ToListAsync(cancellationToken);
+        return new PagedResult<DefenseRoundResult>(items, request.SafePage, request.SafePageSize, total);
+    }
+
+    private static IQueryable<DefenseRound> ApplyFilters(
+        IQueryable<DefenseRound> query,
+        PagedRequest request)
+    {
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var search = request.Search.Trim().ToLowerInvariant();
-            query = query.Where(x => x.Code.ToLower().Contains(search) || x.Name.ToLower().Contains(search));
+            var searchPattern = PostgreSqlSearchPattern.Contains(request.Search);
+            query = query.Where(x =>
+                EF.Functions.ILike(x.Code, searchPattern, PostgreSqlSearchPattern.EscapeCharacter) ||
+                EF.Functions.ILike(x.Name, searchPattern, PostgreSqlSearchPattern.EscapeCharacter));
         }
         if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
         {
@@ -24,12 +41,17 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
             query = request.FilterBy.Trim().ToLowerInvariant() switch
             {
                 "semesterid" when int.TryParse(value, out var semesterId) => query.Where(x => x.SemesterId == semesterId),
-                "type" when Enum.TryParse<CouncilType>(value, true, out var type) => query.Where(x => x.Type == type),
-                "status" when Enum.TryParse<DefenseRoundStatus>(value, true, out var status) => query.Where(x => x.Status == status),
+                "type" when Enum.TryParse<CouncilType>(value, true, out CouncilType type) => query.Where(x => x.Type == type),
+                "status" when Enum.TryParse<DefenseRoundStatus>(value, true, out DefenseRoundStatus status) => query.Where(x => x.Status == status),
                 _ => query
             };
         }
-        query = request.SortBy?.ToLowerInvariant() switch
+        return query;
+    }
+
+    private static IQueryable<DefenseRound> ApplySort(
+        IQueryable<DefenseRound> query,
+        PagedRequest request) => request.SortBy?.ToLowerInvariant() switch
         {
             "code" => request.Desc ? query.OrderByDescending(x => x.Code) : query.OrderBy(x => x.Code),
             "name" => request.Desc ? query.OrderByDescending(x => x.Name) : query.OrderBy(x => x.Name),
@@ -39,13 +61,6 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
             "enddate" => request.Desc ? query.OrderByDescending(x => x.EndDate) : query.OrderBy(x => x.EndDate),
             _ => request.Desc ? query.OrderByDescending(x => x.StartDate) : query.OrderBy(x => x.StartDate)
         };
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query.Skip((request.SafePage - 1) * request.SafePageSize).Take(request.SafePageSize)
-            .Select(x => new DefenseRoundResult(
-                x.Id, x.Code, x.Name, x.SemesterId, x.Type, x.StartDate, x.EndDate, x.Status))
-            .ToListAsync(cancellationToken);
-        return new PagedResult<DefenseRoundResult>(items, request.SafePage, request.SafePageSize, total);
-    }
 
     public async Task<int?> FindModeratorIdAsync(
         int userId, bool allowFallback, CancellationToken cancellationToken)
@@ -62,11 +77,12 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
     public Task<bool> RoundCodeExistsAsync(
         int semesterId, string code, CancellationToken cancellationToken) =>
         dbContext.DefenseRounds.AnyAsync(x =>
-            x.SemesterId == semesterId && x.Code.ToLower() == code.ToLower(), cancellationToken);
+            x.SemesterId == semesterId && EF.Functions.ILike(x.Code, code), cancellationToken);
 
     public async Task<DefenseRoundResult> CreateRoundAsync(
         CreateDefenseRoundCommand input, int moderatorId, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(input);
         var entity = new DefenseRound
         {
             Code = input.Code, Name = input.Name, SemesterId = input.SemesterId, Type = input.Type,
@@ -87,7 +103,8 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
     public async Task<DefenseBoardResult> CreateBoardAsync(
         CreateDefenseBoardCommand input, int moderatorId, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(input);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var council = new Council
         {
             Code = input.Code,
@@ -106,7 +123,7 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
             (input.SecretaryId, CouncilMemberRole.Secretary)
         };
         members.AddRange(input.MemberLecturerIds.Select(x => (x, CouncilMemberRole.Member)));
-        foreach (var member in members.GroupBy(x => x.LecturerId).Select(x => x.First()))
+        foreach ((int LecturerId, CouncilMemberRole Role) member in members.GroupBy(x => x.LecturerId).Select(x => x.First()))
             dbContext.CouncilMembers.Add(new CouncilMember
             {
                 CouncilId = council.Id, LecturerId = member.LecturerId, Role = member.Role
@@ -152,7 +169,10 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
         DefenseGroupState group,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(council);
+        ArgumentNullException.ThrowIfNull(group);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var session = new DefenseSession
         {
             Code = input.Code, DefenseRoundId = input.DefenseRoundId, CouncilId = input.CouncilId,
@@ -189,7 +209,7 @@ public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseMa
 
     private async Task<DefenseBoardResult> MapBoardAsync(int id, CancellationToken cancellationToken)
     {
-        var council = await dbContext.Councils.SingleAsync(x => x.Id == id, cancellationToken);
+        Council council = await dbContext.Councils.SingleAsync(x => x.Id == id, cancellationToken);
         var memberIds = await dbContext.CouncilMembers.Where(x => x.CouncilId == id)
             .OrderBy(x => x.Role).ThenBy(x => x.LecturerId).Select(x => x.LecturerId)
             .ToArrayAsync(cancellationToken);

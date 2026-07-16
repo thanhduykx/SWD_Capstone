@@ -26,7 +26,7 @@ public sealed class ProjectSuggestionsController(IProjectSuggestionService sugge
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await suggestionService.GenerateAsync(
+        ProjectSuggestionResult result = await suggestionService.GenerateAsync(
             new ProjectSuggestionInput(request.ProjectName, request.ProjectContent),
             cancellationToken);
 

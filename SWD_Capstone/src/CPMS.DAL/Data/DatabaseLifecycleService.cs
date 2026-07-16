@@ -4,6 +4,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Data;
 
@@ -36,7 +37,9 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     public async Task ResetAsync(CancellationToken cancellationToken)
     {
         var sql = $"TRUNCATE TABLE {string.Join(", ", ResetTables.Select(x => $"\"{x}\""))} RESTART IDENTITY CASCADE;";
+#pragma warning disable S2077 // Identifiers come exclusively from the internal ResetTables whitelist.
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+#pragma warning restore S2077
         await SeedDevelopmentDataAsync(cancellationToken);
     }
 
@@ -51,8 +54,8 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     {
         const string username = "Admin@gmail.com";
         const string email = "Admin@gmail.com";
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var user = await dbContext.Users.FirstOrDefaultAsync(
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        User? user = await dbContext.Users.FirstOrDefaultAsync(
             x => x.Username == username || x.Email == email, cancellationToken);
         if (user is null)
         {
@@ -101,16 +104,16 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
     private async Task SeedTestAccountsAsync(CancellationToken cancellationToken)
     {
-        var accounts = new[]
+        (string, string, UserRole)[] accounts = new[]
         {
             ("test.training", "test.training@cpms.local", UserRole.TrainingDepartment),
             ("test.lecturer", "test.lecturer@cpms.local", UserRole.Lecturer),
             ("test.student", "test.student@cpms.local", UserRole.Student)
         };
-        foreach (var account in accounts)
+        foreach ((string, string, UserRole) account in accounts)
         {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-            var user = await dbContext.Users.FirstOrDefaultAsync(x =>
+            await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            User? user = await dbContext.Users.FirstOrDefaultAsync(x =>
                 x.Username == account.Item1 || x.Email == account.Item2, cancellationToken);
             if (user is null)
             {
@@ -162,47 +165,13 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
     private async Task SeedAcademicDataAsync(CancellationToken cancellationToken)
     {
-        var lecturer = await dbContext.Lecturers.SingleAsync(x => x.Code == "LEC_TEST", cancellationToken);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
-            ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026", cancellationToken);
-        if (semester is null)
-        {
-            semester = new Semester
-            {
-                Code = "SU2026", Name = "Summer 2026", AcademicYear = "2025-2026",
-                StartDate = new DateOnly(2026, 5, 1), EndDate = new DateOnly(2026, 8, 31), IsActive = true
-            };
-            dbContext.Semesters.Add(semester);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        else semester.IsActive = true;
+        Lecturer lecturer = await dbContext.Lecturers.SingleAsync(x => x.Code == "LEC_TEST", cancellationToken);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        Semester semester = await EnsureSemesterAsync(cancellationToken);
         const string title = "Smart Home Inventory";
-        var topic = await dbContext.Topics.FirstOrDefaultAsync(x =>
-            x.SemesterId == semester.Id && (x.NameVn == title || x.NameEn == title), cancellationToken);
-        if (topic is null)
-        {
-            topic = new Topic
-            {
-                Code = BuildTopicCode(semester.Code), NameVn = title, NameEn = title, SemesterId = semester.Id
-            };
-            dbContext.Topics.Add(topic);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        var group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
-            x.SemesterId == semester.Id && x.TopicId == topic.Id, cancellationToken);
-        if (group is null)
-        {
-            group = new CapstoneGroup
-            {
-                Code = "TEST_GROUP_SMART_HOME", TopicId = topic.Id, SemesterId = semester.Id,
-                LecturerId = lecturer.Id, Status = GroupStatus.Active
-            };
-            dbContext.CapstoneGroups.Add(group);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        else { group.LecturerId = lecturer.Id; group.Status = GroupStatus.Active; }
-        var students = new[]
+        Topic topic = await EnsureTopicAsync(semester, title, cancellationToken);
+        CapstoneGroup group = await EnsureGroupAsync(semester.Id, topic.Id, lecturer.Id, cancellationToken);
+        StudentSeed[] students = new[]
         {
             new StudentSeed("Huỳnh Nhật Thịnh", "SE194673", "duongduy12317@gmail.com", false),
             new StudentSeed("Phạm Thị Ánh", "SE182446", "thanhduykx@gmail.com", false),
@@ -212,11 +181,11 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             new StudentSeed("Nguyễn Minh Thành", "SE191034", "ab@gmail.com", false)
         };
         var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12);
-        foreach (var seed in students)
+        foreach (StudentSeed? seed in students)
         {
-            var student = await dbContext.Students.FirstOrDefaultAsync(x => x.Code == seed.Code, cancellationToken);
+            Student? student = await dbContext.Students.FirstOrDefaultAsync(x => x.Code == seed.Code, cancellationToken);
             var username = AccountUsernameGenerator.Generate(seed.FullName, seed.Code);
-            var user = student is not null
+            User? user = student is not null
                 ? await dbContext.Users.SingleAsync(x => x.Id == student.UserId, cancellationToken)
                 : await dbContext.Users.FirstOrDefaultAsync(x =>
                     x.Username == username || x.Email == seed.Email, cancellationToken);
@@ -252,6 +221,66 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         }
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task<Semester> EnsureSemesterAsync(CancellationToken cancellationToken)
+    {
+        Semester? semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
+            ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026", cancellationToken);
+        if (semester is not null)
+        {
+            semester.IsActive = true;
+            return semester;
+        }
+        semester = new Semester
+        {
+            Code = "SU2026", Name = "Summer 2026", AcademicYear = "2025-2026",
+            StartDate = new DateOnly(2026, 5, 1), EndDate = new DateOnly(2026, 8, 31), IsActive = true
+        };
+        dbContext.Semesters.Add(semester);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return semester;
+    }
+
+    private async Task<Topic> EnsureTopicAsync(
+        Semester semester,
+        string title,
+        CancellationToken cancellationToken)
+    {
+        Topic? topic = await dbContext.Topics.FirstOrDefaultAsync(x =>
+            x.SemesterId == semester.Id && (x.NameVn == title || x.NameEn == title), cancellationToken);
+        if (topic is not null) return topic;
+        topic = new Topic
+        {
+            Code = BuildTopicCode(semester.Code), NameVn = title, NameEn = title, SemesterId = semester.Id
+        };
+        dbContext.Topics.Add(topic);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return topic;
+    }
+
+    private async Task<CapstoneGroup> EnsureGroupAsync(
+        int semesterId,
+        int topicId,
+        int lecturerId,
+        CancellationToken cancellationToken)
+    {
+        CapstoneGroup? group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
+            x.SemesterId == semesterId && x.TopicId == topicId, cancellationToken);
+        if (group is null)
+        {
+            group = new CapstoneGroup
+            {
+                Code = "TEST_GROUP_SMART_HOME", TopicId = topicId, SemesterId = semesterId,
+                LecturerId = lecturerId, Status = GroupStatus.Active
+            };
+            dbContext.CapstoneGroups.Add(group);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return group;
+        }
+        group.LecturerId = lecturerId;
+        group.Status = GroupStatus.Active;
+        return group;
     }
 
     private static string BuildTopicCode(string semesterCode)

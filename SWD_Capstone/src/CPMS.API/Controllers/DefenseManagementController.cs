@@ -19,7 +19,7 @@ public sealed class DefenseManagementController(IDefenseManagementService defens
     public async Task<PagedResult<DefenseRoundResponse>> GetRounds(
         [FromQuery] PagedRequest request, CancellationToken cancellationToken)
     {
-        var result = await defenseService.GetRoundsAsync(request, cancellationToken);
+        PagedResult<DefenseRoundResult> result = await defenseService.GetRoundsAsync(request, cancellationToken);
         return new PagedResult<DefenseRoundResponse>(
             result.Items.Select(MapRound).ToArray(), result.Page, result.PageSize, result.TotalCount);
     }
@@ -30,7 +30,7 @@ public sealed class DefenseManagementController(IDefenseManagementService defens
         CreateDefenseRoundRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await defenseService.CreateRoundAsync(
+        DefenseRoundResult result = await defenseService.CreateRoundAsync(
             new CreateDefenseRoundCommand(
                 request.Code, request.Name, request.SemesterId, request.Type, request.StartDate, request.EndDate),
             CurrentActor(), cancellationToken);
@@ -43,7 +43,7 @@ public sealed class DefenseManagementController(IDefenseManagementService defens
         CreateDefenseBoardRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await defenseService.CreateBoardAsync(
+        DefenseBoardResult result = await defenseService.CreateBoardAsync(
             new CreateDefenseBoardCommand(
                 request.Code, request.SemesterId, request.Type, request.ChairmanId,
                 request.SecretaryId, request.MemberLecturerIds),
@@ -72,7 +72,7 @@ public sealed class DefenseManagementController(IDefenseManagementService defens
         AssignDefenseSessionRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await defenseService.AssignSessionAsync(
+        DefenseSessionAssignmentResult result = await defenseService.AssignSessionAsync(
             new AssignDefenseSessionCommand(
                 request.Code, request.DefenseRoundId, request.CouncilId, request.GroupId,
                 request.SessionDate, request.Slot, request.Room),

@@ -11,7 +11,7 @@ public sealed class ProjectSuggestionServiceTests
         var generator = new StubGenerator(expected);
         var service = new ProjectSuggestionService(generator);
 
-        var result = await service.GenerateAsync(
+        ProjectSuggestionResult result = await service.GenerateAsync(
             new ProjectSuggestionInput("  CPMS  ", "  Project details  "),
             CancellationToken.None);
 

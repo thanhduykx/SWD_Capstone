@@ -22,7 +22,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
         }
         catch (ValidationException exception)
         {
-            var errors = exception.Errors
+            ApiError[] errors = exception.Errors
                 .Select(error => new ApiError("validation", error.ErrorMessage, error.PropertyName))
                 .ToArray();
             await WriteErrorAsync(context, StatusCodes.Status400BadRequest, "Validation failed.", "validation", errors);
@@ -73,7 +73,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
     {
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
-        var response = ApiResponse<object>.Fail(
+        var response = ApiResponse.Fail<object>(
             statusCode,
             message,
             context.TraceIdentifier,

@@ -50,7 +50,7 @@ public sealed class ReviewSchedulingController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await assignmentService.GenerateAsync(
+            GenerateReviewAssignmentsResult result = await assignmentService.GenerateAsync(
                 new GenerateReviewAssignmentsCommand(
                     request.SemesterId,
                     request.ReviewType,
@@ -84,7 +84,7 @@ public sealed class ReviewSchedulingController(
         int semesterId,
         CancellationToken cancellationToken)
     {
-        var results = await roundService.GetRoundsAsync(semesterId, cancellationToken);
+        IReadOnlyList<ReviewRoundManagementResult> results = await roundService.GetRoundsAsync(semesterId, cancellationToken);
         return results.Select(MapRound).ToArray();
     }
 
@@ -95,7 +95,7 @@ public sealed class ReviewSchedulingController(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await roundService.CreateRoundAsync(
+        ReviewRoundManagementResult result = await roundService.CreateRoundAsync(
             CurrentUserId(),
             User.IsInRole(nameof(UserRole.SystemAdministrator)),
             request.SemesterId,
@@ -138,7 +138,7 @@ public sealed class ReviewSchedulingController(
         int roundId,
         CancellationToken cancellationToken)
     {
-        var results = await boardService.GetStudentRegistrationsAsync(roundId, cancellationToken);
+        IReadOnlyList<StudentSlotRegistrationResult> results = await boardService.GetStudentRegistrationsAsync(roundId, cancellationToken);
         return results.Select(x => new StudentSlotRegistrationResponse(
             x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray();
     }

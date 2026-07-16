@@ -3,6 +3,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Reviews;
 
@@ -11,8 +12,9 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
     public async Task<TResult> ExecuteInTransactionAsync<TResult>(
         Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var result = await operation(cancellationToken);
+        ArgumentNullException.ThrowIfNull(operation);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        TResult? result = await operation(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
@@ -111,6 +113,7 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
     public async Task<ReviewSessionResult> CreateSessionAsync(
         PersistReviewSession input, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(input);
         var session = new ReviewSession
         {
             Code = input.Code,
@@ -145,7 +148,8 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
     public async Task<ReviewSessionResult> UpdateSessionAsync(
         int sessionId, PersistReviewSessionUpdate update, CancellationToken cancellationToken)
     {
-        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(update);
+        ReviewSession session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
         session.Code = update.Code;
         session.Room = update.Room;
         session.SessionDate = update.SessionDate;
@@ -154,9 +158,9 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
         session.Reviewer1Id = update.ReviewerIds.ElementAtOrDefault(0);
         session.Reviewer2Id = update.ReviewerIds.Count > 1 ? update.ReviewerIds[1] : null;
         session.Status = update.Status;
-        var groupIds = await dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId)
+        List<int> groupIds = await dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId)
             .Select(x => x.GroupId).ToListAsync(cancellationToken);
-        var submissions = await dbContext.ReviewChecklistSubmissions.Where(x => x.SessionId == sessionId)
+        List<ReviewChecklistSubmission> submissions = await dbContext.ReviewChecklistSubmissions.Where(x => x.SessionId == sessionId)
             .ToListAsync(cancellationToken);
         dbContext.ReviewChecklistSubmissions.RemoveRange(
             submissions.Where(x => !update.ReviewerIds.Contains(x.ReviewerId)));
@@ -210,8 +214,8 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
 
     private async Task<ReviewSessionResult> MapSessionAsync(int sessionId, CancellationToken cancellationToken)
     {
-        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
-        var groups = await dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId)
+        ReviewSession session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        List<ReviewSessionGroupResult> groups = await dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId)
             .OrderBy(x => x.GroupPosition)
             .Select(x => new ReviewSessionGroupResult(
                 x.GroupId,

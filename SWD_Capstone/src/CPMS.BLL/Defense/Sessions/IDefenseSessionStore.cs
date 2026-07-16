@@ -35,7 +35,7 @@ public interface IDefenseSessionStore
     Task<SubmittedDefenseScoreResult> SaveScoreAsync(
         int sessionId,
         int lecturerId,
-        SubmitDefenseScoreData score,
+        SubmitDefenseScoreData input,
         ExistingDefenseScore existing,
         DefenseSessionActor actor,
         DateTime submittedAt,
@@ -47,7 +47,7 @@ public interface IDefenseSessionStore
     Task<DefenseEvidenceResult> SaveEvidenceAsync(
         int sessionId,
         int lecturerId,
-        UploadDefenseEvidenceData evidence,
+        UploadDefenseEvidenceData input,
         DefenseSessionActor actor,
         DateTime capturedAt,
         CancellationToken cancellationToken);

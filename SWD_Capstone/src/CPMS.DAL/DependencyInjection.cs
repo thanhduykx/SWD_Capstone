@@ -38,6 +38,7 @@ public static class DependencyInjection
         IConfiguration configuration,
         IConfigurationSection? geminiConfiguration = null)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
         services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IReviewRegistrationStore, ReviewRegistrationStore>();
@@ -64,7 +65,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<,>), typeof(GenericRepository<,>));
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 
-        var geminiOptions = (geminiConfiguration ?? configuration.GetSection(GeminiOptions.SectionName))
+        GeminiOptions geminiOptions = (geminiConfiguration ?? configuration.GetSection(GeminiOptions.SectionName))
             .Get<GeminiOptions>()
             ?? new GeminiOptions();
         if (string.IsNullOrWhiteSpace(geminiOptions.Model))
@@ -79,7 +80,9 @@ public static class DependencyInjection
         services.AddSingleton(geminiOptions);
         services.AddHttpClient<IProjectSuggestionGenerator, GeminiProjectSuggestionGenerator>(client =>
         {
+#pragma warning disable S1075 // Fixed vendor API endpoint; credentials and model remain configuration-driven.
             client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+#pragma warning restore S1075
             client.Timeout = TimeSpan.FromSeconds(geminiOptions.TimeoutSeconds);
         });
 

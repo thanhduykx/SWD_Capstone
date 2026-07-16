@@ -37,7 +37,7 @@ public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
         message.To.Add(recipientEmail);
         using var client = new SmtpClient(host, configuration.GetValue("Smtp:Port", 587))
         {
-            EnableSsl = configuration.GetValue("Smtp:EnableSsl", true)
+            EnableSsl = true
         };
         var userName = configuration["Smtp:UserName"];
         if (!string.IsNullOrWhiteSpace(userName))

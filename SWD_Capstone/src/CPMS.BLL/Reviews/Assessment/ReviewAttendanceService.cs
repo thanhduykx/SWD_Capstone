@@ -9,7 +9,8 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     public async Task<ReviewAttendanceResult> GetAttendanceAsync(
         int sessionId, int? groupId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewAttendance(context, actor);
         return await BuildAttendanceAsync(context, cancellationToken);
     }
@@ -22,7 +23,8 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        var context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         if (actor.Role != UserRole.Lecturer || context.LecturerId is null ||
             context.SessionStatus != ReviewSessionStatus.Published ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
@@ -41,7 +43,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         {
             throw new BusinessRuleException("Attendance notes cannot exceed 1000 characters.");
         }
-        var validStudentIds = await store.GetStudentIdsAsync(context.GroupId, cancellationToken);
+        IReadOnlySet<int> validStudentIds = await store.GetStudentIdsAsync(context.GroupId, cancellationToken);
         if (entries.Any(x => !validStudentIds.Contains(x.StudentId)))
         {
             throw new BusinessRuleException("Every attendance entry must belong to the selected group.");
@@ -54,7 +56,8 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     public async Task<IReadOnlyList<ReviewCommentResult>> GetCommentsAsync(
         int sessionId, int? groupId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewComments(context, actor);
         return await store.GetCommentsAsync(sessionId, context.GroupId, cancellationToken);
     }
@@ -66,7 +69,8 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         ReviewActor actor,
         CancellationToken cancellationToken)
     {
-        var context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         if (actor.Role != UserRole.Lecturer || context.LecturerId is null ||
             context.SessionStatus != ReviewSessionStatus.Published ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
@@ -89,7 +93,8 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     public async Task<CompleteReviewResult> CompleteAsync(
         int sessionId, int groupId, ReviewActor actor, CancellationToken cancellationToken)
     {
-        var context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         if (actor.Role != UserRole.Lecturer || context.LecturerId is null ||
             !context.ReviewerIds.Contains(context.LecturerId.Value))
         {
@@ -104,7 +109,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             return new CompleteReviewResult(
                 sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
-        var counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
+        (int StudentCount, int AttendanceCount, int SubmittedCount) counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
         if (counts.StudentCount == 0 || counts.AttendanceCount != counts.StudentCount ||
             counts.SubmittedCount != context.ReviewerIds.Count)
         {
@@ -118,7 +123,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     private async Task<ReviewAttendanceContext> RequireContextAsync(
         int sessionId, int? groupId, int userId, CancellationToken cancellationToken)
     {
-        var lookup = await store.LoadContextAsync(sessionId, groupId, userId, cancellationToken);
+        ReviewAttendanceContextLookup lookup = await store.LoadContextAsync(sessionId, groupId, userId, cancellationToken);
         if (!lookup.SessionExists) throw new KeyNotFoundException("Review session not found.");
         return lookup.Context ?? throw new KeyNotFoundException("No group assigned to this session.");
     }

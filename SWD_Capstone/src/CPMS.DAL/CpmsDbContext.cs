@@ -1,6 +1,7 @@
 using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace CPMS.DAL.Data;
 
@@ -474,13 +475,11 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             throw new InvalidOperationException("Audit logs are append-only and cannot be changed or deleted.");
         }
 
-        foreach (var entry in ChangeTracker.Entries<Score>()
-                     .Where(x => x.State is EntityState.Modified or EntityState.Deleted))
+        if (ChangeTracker.Entries<Score>()
+            .Where(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            .Any(entry => entry.OriginalValues.GetValue<bool>(nameof(Score.IsLocked))))
         {
-            if (entry.OriginalValues.GetValue<bool>(nameof(Score.IsLocked)))
-            {
-                throw new InvalidOperationException("Locked scores cannot be changed or deleted.");
-            }
+            throw new InvalidOperationException("Locked scores cannot be changed or deleted.");
         }
     }
 }

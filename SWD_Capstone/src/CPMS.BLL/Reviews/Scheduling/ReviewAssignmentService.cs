@@ -34,29 +34,16 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         int? seed,
         CancellationToken cancellationToken)
     {
-        var snapshot = await store.LoadSnapshotAsync(scope, cancellationToken);
-        if (!snapshot.SemesterExists)
-        {
-            throw new BusinessRuleException("Semester does not exist.");
-        }
-        if (snapshot.RoundId is null)
-        {
-            throw new BusinessRuleException("The selected review round does not exist.");
-        }
-        if (snapshot.RoundStatus != ReviewRoundStatus.Closed)
-        {
-            throw new ConflictException("The review round must be Closed before assignments can be generated.");
-        }
-        if (snapshot.SubmittedAvailability.Count == 0)
-        {
-            throw new BusinessRuleException("No submitted lecturer availability exists for this week.");
-        }
+        ReviewAssignmentSnapshot snapshot = await store.LoadSnapshotAsync(scope, cancellationToken);
+        ValidateSnapshot(snapshot);
         if (snapshot.Groups.Count == 0)
         {
             return new GenerateReviewAssignmentsResult(0, 0, [], []);
         }
 
-        var random = seed.HasValue ? new Random(seed.Value) : new Random();
+#pragma warning disable S2245 // Scheduling randomization is non-security-sensitive; seeds enable deterministic tests.
+        Random random = seed.HasValue ? new Random(seed.Value) : new Random();
+#pragma warning restore S2245
         var usedCodes = snapshot.UsedSessionCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var occupiedSlots = snapshot.OccupiedReviewerSlots
             .Select(x => OccupiedKey(x.LecturerId, x.SessionDate, x.Slot))
@@ -66,71 +53,29 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         var unassignedGroups = new List<UnassignedReviewGroup>();
         var roomPrefix = string.IsNullOrWhiteSpace(requestedRoomPrefix) ? "AUTO" : requestedRoomPrefix.Trim();
 
-        foreach (var group in Shuffle(snapshot.Groups, random))
+        foreach (AssignmentGroup? group in Shuffle(snapshot.Groups, random))
         {
-            if (!snapshot.StudentAvailabilityByGroup.TryGetValue(group.Id, out var groupAvailability) ||
-                groupAvailability.Count != AssignmentRules.RequiredStudentAvailabilityCount)
+            if (!TryGetStudentAvailability(snapshot, group.Id, out IReadOnlySet<string> groupAvailability))
             {
                 unassignedGroups.Add(new UnassignedReviewGroup(
                     group.Id, group.Code, "The group leader did not submit exactly five available slots."));
                 continue;
             }
 
-            var previousReviewerIds = snapshot.PreviousReviewerIdsByGroup.TryGetValue(group.Id, out var previous)
+            IReadOnlySet<int> previousReviewerIds = snapshot.PreviousReviewerIdsByGroup.TryGetValue(group.Id, out IReadOnlySet<int>? previous)
                 ? previous
                 : new HashSet<int>();
-            var selectedPanel = panels
-                .Where(panel => panel.GroupCount < 3 &&
-                                panel.ReviewerIds.Count == reviewersPerSession &&
-                                groupAvailability.Contains(SlotKey(panel.DayOfWeek, panel.Slot)) &&
-                                !panel.ReviewerIds.Contains(group.SupervisorId) &&
-                                !panel.ReviewerIds.Any(previousReviewerIds.Contains))
-                .OrderByDescending(panel => panel.GroupCount)
-                .FirstOrDefault();
-
+            MutablePanel? selectedPanel = FindReusablePanel(
+                panels, group, groupAvailability, previousReviewerIds, reviewersPerSession);
+            selectedPanel ??= await CreatePanelAsync(
+                scope, snapshot, group, groupAvailability, previousReviewerIds,
+                reviewersPerSession, roomPrefix, panels, occupiedSlots, usedCodes, random,
+                cancellationToken);
             if (selectedPanel is null)
             {
-                var eligibleSlots = snapshot.SubmittedAvailability
-                    .Where(slot => slot.LecturerId != group.SupervisorId &&
-                                   groupAvailability.Contains(SlotKey(slot.DayOfWeek, slot.Slot)) &&
-                                   !previousReviewerIds.Contains(slot.LecturerId) &&
-                                   !occupiedSlots.Contains(OccupiedKey(
-                                       slot.LecturerId,
-                                       SessionDate(scope.WeekStart, slot.DayOfWeek),
-                                       slot.Slot)))
-                    .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
-                    .Where(slotGroup => slotGroup.Select(slot => slot.LecturerId).Distinct().Count() >= reviewersPerSession)
-                    .ToArray();
-                if (eligibleSlots.Length == 0)
-                {
-                    unassignedGroups.Add(new UnassignedReviewGroup(
-                        group.Id, group.Code, "No shared student/lecturer slot satisfies reviewer conflict rules."));
-                    continue;
-                }
-
-                var selectedSlot = Shuffle(eligibleSlots, random)[0];
-                var reviewerIds = Shuffle(selectedSlot.Select(x => x.LecturerId).Distinct(), random)
-                    .Take(reviewersPerSession).ToArray();
-                rules.ValidateReviewAssignment(group.SupervisorId, reviewerIds, previousReviewerIds);
-                var sessionDate = SessionDate(scope.WeekStart, selectedSlot.Key.DayOfWeek);
-                var createdPanel = await store.CreatePanelAsync(
-                    new CreateAssignmentPanel(
-                        NextSessionCode(snapshot.SemesterCode!, scope.ReviewType, group.Code, sessionDate,
-                            selectedSlot.Key.Slot, usedCodes),
-                        scope.SemesterId,
-                        selectedSlot.Key.DayOfWeek,
-                        selectedSlot.Key.Slot,
-                        $"{roomPrefix}-{selectedSlot.Key.DayOfWeek}{selectedSlot.Key.Slot}-{panels.Count + 1:D2}",
-                        scope.ReviewType,
-                        reviewerIds,
-                        sessionDate),
-                    cancellationToken);
-                selectedPanel = new MutablePanel(createdPanel);
-                panels.Add(selectedPanel);
-                foreach (var reviewerId in reviewerIds)
-                {
-                    occupiedSlots.Add(OccupiedKey(reviewerId, sessionDate, selectedPanel.Slot));
-                }
+                unassignedGroups.Add(new UnassignedReviewGroup(
+                    group.Id, group.Code, "No shared student/lecturer slot satisfies reviewer conflict rules."));
+                continue;
             }
 
             rules.EnsureReviewSessionCapacity(selectedPanel.GroupCount);
@@ -148,6 +93,92 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
 
         return new GenerateReviewAssignmentsResult(
             snapshot.Groups.Count, assignedSessions.Count, unassignedGroups, assignedSessions);
+    }
+
+    private static void ValidateSnapshot(ReviewAssignmentSnapshot snapshot)
+    {
+        if (!snapshot.SemesterExists) throw new BusinessRuleException("Semester does not exist.");
+        if (snapshot.RoundId is null)
+            throw new BusinessRuleException("The selected review round does not exist.");
+        if (snapshot.RoundStatus != ReviewRoundStatus.Closed)
+            throw new ConflictException("The review round must be Closed before assignments can be generated.");
+        if (snapshot.SubmittedAvailability.Count == 0)
+            throw new BusinessRuleException("No submitted lecturer availability exists for this week.");
+    }
+
+    private static bool TryGetStudentAvailability(
+        ReviewAssignmentSnapshot snapshot,
+        int groupId,
+        out IReadOnlySet<string> availability)
+    {
+        if (snapshot.StudentAvailabilityByGroup.TryGetValue(groupId, out IReadOnlySet<string>? selected) &&
+            selected.Count == AssignmentRules.RequiredStudentAvailabilityCount)
+        {
+            availability = selected;
+            return true;
+        }
+        availability = new HashSet<string>();
+        return false;
+    }
+
+    private static MutablePanel? FindReusablePanel(
+        IEnumerable<MutablePanel> panels,
+        AssignmentGroup group,
+        IReadOnlySet<string> groupAvailability,
+        IReadOnlySet<int> previousReviewerIds,
+        int reviewersPerSession) => panels
+        .Where(panel => panel.GroupCount < AssignmentRules.MaxGroupsPerReviewSession &&
+                        panel.ReviewerIds.Count == reviewersPerSession &&
+                        groupAvailability.Contains(SlotKey(panel.DayOfWeek, panel.Slot)) &&
+                        !panel.ReviewerIds.Contains(group.SupervisorId) &&
+                        !panel.ReviewerIds.Any(previousReviewerIds.Contains))
+        .OrderByDescending(panel => panel.GroupCount)
+        .FirstOrDefault();
+
+    private async Task<MutablePanel?> CreatePanelAsync(
+        ReviewAssignmentScope scope,
+        ReviewAssignmentSnapshot snapshot,
+        AssignmentGroup group,
+        IReadOnlySet<string> groupAvailability,
+        IReadOnlySet<int> previousReviewerIds,
+        int reviewersPerSession,
+        string roomPrefix,
+        List<MutablePanel> panels,
+        HashSet<string> occupiedSlots,
+        HashSet<string> usedCodes,
+        Random random,
+        CancellationToken cancellationToken)
+    {
+        var eligibleSlots = snapshot.SubmittedAvailability
+            .Where(slot => slot.LecturerId != group.SupervisorId &&
+                           groupAvailability.Contains(SlotKey(slot.DayOfWeek, slot.Slot)) &&
+                           !previousReviewerIds.Contains(slot.LecturerId) &&
+                           !occupiedSlots.Contains(OccupiedKey(
+                               slot.LecturerId, SessionDate(scope.WeekStart, slot.DayOfWeek), slot.Slot)))
+            .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
+            .Where(groupedSlots =>
+                groupedSlots.Select(slot => slot.LecturerId).Distinct().Count() >= reviewersPerSession)
+            .ToArray();
+        if (eligibleSlots.Length == 0) return null;
+
+        var selectedSlot = Shuffle(eligibleSlots, random)[0];
+        var reviewerIds = Shuffle(selectedSlot.Select(x => x.LecturerId).Distinct(), random)
+            .Take(reviewersPerSession).ToArray();
+        rules.ValidateReviewAssignment(group.SupervisorId, reviewerIds, previousReviewerIds);
+        DateTime sessionDate = SessionDate(scope.WeekStart, selectedSlot.Key.DayOfWeek);
+        AssignmentPanel created = await store.CreatePanelAsync(
+            new CreateAssignmentPanel(
+                NextSessionCode(snapshot.SemesterCode!, scope.ReviewType, group.Code, sessionDate,
+                    selectedSlot.Key.Slot, usedCodes),
+                scope.SemesterId, selectedSlot.Key.DayOfWeek, selectedSlot.Key.Slot,
+                $"{roomPrefix}-{selectedSlot.Key.DayOfWeek}{selectedSlot.Key.Slot}-{panels.Count + 1:D2}",
+                scope.ReviewType, reviewerIds, sessionDate),
+            cancellationToken);
+        var panel = new MutablePanel(created);
+        panels.Add(panel);
+        foreach (var reviewerId in reviewerIds)
+            occupiedSlots.Add(OccupiedKey(reviewerId, sessionDate, panel.Slot));
+        return panel;
     }
 
     private static DateTime SessionDate(DateOnly weekStart, int dayOfWeek) =>
@@ -177,7 +208,7 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
 
     private static T[] Shuffle<T>(IEnumerable<T> source, Random random)
     {
-        var items = source.ToArray();
+        T[] items = source.ToArray();
         for (var index = items.Length - 1; index > 0; index--)
         {
             var swapIndex = random.Next(index + 1);
@@ -189,18 +220,18 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
     private sealed class MutablePanel(AssignmentPanel panel)
     {
         public int SessionId { get; } = panel.SessionId;
-        public string Code { get; } = panel.Code;
+        public string SessionCode { get; } = panel.Code;
         public ReviewType Type { get; } = panel.Type;
         public ReviewSessionStatus Status { get; } = panel.Status;
         public IReadOnlyList<int> ReviewerIds { get; } = panel.ReviewerIds;
-        public DateTime SessionDate { get; } = panel.SessionDate;
+        public DateTime ScheduledAt { get; } = panel.SessionDate;
         public int DayOfWeek { get; } = panel.DayOfWeek;
         public int Slot { get; } = panel.Slot;
         public string Room { get; } = panel.Room;
         public int GroupCount { get; set; } = panel.GroupCount;
 
         public ReviewSchedulingSession ToResult(AssignmentGroup group) =>
-            new(SessionId, Code, group.Id, group.Code, Type, Status, ReviewerIds,
-                SessionDate, DayOfWeek, Slot, Room);
+            new(SessionId, SessionCode, group.Id, group.Code, Type, Status, ReviewerIds,
+                ScheduledAt, DayOfWeek, Slot, Room);
     }
 }

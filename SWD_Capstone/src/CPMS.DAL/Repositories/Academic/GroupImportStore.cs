@@ -3,6 +3,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Academic;
 
@@ -11,8 +12,9 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
     public async Task<TResult> ExecuteInTransactionAsync<TResult>(
         Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var result = await operation(cancellationToken);
+        ArgumentNullException.ThrowIfNull(operation);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        TResult? result = await operation(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
@@ -21,7 +23,7 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
     public async Task<(int Id, bool Created)> UpsertTopicAsync(
         int semesterId, string code, string title, CancellationToken cancellationToken)
     {
-        var topic = await dbContext.Topics.FirstOrDefaultAsync(x =>
+        Topic? topic = await dbContext.Topics.FirstOrDefaultAsync(x =>
             x.SemesterId == semesterId && x.Code == code, cancellationToken);
         var created = topic is null;
         if (topic is null)
@@ -37,7 +39,7 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
     public async Task<(int Id, bool Created)> UpsertGroupAsync(
         int semesterId, string code, int topicId, int lecturerId, CancellationToken cancellationToken)
     {
-        var group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
+        CapstoneGroup? group = await dbContext.CapstoneGroups.FirstOrDefaultAsync(x =>
             x.SemesterId == semesterId && x.Code == code, cancellationToken);
         var created = group is null;
         if (group is null)
@@ -79,7 +81,7 @@ public sealed class GroupImportStore(CpmsDbContext dbContext) : IGroupImportStor
         bool isLeader,
         CancellationToken cancellationToken)
     {
-        var student = await dbContext.Students.FirstOrDefaultAsync(
+        Student? student = await dbContext.Students.FirstOrDefaultAsync(
             x => x.Code == studentCode, cancellationToken);
         var created = student is null;
         if (student is null)

@@ -10,17 +10,19 @@ public sealed record CreateAccountRequest(
     string? IdentityCode,
     string Email,
     string Password,
-    UserRole Role,
+    [property: JsonRequired] UserRole Role,
     string? FullName,
     string? Department,
     string? Position,
     string? PermissionScope,
-    bool IsPartTime,
+    [property: JsonRequired] bool IsPartTime,
     string? ClassCode,
     string? Batch,
     string? Major);
-public sealed record UpdateAccountStatusRequest(bool IsActive, bool Unlock);
-public sealed record UpdateAccountRoleRequest(UserRole Role);
+public sealed record UpdateAccountStatusRequest(
+    [property: JsonRequired] bool IsActive,
+    [property: JsonRequired] bool Unlock);
+public sealed record UpdateAccountRoleRequest([property: JsonRequired] UserRole Role);
 public sealed record AccountCreatedResponse(
     int Id,
     string Username,

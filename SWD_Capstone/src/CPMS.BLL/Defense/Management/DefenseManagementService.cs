@@ -18,6 +18,7 @@ public sealed class DefenseManagementService(IDefenseManagementStore store) : ID
         CreateDefenseRoundCommand command, DefenseActor actor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(actor);
         EnsureDateRange(command.StartDate, command.EndDate);
         var code = Required(command.Code, "Defense round code is required.");
         var name = Required(command.Name, "Defense round name is required.");
@@ -33,6 +34,7 @@ public sealed class DefenseManagementService(IDefenseManagementStore store) : ID
         CreateDefenseBoardCommand command, DefenseActor actor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(actor);
         var code = Required(command.Code, "Defense board code is required.");
         if (!await store.SemesterExistsAsync(command.SemesterId, cancellationToken))
             throw new BusinessRuleException("Semester does not exist.");
@@ -60,14 +62,15 @@ public sealed class DefenseManagementService(IDefenseManagementStore store) : ID
         AssignDefenseSessionCommand command, DefenseActor actor, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(actor);
         var code = Required(command.Code, "Defense session code is required.");
         var room = Required(command.Room, "Defense room is required.");
         var moderatorId = await RequireModeratorAsync(actor, cancellationToken);
-        var round = await store.FindRoundAsync(command.DefenseRoundId, cancellationToken)
+        DefenseRoundState round = await store.FindRoundAsync(command.DefenseRoundId, cancellationToken)
             ?? throw new KeyNotFoundException("Defense round does not exist.");
-        var council = await store.FindCouncilAsync(command.CouncilId, cancellationToken)
+        DefenseCouncilState council = await store.FindCouncilAsync(command.CouncilId, cancellationToken)
             ?? throw new KeyNotFoundException("Defense board does not exist.");
-        var group = await store.FindGroupAsync(command.GroupId, cancellationToken)
+        DefenseGroupState group = await store.FindGroupAsync(command.GroupId, cancellationToken)
             ?? throw new KeyNotFoundException("Project/group does not exist.");
         if (council.SemesterId != round.SemesterId || group.SemesterId != round.SemesterId)
             throw new BusinessRuleException("Defense round, board and project must belong to the same semester.");

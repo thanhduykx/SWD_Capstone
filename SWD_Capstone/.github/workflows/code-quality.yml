@@ -1,0 +1,60 @@
+name: Code quality
+
+on:
+  pull_request:
+  push:
+    branches: [main, master, steveDuong]
+
+permissions:
+  contents: read
+
+jobs:
+  sonar:
+    runs-on: windows-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: thanhduykx_SWD_Capstone
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install SonarScanner
+        shell: pwsh
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarQube analysis
+        shell: pwsh
+        run: >-
+          dotnet-sonarscanner begin
+          /k:"$env:SONAR_PROJECT_KEY"
+          /o:"thanhduykx"
+          /d:sonar.token="$env:SONAR_TOKEN"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+
+      - name: Build with warnings as errors
+        shell: pwsh
+        run: dotnet build CPMS.sln --configuration Release --no-incremental -p:CI=true
+
+      - name: Test with coverage
+        shell: pwsh
+        run: >-
+          dotnet test CPMS.sln
+          --configuration Release
+          --no-build
+          --collect:"XPlat Code Coverage"
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: End SonarQube analysis
+        shell: pwsh
+        run: dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+
+      - name: Enforce repository quality thresholds
+        shell: pwsh
+        run: ./scripts/verify-sonar-quality.ps1

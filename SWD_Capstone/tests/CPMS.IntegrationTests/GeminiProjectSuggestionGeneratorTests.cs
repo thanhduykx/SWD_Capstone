@@ -32,10 +32,10 @@ public sealed class GeminiProjectSuggestionGeneratorTests
         {
             Content = new StringContent(geminiResponse, Encoding.UTF8, "application/json")
         });
-        using var httpClient = CreateHttpClient(handler);
-        var generator = CreateGenerator(httpClient);
+        using HttpClient httpClient = CreateHttpClient(handler);
+        GeminiProjectSuggestionGenerator generator = CreateGenerator(httpClient);
 
-        var result = await generator.GenerateAsync(
+        ProjectSuggestionResult result = await generator.GenerateAsync(
             new ProjectSuggestionInput("CPMS", "Quản lý lịch review và nhận xét đồ án."),
             CancellationToken.None);
 
@@ -48,7 +48,7 @@ public sealed class GeminiProjectSuggestionGeneratorTests
         Assert.Equal("test-api-key", handler.ApiKey);
 
         using var requestJson = JsonDocument.Parse(Assert.IsType<string>(handler.RequestBody));
-        var root = requestJson.RootElement;
+        JsonElement root = requestJson.RootElement;
         Assert.Contains(
             "giảng viên",
             root.GetProperty("systemInstruction").GetProperty("parts")[0]
@@ -59,17 +59,19 @@ public sealed class GeminiProjectSuggestionGeneratorTests
             root.GetProperty("generationConfig").GetProperty("responseMimeType").GetString());
         var required = root.GetProperty("generationConfig").GetProperty("responseSchema")
             .GetProperty("required").EnumerateArray().Select(x => x.GetString()).ToArray();
-        Assert.Equal(
-            ["contentSummary", "strengthsSummary", "improvementSummary"],
-            required);
+        Assert.Collection(
+            required,
+            value => Assert.Equal("contentSummary", value),
+            value => Assert.Equal("strengthsSummary", value),
+            value => Assert.Equal("improvementSummary", value));
     }
 
     [Fact]
     public async Task GenerateAsync_WhenApiKeyIsBlank_DoesNotCallGemini()
     {
         var handler = new RecordingHandler(_ => throw new InvalidOperationException("Must not call HTTP."));
-        using var httpClient = CreateHttpClient(handler);
-        var generator = CreateGenerator(httpClient, string.Empty);
+        using HttpClient httpClient = CreateHttpClient(handler);
+        GeminiProjectSuggestionGenerator generator = CreateGenerator(httpClient, string.Empty);
 
         await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() =>
             generator.GenerateAsync(
@@ -83,8 +85,8 @@ public sealed class GeminiProjectSuggestionGeneratorTests
     public async Task GenerateAsync_WhenGeminiRateLimits_ReportsTemporaryUnavailability()
     {
         var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
-        using var httpClient = CreateHttpClient(handler);
-        var generator = CreateGenerator(httpClient);
+        using HttpClient httpClient = CreateHttpClient(handler);
+        GeminiProjectSuggestionGenerator generator = CreateGenerator(httpClient);
 
         await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() =>
             generator.GenerateAsync(

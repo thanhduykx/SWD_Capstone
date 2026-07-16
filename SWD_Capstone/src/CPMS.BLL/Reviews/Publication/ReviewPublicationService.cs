@@ -25,11 +25,11 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 "A Training Department moderator profile is required for publishing review schedules.");
         var scope = new ReviewPublicationScope(
             command.SemesterId, command.ReviewType, ReviewWeek.NormalizeStart(command.WeekStart));
-        var persisted = await store.ExecuteLockedAsync(
+        (int PublicationId, int SessionCount) persisted = await store.ExecuteLockedAsync(
             scope,
             token => PrepareAndPersistAsync(scope, command, moderatorId, subject, token),
             cancellationToken);
-        var delivery = await store.DispatchEmailsAsync(persisted.PublicationId, CancellationToken.None);
+        (int Sent, int Failed) delivery = await store.DispatchEmailsAsync(persisted.PublicationId, CancellationToken.None);
         return new ReviewSchedulePublicationResult(
             persisted.PublicationId, persisted.SessionCount, delivery.Sent, delivery.Failed);
     }
@@ -41,7 +41,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
         string subject,
         CancellationToken cancellationToken)
     {
-        var snapshot = await store.LoadSnapshotAsync(
+        ReviewPublicationSnapshot snapshot = await store.LoadSnapshotAsync(
             scope, AssignmentRules.RequiredStudentAvailabilityCount, cancellationToken);
         if (snapshot.RoundId is null)
         {
@@ -70,7 +70,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 snapshot.ScheduledGroupCount);
         }
 
-        var emails = BuildEmails(command.Message, subject, snapshot);
+        IReadOnlyList<PublicationEmail> emails = BuildEmails(command.Message, subject, snapshot);
         var publicationId = await store.PersistAsync(
             scope,
             new PersistReviewPublication(
@@ -88,14 +88,14 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
         return (publicationId, snapshot.Sessions.Count);
     }
 
-    private static IReadOnlyList<PublicationEmail> BuildEmails(
+    private static List<PublicationEmail> BuildEmails(
         string? moderatorMessage,
         string reviewerSubject,
         ReviewPublicationSnapshot snapshot)
     {
         var sessions = snapshot.Sessions.ToDictionary(x => x.Id);
         var emails = new List<PublicationEmail>();
-        foreach (var recipient in snapshot.ReviewerRecipients)
+        foreach (PublicationRecipient recipient in snapshot.ReviewerRecipients)
         {
             emails.Add(new PublicationEmail(
                 recipient.UserId,
@@ -104,7 +104,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 BuildReviewerBody(moderatorMessage, recipient.DisplayName,
                     recipient.SessionIds.Select(id => sessions[id]))));
         }
-        foreach (var recipient in snapshot.GroupLeaderRecipients)
+        foreach (PublicationRecipient recipient in snapshot.GroupLeaderRecipients)
         {
             emails.Add(new PublicationEmail(
                 recipient.UserId,
@@ -143,7 +143,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
     }
 
     private static void AddMessageAndSessions(
-        ICollection<string> lines, string? moderatorMessage, IEnumerable<PublicationSession> sessions)
+        List<string> lines, string? moderatorMessage, IEnumerable<PublicationSession> sessions)
     {
         if (!string.IsNullOrWhiteSpace(moderatorMessage))
         {
@@ -151,7 +151,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
             lines.Add(moderatorMessage.Trim());
         }
         lines.Add("");
-        foreach (var session in sessions.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot))
+        foreach (PublicationSession? session in sessions.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot))
         {
             lines.Add($"- {session.Type} | {session.Code} | {session.SessionDate:yyyy-MM-dd} | {SlotTimeLabel(session.Slot)} | Room {session.Room}");
         }

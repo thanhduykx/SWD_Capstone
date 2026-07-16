@@ -8,15 +8,17 @@ public sealed record ApiResponse<T>(
     string Message,
     T? Data,
     IReadOnlyCollection<ApiError> Errors,
-    string TraceId)
+    string TraceId);
+
+public static class ApiResponse
 {
-    public static ApiResponse<T> Ok(T data, string traceId, string message = "OK") =>
+    public static ApiResponse<T> Ok<T>(T data, string traceId, string message = "OK") =>
         new(true, 200, message, data, [], traceId);
 
-    public static ApiResponse<T> Created(T data, string traceId, string message = "Created") =>
+    public static ApiResponse<T> Created<T>(T data, string traceId, string message = "Created") =>
         new(true, 201, message, data, [], traceId);
 
-    public static ApiResponse<T> Fail(
+    public static ApiResponse<T> Fail<T>(
         int statusCode,
         string message,
         string traceId,
