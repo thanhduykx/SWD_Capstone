@@ -40,7 +40,9 @@ public sealed record StudentSlotRegistrationResponse(
     int Slot);
 
 public sealed record ReviewSlotSelection(int DayOfWeek, int Slot);
-public sealed record SaveStudentAvailabilityRequest(int RoundId, IReadOnlyCollection<ReviewSlotSelection> Slots);
+public sealed record SaveStudentAvailabilityRequest(
+    [property: JsonRequired] int RoundId,
+    IReadOnlyCollection<ReviewSlotSelection> Slots);
 
 public sealed record StudentScheduleResponse(
     int SessionId,

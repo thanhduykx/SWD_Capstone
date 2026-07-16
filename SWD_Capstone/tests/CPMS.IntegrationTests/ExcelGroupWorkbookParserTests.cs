@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using CPMS.BLL.Academic.Import;
 using CPMS.BLL.Exceptions;
 using CPMS.DAL.ExternalServices;
 
@@ -6,13 +7,15 @@ namespace CPMS.IntegrationTests;
 
 public sealed class ExcelGroupWorkbookParserTests
 {
+    private const int MaximumWorkbookBytes = 5 * 1024 * 1024;
+
     [Fact]
     public void Parse_ReadsOnlySelectedColumnsAndIdentifiesLeader()
     {
-        using var workbook = CreateWorkbook();
-        var groups = Parse(workbook);
+        using XLWorkbook workbook = CreateWorkbook();
+        IReadOnlyList<ImportedGroupData> groups = Parse(workbook);
 
-        var group = Assert.Single(groups);
+        ImportedGroupData group = Assert.Single(groups);
         Assert.Equal("Smart Home Inventory", group.ProjectTitle);
         Assert.Equal("Dương Thành Thanh Duy", group.LeaderName);
         Assert.Equal(2, group.Students.Count);
@@ -23,10 +26,10 @@ public sealed class ExcelGroupWorkbookParserTests
     [Fact]
     public void Parse_RejectsLeaderWhoIsNotAGroupMember()
     {
-        using var workbook = CreateWorkbook();
+        using XLWorkbook workbook = CreateWorkbook();
         workbook.Worksheet(1).Cell(2, 11).Value = "Người Không Thuộc Nhóm";
 
-        var exception = Assert.Throws<BusinessRuleException>(() =>
+        BusinessRuleException exception = Assert.Throws<BusinessRuleException>(() =>
             Parse(workbook));
 
         Assert.Contains("must match exactly one student", exception.Message, StringComparison.Ordinal);
@@ -35,19 +38,30 @@ public sealed class ExcelGroupWorkbookParserTests
     [Fact]
     public void Parse_RejectsDuplicateStudentCode()
     {
-        using var workbook = CreateWorkbook();
+        using XLWorkbook workbook = CreateWorkbook();
         workbook.Worksheet(1).Cell(3, 6).Value = "SE194673";
 
-        var exception = Assert.Throws<BusinessRuleException>(() =>
+        BusinessRuleException exception = Assert.Throws<BusinessRuleException>(() =>
             Parse(workbook));
 
         Assert.Contains("duplicate MSSV", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Parse_RejectsWorkbookLargerThanConfiguredLimit()
+    {
+        using var stream = new MemoryStream(new byte[MaximumWorkbookBytes + 1]);
+
+        BusinessRuleException exception = Assert.Throws<BusinessRuleException>(() =>
+            new ExcelGroupWorkbookParser().Parse(stream));
+
+        Assert.Contains("5 MB", exception.Message, StringComparison.Ordinal);
+    }
+
     private static XLWorkbook CreateWorkbook()
     {
         var workbook = new XLWorkbook();
-        var worksheet = workbook.AddWorksheet("SU26_EXE101 | Group List");
+        IXLWorksheet worksheet = workbook.AddWorksheet("SU26_EXE101 | Group List");
         worksheet.Cell(1, 1).InsertData(new[]
         {
             new object[]

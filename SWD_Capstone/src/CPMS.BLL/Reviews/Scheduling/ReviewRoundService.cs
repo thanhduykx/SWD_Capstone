@@ -26,13 +26,13 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
 
         var moderatorId = await store.FindModeratorIdAsync(userId, allowModeratorFallback, cancellationToken)
             ?? throw new UnauthorizedAccessException("A Training Department moderator profile is required.");
-        var normalizedStart = ReviewWeek.NormalizeStart(weekStartDate);
+        DateOnly normalizedStart = ReviewWeek.NormalizeStart(weekStartDate);
         if (await store.RoundExistsAsync(semesterId, reviewType, normalizedStart, cancellationToken))
         {
             throw new BusinessRuleException("A review round already exists for this semester, type, and week.");
         }
 
-        var state = await store.CreateRoundAsync(
+        ReviewRoundState state = await store.CreateRoundAsync(
             semesterId, reviewType, normalizedStart, normalizedStart.AddDays(5), moderatorId, cancellationToken);
         return Map(state);
     }
@@ -40,7 +40,7 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
     public async Task<ReviewRoundManagementResult> UpdateStatusAsync(
         int roundId, ReviewRoundStatus nextStatus, CancellationToken cancellationToken)
     {
-        var round = await store.FindRoundAsync(roundId, cancellationToken)
+        ReviewRoundState round = await store.FindRoundAsync(roundId, cancellationToken)
             ?? throw new KeyNotFoundException("Review round not found.");
         try
         {
@@ -51,14 +51,23 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
             throw new ConflictException(exception.Message);
         }
 
-        var openedAt = round.OpenedAt;
-        var closedAt = round.ClosedAt;
+        DateTime? openedAt = round.OpenedAt;
+        DateTime? closedAt = round.ClosedAt;
         if (nextStatus == ReviewRoundStatus.Open && openedAt is null)
         {
             openedAt = DateTime.UtcNow;
         }
         if (nextStatus == ReviewRoundStatus.Closed && closedAt is null)
         {
+            (int ActiveGroups, int CompletedRegistrations) completion = await store.GetRegistrationCompletionAsync(
+                round.Id, round.SemesterId, AssignmentRules.RequiredStudentAvailabilityCount, cancellationToken);
+            if (completion.ActiveGroups == 0 || completion.CompletedRegistrations != completion.ActiveGroups)
+            {
+                throw new ReviewRoundClosureException(
+                    "Every active capstone group must submit exactly five slots before registration closes.",
+                    completion.ActiveGroups,
+                    completion.CompletedRegistrations);
+            }
             closedAt = DateTime.UtcNow;
         }
 

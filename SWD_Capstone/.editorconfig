@@ -31,14 +31,22 @@ dotnet_diagnostic.CA1303.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1716.severity = none
 dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.S3776.severity = warning
 
 [*.{ts,tsx,js,jsx,json,css,md,yml,yaml}]
 indent_style = space
 indent_size = 2
 
-[backend/ServiceLayer/Services/AssignmentRules.cs]
+[src/CPMS.BLL/Services/AssignmentRules.cs]
+# AssignmentRules is intentionally an injectable domain-policy object to keep services testable.
 dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.S2325.severity = none
 
-[backend/DataAccessLayer/Migrations/*.cs]
+[src/CPMS.API/Controllers/{ReviewSchedulingController.cs,V1/AccountsController.cs}]
+# These controllers aggregate commands for one REST resource; splitting would duplicate route ownership.
+dotnet_diagnostic.S6960.severity = none
+
+[src/CPMS.DAL/Migrations/*.cs]
+generated_code = true
 dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.CA1861.severity = none

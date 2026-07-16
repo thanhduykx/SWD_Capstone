@@ -7,9 +7,9 @@ public sealed record SemesterTermData(
 public interface ISemesterStore
 {
     Task<(IReadOnlyList<SemesterResult> Items, int Total)> GetAllAsync(
-        SemesterQuery query, CancellationToken cancellationToken);
+        SemesterQuery request, CancellationToken cancellationToken);
     Task<SemesterResult?> FindByCodeAsync(string code, CancellationToken cancellationToken);
     Task<SemesterResult> UpsertResolvedAsync(SemesterTermData term, CancellationToken cancellationToken);
-    Task<SemesterResult> CreateAsync(SemesterTermData semester, CancellationToken cancellationToken);
+    Task<SemesterResult> CreateAsync(SemesterTermData input, CancellationToken cancellationToken);
     Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(int semesterId, CancellationToken cancellationToken);
 }

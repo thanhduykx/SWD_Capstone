@@ -10,7 +10,7 @@ public sealed class ReviewAssignmentServiceTests
     [Fact]
     public async Task Generate_RejectsRoundThatIsNotClosed()
     {
-        var store = new FakeStore { Snapshot = Snapshot(roundStatus: ReviewRoundStatus.Open) };
+        var store = new FakeStore { AssignmentSnapshot = Snapshot(roundStatus: ReviewRoundStatus.Open) };
         var service = new ReviewAssignmentService(store, new AssignmentRules());
 
         await Assert.ThrowsAsync<ConflictException>(() => service.GenerateAsync(Command(), CancellationToken.None));
@@ -21,10 +21,10 @@ public sealed class ReviewAssignmentServiceTests
     [Fact]
     public async Task Generate_LeavesGroupUnassignedWhenLeaderHasNotSubmittedFiveSlots()
     {
-        var store = new FakeStore { Snapshot = Snapshot(studentSlotCount: 4) };
+        var store = new FakeStore { AssignmentSnapshot = Snapshot(studentSlotCount: 4) };
         var service = new ReviewAssignmentService(store, new AssignmentRules());
 
-        var result = await service.GenerateAsync(Command(), CancellationToken.None);
+        GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
         Assert.Equal(0, result.AssignedCount);
         Assert.Single(result.UnassignedGroups);
@@ -34,10 +34,10 @@ public sealed class ReviewAssignmentServiceTests
     [Fact]
     public async Task Generate_ExcludesSupervisorAndCreatesAssignment()
     {
-        var store = new FakeStore { Snapshot = Snapshot() };
+        var store = new FakeStore { AssignmentSnapshot = Snapshot() };
         var service = new ReviewAssignmentService(store, new AssignmentRules());
 
-        var result = await service.GenerateAsync(Command(), CancellationToken.None);
+        GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
         Assert.Equal(1, result.AssignedCount);
         Assert.Single(store.AssignedGroups);
@@ -51,7 +51,7 @@ public sealed class ReviewAssignmentServiceTests
         var panel = new AssignmentPanel(
             44, "PANEL", ReviewType.Review1, ReviewSessionStatus.Draft, [1, 2],
             new DateTime(2026, 7, 13, 0, 0, 0, DateTimeKind.Utc), 1, 1, "A", 2);
-        var snapshot = Snapshot() with
+        ReviewAssignmentSnapshot snapshot = Snapshot() with
         {
             Groups = [new(10, "G1", 9), new(11, "G2", 9)],
             StudentAvailabilityByGroup = new Dictionary<int, IReadOnlySet<string>>
@@ -61,10 +61,10 @@ public sealed class ReviewAssignmentServiceTests
             },
             ReusablePanels = [panel]
         };
-        var store = new FakeStore { Snapshot = snapshot };
+        var store = new FakeStore { AssignmentSnapshot = snapshot };
         var service = new ReviewAssignmentService(store, new AssignmentRules());
 
-        var result = await service.GenerateAsync(Command(), CancellationToken.None);
+        GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
         Assert.Equal(2, result.AssignedCount);
         Assert.Equal(44, store.AssignedGroups[0].SessionId);
@@ -97,7 +97,7 @@ public sealed class ReviewAssignmentServiceTests
     private sealed class FakeStore : IReviewAssignmentStore
     {
         private int _nextSessionId = 100;
-        public required ReviewAssignmentSnapshot Snapshot { get; init; }
+        public required ReviewAssignmentSnapshot AssignmentSnapshot { get; init; }
         public List<AssignedGroup> AssignedGroups { get; } = [];
 
         public Task<TResult> ExecuteLockedAsync<TResult>(
@@ -106,7 +106,7 @@ public sealed class ReviewAssignmentServiceTests
             CancellationToken cancellationToken) => operation(cancellationToken);
 
         public Task<ReviewAssignmentSnapshot> LoadSnapshotAsync(
-            ReviewAssignmentScope scope, CancellationToken cancellationToken) => Task.FromResult(Snapshot);
+            ReviewAssignmentScope scope, CancellationToken cancellationToken) => Task.FromResult(AssignmentSnapshot);
 
         public Task<AssignmentPanel> CreatePanelAsync(
             CreateAssignmentPanel panel, CancellationToken cancellationToken) =>

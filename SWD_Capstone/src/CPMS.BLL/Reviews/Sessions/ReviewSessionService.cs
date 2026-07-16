@@ -27,7 +27,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
             async token =>
             {
                 var results = new List<ReviewSessionResult>(commands.Count);
-                foreach (var command in commands)
+                foreach (AssignReviewSessionCommand command in commands)
                 {
                     results.Add(await CreateWithinTransactionAsync(command, token));
                 }
@@ -59,19 +59,19 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
         ValidateText(command.Code, "Session code");
         ValidateText(command.Room, "Room");
         rules.ValidateReviewSlot(command.Slot);
-        var sessionDate = NormalizeSessionDate(command.SessionDate);
+        DateTime sessionDate = NormalizeSessionDate(command.SessionDate);
         var dayOfWeek = IsoDayOfWeek(sessionDate);
         var reviewerIds = NormalizeReviewers(command.ReviewerIds);
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
-        var group = await store.FindGroupAsync(command.GroupId, cancellationToken)
+        ReviewGroupState group = await store.FindGroupAsync(command.GroupId, cancellationToken)
             ?? throw new KeyNotFoundException("Capstone group does not exist.");
         rules.ValidateReviewAssignment(
             group.SupervisorId,
             reviewerIds,
             command.Type == ReviewType.Review2 ? command.PreviousReviewerIds : null);
 
-        var weekStart = ReviewWeekStart(sessionDate);
-        var round = await store.AcquireRoundAsync(
+        DateTime weekStart = ReviewWeekStart(sessionDate);
+        ReviewRoundEditState? round = await store.AcquireRoundAsync(
             group.SemesterId, command.Type, DateOnly.FromDateTime(weekStart), cancellationToken);
         if (round?.Status != ReviewRoundStatus.Closed)
         {
@@ -104,7 +104,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
     {
         ValidateText(command.Code, "Session code");
         ValidateText(command.Room, "Room");
-        var session = await store.FindSessionForEditAsync(sessionId, cancellationToken)
+        ReviewSessionEditState session = await store.FindSessionForEditAsync(sessionId, cancellationToken)
             ?? throw new KeyNotFoundException("Review session not found.");
         if (session.Status != ReviewSessionStatus.Draft || command.Status == ReviewSessionStatus.Published)
         {
@@ -113,7 +113,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
         }
 
         rules.ValidateReviewSlot(command.Slot);
-        var sessionDate = NormalizeSessionDate(command.SessionDate);
+        DateTime sessionDate = NormalizeSessionDate(command.SessionDate);
         var dayOfWeek = IsoDayOfWeek(sessionDate);
         var reviewerIds = NormalizeReviewers(command.ReviewerIds);
         foreach (var supervisorId in session.SupervisorIds)
@@ -122,7 +122,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
         }
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
 
-        var round = await store.AcquireRoundAsync(
+        ReviewRoundEditState? round = await store.AcquireRoundAsync(
             session.SemesterId, session.Type, DateOnly.FromDateTime(ReviewWeekStart(sessionDate)), cancellationToken);
         if (round?.Status != ReviewRoundStatus.Closed)
         {
@@ -150,13 +150,13 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
     }
 
     private async Task EnsureLecturersExistAsync(
-        IReadOnlyCollection<int> reviewerIds, CancellationToken cancellationToken)
+        int[] reviewerIds, CancellationToken cancellationToken)
     {
-        if (reviewerIds.Count == 0)
+        if (reviewerIds.Length == 0)
         {
             throw new BusinessRuleException("At least one reviewer is required.");
         }
-        if (await store.CountExistingLecturersAsync(reviewerIds, cancellationToken) != reviewerIds.Count)
+        if (await store.CountExistingLecturersAsync(reviewerIds, cancellationToken) != reviewerIds.Length)
         {
             throw new KeyNotFoundException("One or more reviewers do not exist.");
         }
@@ -166,11 +166,11 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
         int roundId,
         int dayOfWeek,
         int slot,
-        IReadOnlyCollection<int> reviewerIds,
+        int[] reviewerIds,
         CancellationToken cancellationToken)
     {
         if (await store.CountAvailableReviewersAsync(
-                roundId, dayOfWeek, slot, reviewerIds, cancellationToken) != reviewerIds.Count)
+                roundId, dayOfWeek, slot, reviewerIds, cancellationToken) != reviewerIds.Length)
         {
             throw new BusinessRuleException(
                 "All reviewers must submit availability for the selected date and slot before scheduling.");

@@ -27,7 +27,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IAuthenticat
     {
         ArgumentNullException.ThrowIfNull(identity);
 
-        var claims = new[]
+        Claim[] claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, identity.Id.ToString(CultureInfo.InvariantCulture)),
             new Claim("sub", identity.Id.ToString(CultureInfo.InvariantCulture)),

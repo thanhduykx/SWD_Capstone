@@ -24,6 +24,7 @@ public sealed class AccountAdministrationService(
         CreateAccountData data, AccountAuditContext audit, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(audit);
         var fullName = Required(data.FullName, "Full name is required for generated account usernames.");
         var identityCode = Required(data.IdentityCode ?? data.Username, "Identity code is required.");
         var email = Required(data.Email, "Email and password are required.");
@@ -36,7 +37,7 @@ public sealed class AccountAdministrationService(
         var username = usernameGenerator.Generate(fullName, identityCode);
         if (await store.UsernameOrEmailExistsAsync(username, email, cancellationToken))
             throw new ConflictException("Username or email already exists.");
-        var persisted = await store.CreateAsync(
+        AccountResult persisted = await store.CreateAsync(
             new PersistAccount(
                 username,
                 email,
@@ -55,7 +56,7 @@ public sealed class AccountAdministrationService(
                 audit.IpAddress,
                 audit.UserAgent),
             cancellationToken);
-        var delivery = await notificationSender.SendAsync(
+        AccountNotificationResult delivery = await notificationSender.SendAsync(
             persisted.Email, fullName, persisted.Username, data.Password, cancellationToken);
         return new AccountCreatedResult(
             persisted.Id, persisted.Username, persisted.Email, data.Password, persisted.Role,
@@ -79,7 +80,7 @@ public sealed class AccountAdministrationService(
         CancellationToken cancellationToken)
     {
         if (!Enum.IsDefined(role)) throw new BusinessRuleException("Unsupported account role.");
-        var current = await store.FindForRoleUpdateAsync(userId, cancellationToken)
+        (AccountResult Account, AccountProfileSeed Seed) current = await store.FindForRoleUpdateAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Account not found.");
         return current.Account.Role == role
             ? current.Account

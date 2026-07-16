@@ -23,7 +23,7 @@ public sealed class ReviewSchedulesController(IReviewPublicationService publicat
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await publicationService.PublishAsync(
+            ReviewSchedulePublicationResult result = await publicationService.PublishAsync(
                 new PublishReviewScheduleCommand(
                     CurrentUserId(),
                     User.IsInRole(nameof(UserRole.SystemAdministrator)),

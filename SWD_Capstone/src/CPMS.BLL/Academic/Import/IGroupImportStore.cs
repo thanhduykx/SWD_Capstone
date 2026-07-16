@@ -12,7 +12,7 @@ public interface IGroupImportStore
     Task<bool> LecturerExistsAsync(int lecturerId, CancellationToken cancellationToken);
     Task<int> FindDefaultLecturerIdAsync(CancellationToken cancellationToken);
     Task<(int Id, bool Created)> UpsertTopicAsync(
-        int semesterId, string code, string projectTitle, CancellationToken cancellationToken);
+        int semesterId, string code, string title, CancellationToken cancellationToken);
     Task<(int Id, bool Created)> UpsertGroupAsync(
         int semesterId, string code, int topicId, int? lecturerId, CancellationToken cancellationToken);
     Task<ImportUserState?> FindUserAsync(

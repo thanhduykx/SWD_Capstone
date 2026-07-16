@@ -17,7 +17,7 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
     public async Task<PagedResult<SemesterResponse>> GetAll(
         [FromQuery] PagedRequest request, CancellationToken cancellationToken)
     {
-        var result = await semesterService.GetAllAsync(request, cancellationToken);
+        PagedResult<SemesterResult> result = await semesterService.GetAllAsync(request, cancellationToken);
         return new PagedResult<SemesterResponse>(
             result.Items.Select(Map).ToArray(), result.Page, result.PageSize, result.TotalCount);
     }
@@ -36,7 +36,7 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await semesterService.CreateAsync(new CreateSemesterCommand(
+            SemesterResult result = await semesterService.CreateAsync(new CreateSemesterCommand(
                 request.Code, request.Name, request.AcademicYear, request.StartDate, request.EndDate, request.IsActive),
                 cancellationToken);
             return CreatedAtAction(nameof(GetAll), new { result.Id }, Map(result));
@@ -48,7 +48,7 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
     public async Task<ActionResult<IReadOnlyList<SemesterGroupResponse>>> GetGroups(
         int semesterId, CancellationToken cancellationToken)
     {
-        var groups = await semesterService.GetGroupsAsync(semesterId, cancellationToken);
+        IReadOnlyList<SemesterGroupResult> groups = await semesterService.GetGroupsAsync(semesterId, cancellationToken);
         return Ok(groups.Select(x => new SemesterGroupResponse(
             x.Id, x.Code, x.TopicName, x.SupervisorName, x.Status,
             x.Members.Select(member => new GroupMemberResponse(

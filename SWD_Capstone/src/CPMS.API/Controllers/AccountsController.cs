@@ -19,7 +19,7 @@ public sealed class AccountsController(IAccountAdministrationService accountServ
     public async Task<PagedResult<AccountResponse>> GetAll(
         [FromQuery] PagedRequest request, CancellationToken cancellationToken)
     {
-        var result = await accountService.GetAllAsync(request, cancellationToken);
+        PagedResult<AccountResult> result = await accountService.GetAllAsync(request, cancellationToken);
         return new PagedResult<AccountResponse>(
             result.Items.Select(Map).ToArray(), result.Page, result.PageSize, result.TotalCount);
     }
@@ -31,7 +31,7 @@ public sealed class AccountsController(IAccountAdministrationService accountServ
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await accountService.CreateAsync(
+            AccountCreatedResult result = await accountService.CreateAsync(
                 new CreateAccountData(
                     request.Username, request.IdentityCode, request.Email, request.Password, request.Role,
                     request.FullName, request.Department, request.Position, request.PermissionScope,

@@ -12,8 +12,8 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
 
     public IReadOnlyList<ReviewChecklistTemplateItem> GetItems(ReviewType type)
     {
-        using var workbook = OpenTemplate();
-        var sheet = workbook.Worksheet(SheetName(type));
+        using XLWorkbook workbook = OpenTemplate();
+        IXLWorksheet sheet = workbook.Worksheet(SheetName(type));
         return ReadItems(sheet, type);
     }
 
@@ -21,12 +21,12 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
     {
         ArgumentNullException.ThrowIfNull(data);
 
-        using var workbook = OpenTemplate();
-        var sheet = workbook.Worksheet(SheetName(data.Type));
+        using XLWorkbook workbook = OpenTemplate();
+        IXLWorksheet sheet = workbook.Worksheet(SheetName(data.Type));
         FillMetadata(sheet, data);
 
-        var rows = ReadItems(sheet, data.Type);
-        foreach (var row in rows.Where(x => !x.IsSection))
+        IReadOnlyList<ReviewChecklistTemplateItem> rows = ReadItems(sheet, data.Type);
+        foreach (ReviewChecklistTemplateItem? row in rows.Where(x => !x.IsSection))
         {
             var reviewerResponses = data.Reviewers
                 .Select(reviewer => new
@@ -39,7 +39,7 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
 
             if (data.Type == ReviewType.Review3)
             {
-                var comments = reviewerResponses
+                IEnumerable<string> comments = reviewerResponses
                     .Where(x => !string.IsNullOrWhiteSpace(x.Response!.Comment))
                     .Select(x => Prefix(x.Reviewer, x.Response!.Comment!));
                 SetWrapped(sheet.Cell(row.RowNumber, 6), string.Join(Environment.NewLine, comments));
@@ -61,7 +61,7 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
                 sheet.Cell(row.RowNumber, 4).SetValue("X");
             }
 
-            var noteLines = reviewerResponses
+            IEnumerable<string> noteLines = reviewerResponses
                 .Where(x => !string.IsNullOrWhiteSpace(x.Response!.Comment))
                 .Select(x => Prefix(x.Reviewer, x.Response!.Comment!));
             SetWrapped(sheet.Cell(row.RowNumber, 5), string.Join(Environment.NewLine, noteLines));
@@ -93,14 +93,14 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
         return new XLWorkbook(templatePath);
     }
 
-    private static IReadOnlyList<ReviewChecklistTemplateItem> ReadItems(IXLWorksheet sheet, ReviewType type)
+    private static List<ReviewChecklistTemplateItem> ReadItems(IXLWorksheet sheet, ReviewType type)
     {
         return type == ReviewType.Review3
             ? ReadReviewThreeItems(sheet, type)
             : ReadReviewChecklistItems(sheet, type);
     }
 
-    private static IReadOnlyList<ReviewChecklistTemplateItem> ReadReviewChecklistItems(IXLWorksheet sheet, ReviewType type)
+    private static List<ReviewChecklistTemplateItem> ReadReviewChecklistItems(IXLWorksheet sheet, ReviewType type)
     {
         var headerRow = FindRow(sheet, "Question");
         var commentsRow = FindRow(sheet, "* Comments");
@@ -128,7 +128,7 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
         return items;
     }
 
-    private static IReadOnlyList<ReviewChecklistTemplateItem> ReadReviewThreeItems(IXLWorksheet sheet, ReviewType type)
+    private static List<ReviewChecklistTemplateItem> ReadReviewThreeItems(IXLWorksheet sheet, ReviewType type)
     {
         var headerRow = FindRow(sheet, "Code");
         var items = new List<ReviewChecklistTemplateItem>();
@@ -172,7 +172,11 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
     }
 
     private static bool IsChecklistSection(string label) =>
-        Regex.IsMatch(label, "^[PD][0-9]+\\s*-", RegexOptions.IgnoreCase);
+        Regex.IsMatch(
+            label,
+            "^[PD][0-9]+\\s*-",
+            RegexOptions.IgnoreCase,
+            TimeSpan.FromSeconds(1));
 
     private static string ItemKey(ReviewType type, int row) => $"{type}:R{row}";
 

@@ -10,7 +10,7 @@ public sealed class ReviewWorkflowModelTests
 {
     private static CpmsDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<CpmsDbContext>()
+        DbContextOptions<CpmsDbContext> options = new DbContextOptionsBuilder<CpmsDbContext>()
             .UseNpgsql("Host=localhost;Database=model_only;Username=model_only;Password=model_only")
             .Options;
         return new CpmsDbContext(options);
@@ -19,10 +19,10 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void StudentAvailability_AllowsFiveDistinctSlotsPerGroupAndRound()
     {
-        using var context = CreateContext();
-        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(StudentSlotRegistration))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(StudentSlotRegistration))!;
 
-        var uniqueIndex = entity.GetIndexes().Single(index => index.IsUnique);
+        IIndex uniqueIndex = entity.GetIndexes().Single(index => index.IsUnique);
 
         Assert.Equal(
             [nameof(StudentSlotRegistration.ReviewRoundId), nameof(StudentSlotRegistration.GroupId), nameof(StudentSlotRegistration.DayOfWeek), nameof(StudentSlotRegistration.Slot)],
@@ -32,8 +32,8 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void ReviewSession_EnforcesThreeOrderedGroups()
     {
-        using var context = CreateContext();
-        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(GroupReviewSlot))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(GroupReviewSlot))!;
 
         Assert.Contains(entity.GetCheckConstraints(), constraint =>
             constraint.Name == "ck_group_review_slots_position" && constraint.Sql!.Contains("BETWEEN 1 AND 3", StringComparison.Ordinal));
@@ -45,8 +45,8 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void ReviewSubmission_IsUniquePerSessionGroupAndReviewer()
     {
-        using var context = CreateContext();
-        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewChecklistSubmission))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewChecklistSubmission))!;
 
         Assert.Contains(entity.GetIndexes(), index => index.IsUnique &&
             index.Properties.Select(property => property.Name).SequenceEqual(
@@ -56,8 +56,8 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void Group_CannotHaveMultipleLeaders()
     {
-        using var context = CreateContext();
-        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(Student))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(Student))!;
 
         Assert.Contains(entity.GetIndexes(), index => index.IsUnique &&
             index.Properties.Single().Name == nameof(Student.GroupId) &&
@@ -67,9 +67,9 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void LecturerAvailability_IsUniqueWithinExactReviewRound()
     {
-        using var context = CreateContext();
-        var availability = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailability))!;
-        var submission = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailabilitySubmission))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType availability = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailability))!;
+        IEntityType submission = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewAvailabilitySubmission))!;
 
         Assert.Contains(availability.GetIndexes(), index => index.IsUnique &&
             index.Properties.Select(property => property.Name).SequenceEqual(
@@ -82,8 +82,8 @@ public sealed class ReviewWorkflowModelTests
     [Fact]
     public void EmailDeliveryLog_PersistsBodyForPostCommitDispatch()
     {
-        using var context = CreateContext();
-        var entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(EmailDeliveryLog))!;
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(EmailDeliveryLog))!;
 
         Assert.False(entity.FindProperty(nameof(EmailDeliveryLog.Body))!.IsNullable);
     }

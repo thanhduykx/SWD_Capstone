@@ -17,7 +17,7 @@ public sealed class ReviewRoundServiceTests
         };
         var service = new ReviewRoundService(store, new AssignmentRules());
 
-        var result = await service.CreateRoundAsync(
+        ReviewRoundManagementResult result = await service.CreateRoundAsync(
             7, false, 3, ReviewType.Review1, new DateOnly(2026, 7, 16), CancellationToken.None);
 
         Assert.Equal(new DateOnly(2026, 7, 13), result.WeekStartDate);
@@ -28,7 +28,7 @@ public sealed class ReviewRoundServiceTests
     [Fact]
     public async Task UpdateStatus_RejectsInvalidTransitionWithoutWriting()
     {
-        var store = new FakeStore { Round = Round(status: ReviewRoundStatus.Draft) };
+        var store = new FakeStore { CurrentRound = Round(status: ReviewRoundStatus.Draft) };
         var service = new ReviewRoundService(store, new AssignmentRules());
 
         await Assert.ThrowsAsync<ConflictException>(() =>
@@ -42,12 +42,12 @@ public sealed class ReviewRoundServiceTests
     {
         var store = new FakeStore
         {
-            Round = Round(status: ReviewRoundStatus.Open),
+            CurrentRound = Round(status: ReviewRoundStatus.Open),
             RegistrationCompletion = (4, 3)
         };
         var service = new ReviewRoundService(store, new AssignmentRules());
 
-        var exception = await Assert.ThrowsAsync<ReviewRoundClosureException>(() =>
+        ReviewRoundClosureException exception = await Assert.ThrowsAsync<ReviewRoundClosureException>(() =>
             service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None));
 
         Assert.Equal(4, exception.ActiveGroupCount);
@@ -60,12 +60,12 @@ public sealed class ReviewRoundServiceTests
     {
         var store = new FakeStore
         {
-            Round = Round(status: ReviewRoundStatus.Open),
+            CurrentRound = Round(status: ReviewRoundStatus.Open),
             RegistrationCompletion = (4, 4)
         };
         var service = new ReviewRoundService(store, new AssignmentRules());
 
-        var result = await service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None);
+        ReviewRoundManagementResult result = await service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None);
 
         Assert.True(store.StatusUpdated);
         Assert.Equal(ReviewRoundStatus.Closed, result.Status);
@@ -80,14 +80,13 @@ public sealed class ReviewRoundServiceTests
     {
         public bool SemesterExists { get; init; }
         public int? ModeratorId { get; init; }
-        public bool ExistingRound { get; init; }
-        public ReviewRoundState? Round { get; init; }
+        public ReviewRoundState? CurrentRound { get; init; }
         public (int ActiveGroups, int CompletedRegistrations) RegistrationCompletion { get; init; }
         public int? CreatedByModeratorId { get; private set; }
         public bool StatusUpdated { get; private set; }
 
         public Task<IReadOnlyList<ReviewRoundState>> GetRoundsAsync(int semesterId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ReviewRoundState>>(Round is null ? [] : [Round]);
+            Task.FromResult<IReadOnlyList<ReviewRoundState>>(CurrentRound is null ? [] : [CurrentRound]);
 
         public Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken) =>
             Task.FromResult(SemesterExists);
@@ -96,7 +95,7 @@ public sealed class ReviewRoundServiceTests
             Task.FromResult(ModeratorId);
 
         public Task<bool> RoundExistsAsync(int semesterId, ReviewType reviewType, DateOnly weekStartDate, CancellationToken cancellationToken) =>
-            Task.FromResult(ExistingRound);
+            Task.FromResult(false);
 
         public Task<ReviewRoundState> CreateRoundAsync(
             int semesterId,
@@ -113,7 +112,7 @@ public sealed class ReviewRoundServiceTests
         }
 
         public Task<ReviewRoundState?> FindRoundAsync(int roundId, CancellationToken cancellationToken) =>
-            Task.FromResult(Round);
+            Task.FromResult(CurrentRound);
 
         public Task<(int ActiveGroups, int CompletedRegistrations)> GetRegistrationCompletionAsync(
             int roundId, int semesterId, int requiredSlotCount, CancellationToken cancellationToken) =>
@@ -127,7 +126,7 @@ public sealed class ReviewRoundServiceTests
             CancellationToken cancellationToken)
         {
             StatusUpdated = true;
-            var current = Round ?? throw new InvalidOperationException("Round is required for this test.");
+            ReviewRoundState current = CurrentRound ?? throw new InvalidOperationException("Round is required for this test.");
             return Task.FromResult(current with { Status = status, OpenedAt = openedAt, ClosedAt = closedAt });
         }
     }

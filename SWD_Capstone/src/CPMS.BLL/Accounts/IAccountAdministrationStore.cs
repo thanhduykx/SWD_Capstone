@@ -26,7 +26,7 @@ public interface IAccountAdministrationStore
 {
     Task<PagedResult<AccountResult>> GetAllAsync(PagedRequest request, CancellationToken cancellationToken);
     Task<bool> UsernameOrEmailExistsAsync(string username, string email, CancellationToken cancellationToken);
-    Task<AccountResult> CreateAsync(PersistAccount account, CancellationToken cancellationToken);
+    Task<AccountResult> CreateAsync(PersistAccount input, CancellationToken cancellationToken);
     Task<AccountResult?> UpdateStatusAsync(
         int userId, bool isActive, bool unlock, AccountAuditContext audit, CancellationToken cancellationToken);
     Task<(AccountResult Account, AccountProfileSeed Seed)?> FindForRoleUpdateAsync(

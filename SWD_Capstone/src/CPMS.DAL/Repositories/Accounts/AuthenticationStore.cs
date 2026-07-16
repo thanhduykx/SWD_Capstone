@@ -3,6 +3,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Accounts;
 
@@ -10,9 +11,12 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
 {
     public Task<AuthenticationUser?> FindByLoginAsync(string login, CancellationToken cancellationToken)
     {
-        var normalized = login.ToLower();
-        return dbContext.Users.Where(x => x.Username.ToLower() == normalized || x.Email.ToLower() == normalized ||
-                (normalized == "admin" && (x.Username.ToLower() == "admin@gmail.com" || x.Email.ToLower() == "admin@gmail.com")))
+        ArgumentNullException.ThrowIfNull(login);
+        var normalized = login.Trim().ToLowerInvariant();
+        return dbContext.Users.Where(x => EF.Functions.ILike(x.Username, normalized) ||
+                EF.Functions.ILike(x.Email, normalized) ||
+                (normalized == "admin" && (EF.Functions.ILike(x.Username, "admin@gmail.com") ||
+                                             EF.Functions.ILike(x.Email, "admin@gmail.com"))))
             .Select(MapProjection()).FirstOrDefaultAsync(cancellationToken);
     }
     public Task<AuthenticationUser?> FindByEmailAsync(string email, CancellationToken cancellationToken) =>
@@ -23,14 +27,14 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
     public async Task RecordFailedLoginAsync(
         int userId, int failedAttempts, DateTime? lockedUntil, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
+        User user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
         user.FailedLoginAttempts = failedAttempts;
         user.LockedUntil = lockedUntil;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
     public async Task RecordSuccessfulLoginAsync(int userId, DateTime loginAt, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
+        User user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
         user.FailedLoginAttempts = 0;
         user.LockedUntil = null;
         user.LastLoginAt = loginAt;
@@ -38,6 +42,7 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
     }
     public async Task SaveRefreshTokenAsync(PersistRefreshToken token, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(token);
         dbContext.RefreshTokens.Add(NewToken(token));
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -48,8 +53,9 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
     public async Task RotateRefreshTokenAsync(
         int existingTokenId, PersistRefreshToken replacement, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var existing = await dbContext.RefreshTokens.SingleAsync(x => x.Id == existingTokenId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(replacement);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        RefreshToken existing = await dbContext.RefreshTokens.SingleAsync(x => x.Id == existingTokenId, cancellationToken);
         existing.IsRevoked = true;
         dbContext.RefreshTokens.Add(NewToken(replacement));
         await dbContext.SaveChangesAsync(cancellationToken);
