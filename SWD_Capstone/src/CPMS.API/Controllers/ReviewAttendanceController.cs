@@ -36,7 +36,7 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var entries = request.Entries.Select(x => new AttendanceEntry(x.StudentId, x.IsPresent, x.Note)).ToArray();
+            AttendanceEntry[] entries = request.Entries.Select(x => new AttendanceEntry(x.StudentId, x.IsPresent, x.Note)).ToArray();
             return Ok(Map(await attendanceService.SubmitAttendanceAsync(
                 sessionId, request.GroupId, entries, CurrentActor(), cancellationToken)));
         }
@@ -52,7 +52,7 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
     {
         try
         {
-            var results = await attendanceService.GetCommentsAsync(
+            IReadOnlyList<ReviewCommentResult> results = await attendanceService.GetCommentsAsync(
                 sessionId, groupId, CurrentActor(), cancellationToken);
             return Ok(results.Select(MapComment).ToArray());
         }
@@ -84,7 +84,7 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
     {
         try
         {
-            var result = await attendanceService.CompleteAsync(
+            CompleteReviewResult result = await attendanceService.CompleteAsync(
                 sessionId, groupId, CurrentActor(), cancellationToken);
             return Ok(new { result.SessionId, result.GroupId, status = result.Status, result.CompletedAt });
         }

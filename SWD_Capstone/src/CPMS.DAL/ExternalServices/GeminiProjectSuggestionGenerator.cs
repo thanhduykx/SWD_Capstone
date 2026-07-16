@@ -75,7 +75,8 @@ internal sealed class GeminiProjectSuggestionGenerator(
                     "Gemini returned an invalid response.", exception);
             }
 
-            var text = payload?.Candidates?.FirstOrDefault()?.Content?.Parts?
+            GeminiCandidate? candidate = payload?.Candidates is { Count: > 0 } candidates ? candidates[0] : null;
+            string? text = candidate?.Content?.Parts?
                 .FirstOrDefault(part => !string.IsNullOrWhiteSpace(part.Text))?.Text;
             if (string.IsNullOrWhiteSpace(text))
                 throw new ExternalServiceException("Gemini did not return a project suggestion.");

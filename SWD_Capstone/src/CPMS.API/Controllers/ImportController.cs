@@ -11,6 +11,7 @@ namespace CPMS.API.Controllers;
 public sealed class ImportController(IGroupImportService importService) : ControllerBase
 {
     [HttpPost("groups")]
+    [RequestSizeLimit(GroupImportLimits.MaximumWorkbookBytes)]
     public async Task<ActionResult<GroupImportResult>> ImportGroups(
         [FromForm] ImportGroupsRequest request,
         CancellationToken cancellationToken)
@@ -21,14 +22,20 @@ public sealed class ImportController(IGroupImportService importService) : Contro
             return BadRequest(new { error = "No Excel file was uploaded." });
         }
 
+        if (request.File.Length > GroupImportLimits.MaximumWorkbookBytes)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge,
+                new { error = "The uploaded Excel workbook must not exceed 5 MB." });
+        }
+
         var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
         if (extension != ".xlsx")
         {
             return BadRequest(new { error = "Only .xlsx Excel files are supported." });
         }
 
-        using var stream = request.File.OpenReadStream();
-        var result = await importService.ImportAsync(stream, request.LecturerId, cancellationToken);
+        using Stream stream = request.File.OpenReadStream();
+        GroupImportResult result = await importService.ImportAsync(stream, request.LecturerId, cancellationToken);
         return Ok(result);
     }
 }

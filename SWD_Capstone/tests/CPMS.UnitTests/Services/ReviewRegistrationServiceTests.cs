@@ -17,7 +17,7 @@ public sealed class ReviewRegistrationServiceTests
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());
 
-        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SaveStudentAvailabilityAsync(1, 1, FiveSlots(), CancellationToken.None));
 
         Assert.Equal("Only the group leader can register a review slot.", exception.Message);
@@ -55,7 +55,7 @@ public sealed class ReviewRegistrationServiceTests
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());
 
-        var result = await service.GetStudentScheduleAsync(1, CancellationToken.None);
+        IReadOnlyList<StudentScheduleResult> result = await service.GetStudentScheduleAsync(1, CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal("PUBLISHED", result[0].SessionCode);
@@ -71,7 +71,7 @@ public sealed class ReviewRegistrationServiceTests
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());
 
-        var result = await service.GetStudentRoundsAsync(1, 30, CancellationToken.None);
+        IReadOnlyList<StudentReviewRoundResult> result = await service.GetStudentRoundsAsync(1, 30, CancellationToken.None);
 
         Assert.True(result[0].IsGroupRegistered);
         Assert.False(result[1].IsGroupRegistered);

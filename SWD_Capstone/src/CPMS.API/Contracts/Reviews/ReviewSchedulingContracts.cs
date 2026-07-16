@@ -28,10 +28,10 @@ public sealed record ReviewSchedulingSessionResponse(
     int Slot,
     string Room);
 public sealed record RandomAssignReviewSessionsRequest(
-    int SemesterId,
-    ReviewType ReviewType,
-    DateOnly WeekStart,
-    int ReviewersPerSession,
+    [property: JsonRequired] int SemesterId,
+    [property: JsonRequired] ReviewType ReviewType,
+    [property: JsonRequired] DateOnly WeekStart,
+    [property: JsonRequired] int ReviewersPerSession,
     string? RoomPrefix,
     int? Seed);
 public sealed record RandomAssignReviewSessionsResponse(
@@ -53,5 +53,8 @@ public sealed record ReviewRoundManagementResponse(
     DateTime? OpenedAt,
     DateTime? ClosedAt,
     int RegistrationCount);
-public sealed record CreateReviewRoundRequest(int SemesterId, ReviewType ReviewType, DateOnly WeekStartDate);
-public sealed record UpdateRoundStatusRequest(ReviewRoundStatus Status);
+public sealed record CreateReviewRoundRequest(
+    [property: JsonRequired] int SemesterId,
+    [property: JsonRequired] ReviewType ReviewType,
+    [property: JsonRequired] DateOnly WeekStartDate);
+public sealed record UpdateRoundStatusRequest([property: JsonRequired] ReviewRoundStatus Status);

@@ -8,7 +8,7 @@ public sealed class DependencyRulesTests
     public void SourceTree_ContainsExactlyApiBllAndDalProjects()
     {
         var root = FindRepositoryRoot();
-        var projects = Directory.GetFiles(
+        IOrderedEnumerable<string?> projects = Directory.GetFiles(
                 Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
             .Select(Path.GetFileNameWithoutExtension)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
@@ -37,7 +37,7 @@ public sealed class DependencyRulesTests
     [Fact]
     public void API_ReferencesBLLAndDAL()
     {
-        var references = ProjectReferences("src/CPMS.API/CPMS.API.csproj")
+        IOrderedEnumerable<string> references = ProjectReferences("src/CPMS.API/CPMS.API.csproj")
             .Select(Normalize)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
 
@@ -71,7 +71,7 @@ public sealed class DependencyRulesTests
     {
         var root = FindRepositoryRoot();
         var bllRoot = Path.Combine(root, "src", "CPMS.BLL");
-        var sources = Directory.GetFiles(bllRoot, "*.cs", SearchOption.AllDirectories)
+        IEnumerable<string> sources = Directory.GetFiles(bllRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Select(File.ReadAllText);
 

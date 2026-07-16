@@ -1,3 +1,4 @@
+using System.Globalization;
 using CPMS.BLL.Reviews.Assessment;
 using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
@@ -22,7 +23,7 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
             .Select(x => new ReviewSubmissionSummary(
                 x.Id, x.SessionId, x.GroupId, x.Type.ToString(), x.Status.ToString(),
                 x.ResultText ?? "Pass",
-                x.EffortHours.HasValue ? x.EffortHours.Value.ToString("F1") : "N/A",
+                x.EffortHours.HasValue ? x.EffortHours.Value.ToString("F1", CultureInfo.InvariantCulture) : "N/A",
                 x.ReviewerComment ?? x.Suggestion ?? string.Empty,
                 x.SubmittedAt ?? x.LastSavedAt))
             .ToListAsync(cancellationToken);
@@ -45,7 +46,9 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
                    submission.Type.ToString(),
                    submission.Status.ToString(),
                    slot.Result != null ? slot.Result.ToString()! : submission.ResultText ?? "Pass",
-                   submission.EffortHours.HasValue ? submission.EffortHours.Value.ToString("F1") : "8.5",
+                   submission.EffortHours.HasValue
+                       ? submission.EffortHours.Value.ToString("F1", CultureInfo.InvariantCulture)
+                       : "8.5",
                    submission.ReviewerComment ?? submission.Suggestion ?? slot.Notes ??
                        "Đã hoàn thành đánh giá review checkpoint",
                    submission.SubmittedAt ?? submission.LastSavedAt))
@@ -88,7 +91,7 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
                 ReviewerName = dbContext.Lecturers.Where(reviewer => reviewer.Id == x.ReviewerId)
                     .Select(reviewer => reviewer.FullName).Single()
             }).SingleAsync(cancellationToken);
-        var responses = await dbContext.ReviewChecklistItemResponses.Where(x => x.SubmissionId == submissionId)
+        Dictionary<string, (ReviewChecklistAnswer?, string?)> responses = await dbContext.ReviewChecklistItemResponses.Where(x => x.SubmissionId == submissionId)
             .ToDictionaryAsync(
                 x => x.ItemKey,
                 x => new ValueTuple<ReviewChecklistAnswer?, string?>(x.Answer, x.Comment),
@@ -104,7 +107,8 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
     public async Task SaveDraftAsync(
         int submissionId, PersistReviewDraft draft, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleAsync(
+        ArgumentNullException.ThrowIfNull(draft);
+        ReviewChecklistSubmission submission = await dbContext.ReviewChecklistSubmissions.SingleAsync(
             x => x.Id == submissionId, cancellationToken);
         submission.WorkProductVersion = draft.WorkProductVersion;
         submission.WorkProductSize = draft.WorkProductSize;
@@ -114,11 +118,11 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
         submission.ResultText = draft.ResultText;
         submission.Status = ReviewSubmissionStatus.Draft;
         submission.LastSavedAt = draft.ChangedAt;
-        var existing = await dbContext.ReviewChecklistItemResponses.Where(x => x.SubmissionId == submissionId)
+        Dictionary<string, ReviewChecklistItemResponse> existing = await dbContext.ReviewChecklistItemResponses.Where(x => x.SubmissionId == submissionId)
             .ToDictionaryAsync(x => x.ItemKey, StringComparer.OrdinalIgnoreCase, cancellationToken);
-        foreach (var item in draft.Items)
+        foreach (SaveReviewItem item in draft.Items)
         {
-            if (!existing.TryGetValue(item.ItemKey, out var response))
+            if (!existing.TryGetValue(item.ItemKey, out ReviewChecklistItemResponse? response))
             {
                 response = new ReviewChecklistItemResponse { SubmissionId = submissionId, ItemKey = item.ItemKey };
                 dbContext.ReviewChecklistItemResponses.Add(response);
@@ -138,7 +142,7 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
 
     public async Task SubmitAsync(int submissionId, DateTime submittedAt, CancellationToken cancellationToken)
     {
-        var submission = await dbContext.ReviewChecklistSubmissions.SingleAsync(
+        ReviewChecklistSubmission submission = await dbContext.ReviewChecklistSubmissions.SingleAsync(
             x => x.Id == submissionId, cancellationToken);
         submission.Status = ReviewSubmissionStatus.Submitted;
         submission.SubmittedAt = submittedAt;
@@ -149,29 +153,29 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
     public async Task<ReviewChecklistExportData> GetExportDataAsync(
         int sessionId, int groupId, CancellationToken cancellationToken)
     {
-        var session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
-        var group = await dbContext.CapstoneGroups.SingleAsync(x => x.Id == groupId, cancellationToken);
+        ReviewSession session = await dbContext.ReviewSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        CapstoneGroup group = await dbContext.CapstoneGroups.SingleAsync(x => x.Id == groupId, cancellationToken);
         var projectName = await dbContext.Topics.Where(x => x.Id == group.TopicId)
             .Select(x => x.NameEn).SingleAsync(cancellationToken);
-        var submissions = await dbContext.ReviewChecklistSubmissions
+        List<ReviewChecklistSubmission> submissions = await dbContext.ReviewChecklistSubmissions
             .Where(x => x.SessionId == sessionId && x.GroupId == groupId).OrderBy(x => x.ReviewerId)
             .ToListAsync(cancellationToken);
         var submissionIds = submissions.Select(x => x.Id).ToArray();
-        var itemResponses = await dbContext.ReviewChecklistItemResponses
+        List<ReviewChecklistItemResponse> itemResponses = await dbContext.ReviewChecklistItemResponses
             .Where(x => submissionIds.Contains(x.SubmissionId)).ToListAsync(cancellationToken);
         var reviewerIds = submissions.Select(x => x.ReviewerId).ToArray();
-        var reviewers = await dbContext.Lecturers.Where(x => reviewerIds.Contains(x.Id))
+        Dictionary<int, Lecturer> reviewers = await dbContext.Lecturers.Where(x => reviewerIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, cancellationToken);
-        var exportReviewers = submissions.Select(submission =>
+        ReviewChecklistExportReviewer[] exportReviewers = submissions.Select(submission =>
         {
-            var reviewer = reviewers[submission.ReviewerId];
+            Lecturer reviewer = reviewers[submission.ReviewerId];
             return new ReviewChecklistExportReviewer(
                 reviewer.Id, reviewer.Code, reviewer.FullName, submission.EffortHours,
                 submission.ReviewerComment, submission.Suggestion,
                 itemResponses.Where(x => x.SubmissionId == submission.Id)
                     .Select(x => new ReviewChecklistExportItem(x.ItemKey, x.Answer, x.Comment)).ToArray());
         }).ToArray();
-        var first = submissions.FirstOrDefault();
+        ReviewChecklistSubmission? first = submissions.FirstOrDefault();
         return new ReviewChecklistExportData(
             session.Id, session.Type, group.Code, projectName, session.SessionDate,
             first?.WorkProductVersion, first?.WorkProductSize, exportReviewers);

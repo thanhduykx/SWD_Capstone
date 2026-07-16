@@ -12,7 +12,7 @@ public sealed class GoogleIdentityVerifier(IConfiguration configuration) : IGoog
             throw new InvalidOperationException("Google login is not configured.");
         try
         {
-            var payload = await GoogleJsonWebSignature.ValidateAsync(idToken,
+            GoogleJsonWebSignature.Payload payload = await GoogleJsonWebSignature.ValidateAsync(idToken,
                 new GoogleJsonWebSignature.ValidationSettings { Audience = [clientId] });
             return payload.EmailVerified ? payload.Email : null;
         }

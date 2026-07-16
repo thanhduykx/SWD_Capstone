@@ -10,7 +10,7 @@ public sealed class RabbitMqMessageBus(IConnection connection) : IMessageBus
     public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default)
         where TMessage : class
     {
-        using var channel = connection.CreateModel();
+        using IModel channel = connection.CreateModel();
         var exchange = typeof(TMessage).Name;
         channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true);
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));

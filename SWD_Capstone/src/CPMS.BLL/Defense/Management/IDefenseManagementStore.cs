@@ -14,10 +14,10 @@ public interface IDefenseManagementStore
     Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken);
     Task<bool> RoundCodeExistsAsync(int semesterId, string code, CancellationToken cancellationToken);
     Task<DefenseRoundResult> CreateRoundAsync(
-        CreateDefenseRoundCommand command, int moderatorId, CancellationToken cancellationToken);
+        CreateDefenseRoundCommand input, int moderatorId, CancellationToken cancellationToken);
     Task<int> CountExistingLecturersAsync(IReadOnlyCollection<int> lecturerIds, CancellationToken cancellationToken);
     Task<DefenseBoardResult> CreateBoardAsync(
-        CreateDefenseBoardCommand command, int moderatorId, CancellationToken cancellationToken);
+        CreateDefenseBoardCommand input, int moderatorId, CancellationToken cancellationToken);
     Task<bool> CouncilExistsAsync(int councilId, CancellationToken cancellationToken);
     Task AddCouncilMemberIfMissingAsync(
         int councilId, int lecturerId, CouncilMemberRole role, CancellationToken cancellationToken);
@@ -25,7 +25,7 @@ public interface IDefenseManagementStore
     Task<DefenseCouncilState?> FindCouncilAsync(int councilId, CancellationToken cancellationToken);
     Task<DefenseGroupState?> FindGroupAsync(int groupId, CancellationToken cancellationToken);
     Task<DefenseSessionAssignmentResult> CreateSessionAsync(
-        AssignDefenseSessionCommand command, int moderatorId,
+        AssignDefenseSessionCommand input, int moderatorId,
         DefenseCouncilState council, DefenseGroupState group, CancellationToken cancellationToken);
     Task<int?> FindLecturerIdAsync(int userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<DefenseSessionAssignmentResult>> GetLecturerSessionsAsync(

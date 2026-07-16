@@ -39,7 +39,7 @@ public sealed class DefenseSessionsController(
     public async Task<ActionResult<DefenseSessionStateResult>> Start(
         int sessionId, CancellationToken cancellationToken)
     {
-        var response = await defenseService.StartAsync(sessionId, CurrentActor(), cancellationToken);
+        DefenseSessionStateResult response = await defenseService.StartAsync(sessionId, CurrentActor(), cancellationToken);
         await BroadcastAsync(sessionId, DefenseScoringHub.SessionStarted, response, cancellationToken);
         return Ok(response);
     }
@@ -49,7 +49,7 @@ public sealed class DefenseSessionsController(
         int sessionId, SubmitScoreRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var response = await defenseService.SubmitScoreAsync(
+        SubmittedDefenseScoreResult response = await defenseService.SubmitScoreAsync(
             sessionId, new SubmitDefenseScoreData(request.StudentId, request.ScoreType, request.ScoreValue),
             CurrentActor(), cancellationToken);
         await BroadcastAsync(sessionId, DefenseScoringHub.ScoreSubmitted, response, cancellationToken);
@@ -60,7 +60,7 @@ public sealed class DefenseSessionsController(
     public async Task<ActionResult<IReadOnlyList<DefenseEvidenceResponse>>> GetEvidences(
         int sessionId, CancellationToken cancellationToken)
     {
-        var results = await defenseService.GetEvidencesAsync(sessionId, CurrentUserId(), cancellationToken);
+        IReadOnlyList<DefenseEvidenceResult> results = await defenseService.GetEvidencesAsync(sessionId, CurrentUserId(), cancellationToken);
         return Ok(results.Select(MapEvidence).ToArray());
     }
 
@@ -72,8 +72,8 @@ public sealed class DefenseSessionsController(
         ArgumentNullException.ThrowIfNull(request);
         if (request.File is null)
             return BadRequest(new { error = "Evidence image is required." });
-        await using var content = request.File.OpenReadStream();
-        var result = await defenseService.UploadEvidenceAsync(
+        await using Stream content = request.File.OpenReadStream();
+        DefenseEvidenceResult result = await defenseService.UploadEvidenceAsync(
             sessionId,
             new UploadDefenseEvidenceData(
                 request.File.FileName, request.File.ContentType, request.File.Length, request.Note, content),
@@ -86,7 +86,7 @@ public sealed class DefenseSessionsController(
     public async Task<ActionResult<DefenseSessionStateResult>> Close(
         int sessionId, CancellationToken cancellationToken)
     {
-        var response = await defenseService.CloseAsync(sessionId, CurrentActor(), cancellationToken);
+        DefenseSessionStateResult response = await defenseService.CloseAsync(sessionId, CurrentActor(), cancellationToken);
         await BroadcastAsync(sessionId, DefenseScoringHub.SessionClosed, response, cancellationToken);
         return Ok(response);
     }

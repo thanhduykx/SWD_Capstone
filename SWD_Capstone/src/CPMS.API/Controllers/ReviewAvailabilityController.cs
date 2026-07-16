@@ -18,7 +18,7 @@ public sealed class ReviewAvailabilityController(IReviewRegistrationService regi
         int roundId,
         CancellationToken cancellationToken)
     {
-        var result = await registrationService.GetLecturerAvailabilityAsync(
+        ReviewAvailabilityWeekResult result = await registrationService.GetLecturerAvailabilityAsync(
             CurrentUserId(), roundId, cancellationToken);
         return Ok(Map(result));
     }
@@ -31,7 +31,7 @@ public sealed class ReviewAvailabilityController(IReviewRegistrationService regi
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await registrationService.SaveLecturerAvailabilityAsync(
+        ReviewAvailabilityWeekResult result = await registrationService.SaveLecturerAvailabilityAsync(
             CurrentUserId(),
             roundId,
             request.Slots?.Select(x => new ReviewAvailabilitySlot(x.DayOfWeek, x.Slot)).ToArray(),
@@ -45,7 +45,7 @@ public sealed class ReviewAvailabilityController(IReviewRegistrationService regi
         int roundId,
         CancellationToken cancellationToken)
     {
-        var result = await registrationService.SubmitLecturerAvailabilityAsync(
+        ReviewAvailabilityWeekResult result = await registrationService.SubmitLecturerAvailabilityAsync(
             CurrentUserId(), roundId, cancellationToken);
         return Ok(Map(result));
     }

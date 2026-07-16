@@ -3,7 +3,12 @@ using CPMS.BLL.Enums;
 namespace CPMS.API.Contracts.Academic;
 
 public sealed record CreateSemesterRequest(
-    string Code, string Name, string AcademicYear, DateOnly StartDate, DateOnly EndDate, bool IsActive);
+    string Code,
+    string Name,
+    string AcademicYear,
+    [property: JsonRequired] DateOnly StartDate,
+    [property: JsonRequired] DateOnly EndDate,
+    [property: JsonRequired] bool IsActive);
 public sealed record SemesterResponse(
     int Id, string Code, string Name, string AcademicYear, DateOnly StartDate, DateOnly EndDate, bool IsActive);
 public sealed record SemesterGroupResponse(

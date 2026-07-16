@@ -6,6 +6,7 @@ using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Defense;
 
@@ -15,7 +16,7 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
     public async Task<IReadOnlyList<DefenseSessionListResult>> GetAllAsync(
         int? semesterId, CancellationToken cancellationToken)
     {
-        var query = dbContext.DefenseSessions.AsNoTracking();
+        IQueryable<DefenseSession> query = dbContext.DefenseSessions.AsNoTracking();
         if (semesterId.HasValue)
             query = query.Where(x => dbContext.DefenseRounds.Any(round =>
                 round.Id == x.DefenseRoundId && round.SemesterId == semesterId.Value));
@@ -30,7 +31,7 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
                 dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId)
                     .Join(dbContext.Topics, group => group.TopicId, topic => topic.Id, (_, topic) => topic.NameEn)
                     .FirstOrDefault() ?? "Capstone Project System",
-                x.SessionDate.ToString("yyyy-MM-dd"),
+                x.SessionDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 x.Slot,
                 x.Room,
                 dbContext.CouncilMembers.Where(member => member.CouncilId == x.CouncilId)
@@ -46,7 +47,7 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
     public async Task<DefenseSessionAccessState?> ResolveAsync(
         string code, CancellationToken cancellationToken)
     {
-        var query = dbContext.DefenseSessions.AsQueryable();
+        IQueryable<DefenseSession> query = dbContext.DefenseSessions.AsQueryable();
         if (int.TryParse(code, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
             query = query.Where(x => x.Id == id || x.Code == code ||
                 dbContext.Councils.Any(c => c.Id == x.CouncilId && c.Code == code));
@@ -85,10 +86,11 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
     public async Task<DefenseSessionAccessState> StartAsync(
         int sessionId, DefenseSessionActor actor, DateTime startedAt, CancellationToken cancellationToken)
     {
-        var session = await dbContext.DefenseSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        DefenseSession session = await dbContext.DefenseSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
         session.StartedAt = startedAt;
         session.StartedById = actor.UserId;
-        var council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
+        Council council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
         council.Status = CouncilStatus.Active;
         dbContext.AuditLogs.Add(NewAudit(
             actor, "START_DEFENSE_SESSION", nameof(DefenseSession), session.Id, null, startedAt));
@@ -125,7 +127,10 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         DateTime submittedAt,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(existing);
+        ArgumentNullException.ThrowIfNull(actor);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         Score score;
         if (existing.Id.HasValue)
         {
@@ -168,11 +173,12 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
     public async Task<DefenseSessionAccessState> CloseAsync(
         int sessionId, DefenseSessionActor actor, DateTime endedAt, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var session = await dbContext.DefenseSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        DefenseSession session = await dbContext.DefenseSessions.SingleAsync(x => x.Id == sessionId, cancellationToken);
         session.IsLocked = true;
         session.EndedAt = endedAt;
-        var council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
+        Council council = await dbContext.Councils.SingleAsync(x => x.Id == session.CouncilId, cancellationToken);
         council.Status = CouncilStatus.Closed;
         await dbContext.Scores.Where(x => x.DefenseSessionId == sessionId)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsLocked, true), cancellationToken);
@@ -200,6 +206,8 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         DateTime capturedAt,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(actor);
         var extension = input.ContentType.ToLowerInvariant() switch
         {
             "image/png" => ".png",
@@ -214,7 +222,7 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         var physicalPath = Path.Combine(root, fileName);
         try
         {
-            await using (var output = File.Create(physicalPath))
+            await using (FileStream output = File.Create(physicalPath))
                 await input.Content.CopyToAsync(output, cancellationToken);
             var publicPath = $"/evidence/{sessionId}/{fileName}";
             var entity = new DefenseEvidence

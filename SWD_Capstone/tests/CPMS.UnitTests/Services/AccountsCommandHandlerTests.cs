@@ -7,6 +7,7 @@ using CPMS.BLL.Features.Accounts.Commands.CreateAccount;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Services;
 using CPMS.BLL.Models;
+using FluentValidation.Results;
 
 namespace CPMS.UnitTests.Services;
 
@@ -22,7 +23,7 @@ public sealed class AccountsCommandHandlerTests
             new FakePasswordHasher(),
             new DefaultAccountUsernameGenerator());
 
-        var result = await handler.HandleAsync(NewCommand(), CancellationToken.None);
+        AccountCreatedResponse result = await handler.HandleAsync(NewCommand(), CancellationToken.None);
 
         Assert.Equal("AnNVGV001", result.Username);
         Assert.Equal(UserRole.Lecturer, result.Role);
@@ -50,7 +51,7 @@ public sealed class AccountsCommandHandlerTests
     {
         var validator = new CreateAccountCommandValidator();
 
-        var result = validator.Validate(NewCommand(email: "not-an-email"));
+        ValidationResult result = validator.Validate(NewCommand(email: "not-an-email"));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateAccountCommand.Email));

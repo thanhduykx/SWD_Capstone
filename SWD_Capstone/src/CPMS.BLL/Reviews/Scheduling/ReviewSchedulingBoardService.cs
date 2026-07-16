@@ -16,7 +16,7 @@ public sealed class ReviewSchedulingBoardService(IReviewSchedulingBoardStore sto
             throw new BusinessRuleException("Semester does not exist.");
         }
 
-        var normalizedWeekStart = ReviewWeek.NormalizeStart(weekStart);
+        DateOnly normalizedWeekStart = ReviewWeek.NormalizeStart(weekStart);
         var roundId = await store.FindRoundIdAsync(
             semesterId, reviewType, normalizedWeekStart, cancellationToken)
             ?? throw new KeyNotFoundException("Review round not found.");

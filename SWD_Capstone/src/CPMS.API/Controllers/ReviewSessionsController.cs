@@ -21,7 +21,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await sessionService.CreateAsync(
+        ReviewSessionResult result = await sessionService.CreateAsync(
             ToCommand(
                 request.Code,
                 request.GroupId,
@@ -32,7 +32,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
                 request.Room,
                 request.SessionDate),
             cancellationToken);
-        var response = Map(result);
+        ReviewSessionResponse response = Map(result);
         return CreatedAtAction(nameof(Create), new { response.Id }, response);
     }
 
@@ -47,10 +47,10 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         {
             return BadRequest(new { error = "Sessions is required." });
         }
-        var commands = request.Sessions.Select(x => ToCommand(
+        AssignReviewSessionCommand[] commands = request.Sessions.Select(x => ToCommand(
             x.Code, x.GroupId, x.Type, x.ReviewerIds, x.PreviousReviewerIds,
             x.Slot, x.Room, x.SessionDate)).ToArray();
-        var results = await sessionService.BulkAssignAsync(commands, cancellationToken);
+        IReadOnlyList<ReviewSessionResult> results = await sessionService.BulkAssignAsync(commands, cancellationToken);
         return Ok(new BulkAssignReviewSessionsResponse(0, 0, results.Select(Map).ToArray()));
     }
 
@@ -64,7 +64,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var result = await sessionService.UpdateAsync(
+            ReviewSessionResult result = await sessionService.UpdateAsync(
                 sessionId,
                 new UpdateReviewSessionCommand(
                     request.Code, request.ReviewerIds, request.PreviousReviewerIds,
@@ -86,7 +86,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
     [Authorize(Roles = "Lecturer")]
     public async Task<IReadOnlyList<MyReviewSessionResponse>> GetMySessions(CancellationToken cancellationToken)
     {
-        var results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
+        IReadOnlyList<MyReviewSessionResult> results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new MyReviewSessionResponse(
             x.SessionId, x.SubmissionId, x.Code, x.Type, x.SessionStatus, x.GroupCode,
             x.SessionDate, x.Slot, x.Room, x.SubmissionStatus, x.LastSavedAt)).ToArray();

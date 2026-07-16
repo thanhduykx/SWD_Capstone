@@ -5,6 +5,7 @@ using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Reviews;
 
@@ -29,12 +30,14 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
         Func<CancellationToken, Task<TResult>> operation,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(operation);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
         var lockKey = $"review-round:{scope.SemesterId}:{scope.ReviewType}:{scope.WeekStart:yyyy-MM-dd}";
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
-        var result = await operation(cancellationToken);
+        TResult? result = await operation(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
@@ -42,6 +45,7 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
     public async Task<ReviewPublicationSnapshot> LoadSnapshotAsync(
         ReviewPublicationScope scope, int requiredSlotCount, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(scope);
         var round = await dbContext.ReviewRounds
             .Where(x => x.SemesterId == scope.SemesterId && x.Type == scope.ReviewType &&
                         x.WeekStartDate == scope.WeekStart)
@@ -55,7 +59,7 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
             x.WeekStartDate == scope.WeekStart, cancellationToken);
         var weekStartDate = DateTime.SpecifyKind(
             scope.WeekStart.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var weekEndDate = weekStartDate.AddDays(7);
+        DateTime weekEndDate = weekStartDate.AddDays(7);
         var sessionRows = await dbContext.ReviewSessions
             .Where(x => x.SemesterId == scope.SemesterId && x.Type == scope.ReviewType &&
                         x.SessionDate >= weekStartDate && x.SessionDate < weekEndDate &&
@@ -65,11 +69,11 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
             {
                 x.Id, x.Code, x.Type, x.SessionDate, x.Slot, x.Room, x.Reviewer1Id, x.Reviewer2Id
             }).ToListAsync(cancellationToken);
-        var sessions = sessionRows.Select(x => new PublicationSession(
+        PublicationSession[] sessions = sessionRows.Select(x => new PublicationSession(
             x.Id, x.Code, x.Type, x.SessionDate, x.Slot, x.Room,
             new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray()))
             .ToArray();
-        var activeGroupIds = await dbContext.CapstoneGroups
+        List<int> activeGroupIds = await dbContext.CapstoneGroups
             .Where(x => x.SemesterId == scope.SemesterId && x.Status == GroupStatus.Active)
             .Select(x => x.Id).ToListAsync(cancellationToken);
         var fullyRegisteredCount = await dbContext.StudentSlotRegistrations
@@ -89,7 +93,7 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
                     lecturer.Id, lecturer.FullName, UserId = user.Id, user.Email
                 })
             .ToListAsync(cancellationToken);
-        var reviewerRecipients = reviewerRows.Select(reviewer => new PublicationRecipient(
+        PublicationRecipient[] reviewerRecipients = reviewerRows.Select(reviewer => new PublicationRecipient(
             reviewer.UserId,
             reviewer.Email,
             reviewer.FullName,
@@ -143,6 +147,8 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
         PersistReviewPublication input,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(input);
         var publication = new ReviewSchedulePublication
         {
             SemesterId = scope.SemesterId,
@@ -154,7 +160,7 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
         };
         dbContext.ReviewSchedulePublications.Add(publication);
         await dbContext.SaveChangesAsync(cancellationToken);
-        foreach (var email in input.Emails)
+        foreach (PublicationEmail email in input.Emails)
         {
             dbContext.EmailDeliveryLogs.Add(new EmailDeliveryLog
             {
@@ -166,15 +172,15 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
                 Status = EmailDeliveryStatus.Pending
             });
         }
-        var sessions = await dbContext.ReviewSessions.Where(x => input.SessionIds.Contains(x.Id))
+        List<ReviewSession> sessions = await dbContext.ReviewSessions.Where(x => input.SessionIds.Contains(x.Id))
             .ToListAsync(cancellationToken);
-        foreach (var session in sessions)
+        foreach (ReviewSession? session in sessions)
         {
             session.Status = ReviewSessionStatus.Published;
             session.PublishedAt = input.PublishedAt;
             session.PublishedByTrainingDepartmentId = input.ModeratorId;
         }
-        var round = await dbContext.ReviewRounds.SingleAsync(x => x.Id == input.RoundId, cancellationToken);
+        ReviewRound round = await dbContext.ReviewRounds.SingleAsync(x => x.Id == input.RoundId, cancellationToken);
         round.Status = ReviewRoundStatus.Published;
         dbContext.AuditLogs.Add(new AuditLog
         {
@@ -193,12 +199,12 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
     public async Task<(int Sent, int Failed)> DispatchEmailsAsync(
         int publicationId, CancellationToken cancellationToken)
     {
-        var logs = await dbContext.EmailDeliveryLogs
+        List<EmailDeliveryLog> logs = await dbContext.EmailDeliveryLogs
             .Where(x => x.PublicationId == publicationId && x.Status == EmailDeliveryStatus.Pending)
             .ToListAsync(cancellationToken);
         var sent = 0;
         var failed = 0;
-        foreach (var log in logs)
+        foreach (EmailDeliveryLog? log in logs)
         {
             try
             {

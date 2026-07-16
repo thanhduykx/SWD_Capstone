@@ -4,6 +4,7 @@ using CPMS.BLL.Enums;
 using CPMS.DAL.Data;
 using CPMS.BLL.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Accounts;
 
@@ -12,18 +13,21 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
     public async Task<PagedResult<AccountResult>> GetAllAsync(
         PagedRequest request, CancellationToken cancellationToken)
     {
-        var query = dbContext.Users.AsNoTracking();
+        ArgumentNullException.ThrowIfNull(request);
+        IQueryable<User> query = dbContext.Users.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var search = request.Search.Trim().ToLowerInvariant();
-            query = query.Where(x => x.Username.ToLower().Contains(search) || x.Email.ToLower().Contains(search));
+            var searchPattern = PostgreSqlSearchPattern.Contains(request.Search);
+            query = query.Where(x =>
+                EF.Functions.ILike(x.Username, searchPattern, PostgreSqlSearchPattern.EscapeCharacter) ||
+                EF.Functions.ILike(x.Email, searchPattern, PostgreSqlSearchPattern.EscapeCharacter));
         }
         if (!string.IsNullOrWhiteSpace(request.FilterBy) && !string.IsNullOrWhiteSpace(request.FilterValue))
         {
             var value = request.FilterValue.Trim();
             query = request.FilterBy.Trim().ToLowerInvariant() switch
             {
-                "role" when Enum.TryParse<UserRole>(value, true, out var role) => query.Where(x => x.Role == role),
+                "role" when Enum.TryParse<UserRole>(value, true, out UserRole role) => query.Where(x => x.Role == role),
                 "isactive" when bool.TryParse(value, out var active) => query.Where(x => x.IsActive == active),
                 _ => query
             };
@@ -36,7 +40,7 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
             _ => request.Desc ? query.OrderByDescending(x => x.Username) : query.OrderBy(x => x.Username)
         };
         var total = await query.CountAsync(cancellationToken);
-        var items = await query.Skip((request.SafePage - 1) * request.SafePageSize).Take(request.SafePageSize)
+        List<AccountResult> items = await query.Skip((request.SafePage - 1) * request.SafePageSize).Take(request.SafePageSize)
             .Select(x => new AccountResult(
                 x.Id, x.Username, x.Email, x.Role, x.IsActive, x.LastLoginAt, x.LockedUntil))
             .ToListAsync(cancellationToken);
@@ -49,7 +53,8 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
 
     public async Task<AccountResult> CreateAsync(PersistAccount input, CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(input);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var user = new User
         {
             Username = input.Username,
@@ -77,7 +82,8 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
         AccountAuditContext audit,
         CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(audit);
+        User? user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
         if (user is null) return null;
         var oldValue = user.IsActive;
         user.IsActive = isActive;
@@ -93,7 +99,7 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
     public async Task<(AccountResult Account, AccountProfileSeed Seed)?> FindForRoleUpdateAsync(
         int userId, CancellationToken cancellationToken)
     {
-        var user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        User? user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
         if (user is null) return null;
         var student = await dbContext.Students.Where(x => x.UserId == userId)
             .Select(x => new { x.FullName, IdentityCode = x.Code }).FirstOrDefaultAsync(cancellationToken);
@@ -113,9 +119,11 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
         AccountAuditContext audit,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
-        var oldRole = user.Role;
+        ArgumentNullException.ThrowIfNull(seed);
+        ArgumentNullException.ThrowIfNull(audit);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        User user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
+        UserRole oldRole = user.Role;
         user.Role = newRole;
         user.UpdatedAt = DateTime.UtcNow;
         if (!await RoleProfileExistsAsync(userId, newRole, cancellationToken))
