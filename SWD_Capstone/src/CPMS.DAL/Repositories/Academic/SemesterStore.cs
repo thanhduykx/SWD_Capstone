@@ -94,6 +94,34 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
         return Map(semester);
     }
 
+    public async Task<SemesterResult> ToggleStatusAsync(
+        int semesterId, CancellationToken cancellationToken)
+    {
+        Semester semester = await dbContext.Semesters.SingleAsync(x => x.Id == semesterId, cancellationToken);
+        semester.IsActive = !semester.IsActive;
+        if (semester.IsActive)
+            await dbContext.Semesters.Where(x => x.IsActive && x.Id != semesterId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsActive, false), cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Map(semester);
+    }
+
+    public async Task DeleteAsync(int semesterId, CancellationToken cancellationToken)
+    {
+        bool hasGroups = await dbContext.CapstoneGroups.AnyAsync(x => x.SemesterId == semesterId, cancellationToken);
+        if (hasGroups) throw new CPMS.BLL.Exceptions.BusinessRuleException("Không thể xóa kỳ học đang có nhóm đồ án (Capstone Groups) tham gia.");
+        
+        try
+        {
+            var rows = await dbContext.Semesters.Where(x => x.Id == semesterId).ExecuteDeleteAsync(cancellationToken);
+            if (rows == 0) throw new InvalidOperationException("Semester not found.");
+        }
+        catch (Exception ex) when (ex.Message.Contains("foreign key") || ex.Message.Contains("constraint"))
+        {
+            throw new CPMS.BLL.Exceptions.BusinessRuleException("Không thể xóa kỳ học này vì đã có dữ liệu ràng buộc (đề tài, lịch review, đợt bảo vệ...) tham chiếu đến.");
+        }
+    }
+
     public async Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(
         int semesterId, CancellationToken cancellationToken) =>
         await dbContext.CapstoneGroups.Where(x => x.SemesterId == semesterId).OrderBy(x => x.Code)

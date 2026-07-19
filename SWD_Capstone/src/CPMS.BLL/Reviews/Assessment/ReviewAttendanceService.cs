@@ -155,6 +155,6 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
     private async Task<ReviewAttendanceResult> BuildAttendanceAsync(
         ReviewAttendanceContext context, CancellationToken cancellationToken) =>
         new(context.SessionId, context.SessionCode, context.GroupId, context.GroupCode,
-            context.SessionDate, context.Slot, context.Room,
+            context.GroupStatus, context.SessionDate, context.Slot, context.Room,
             await store.GetStudentsAsync(context.SessionId, context.GroupId, cancellationToken));
 }
