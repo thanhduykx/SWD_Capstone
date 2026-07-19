@@ -11,7 +11,7 @@ public sealed record ReviewRoundData(
     DateOnly WeekEndDate);
 
 public sealed record LecturerAvailabilityData(DateTime? SubmittedAt, IReadOnlyList<ReviewAvailabilitySlot> Slots);
-public sealed record StudentProfileData(int Id, int? GroupId, bool IsLeader, int? GroupSemesterId);
+public sealed record StudentProfileData(int Id, int? GroupId, bool IsLeader, int? GroupSemesterId, string? GroupCode = null);
 public sealed record StudentRoundData(ReviewRoundData Round, int RegistrationCount);
 public sealed record StudentRegistrationData(int Id, int GroupId, string GroupCode, int DayOfWeek, int Slot);
 public sealed record StudentScheduleData(

@@ -91,7 +91,8 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
 
     private static StudentReviewRoundResponse Map(StudentReviewRoundResult result) =>
         new(result.Id, result.SemesterId, result.Type, result.Status,
-            result.WeekStartDate, result.WeekEndDate, result.IsGroupRegistered);
+            result.WeekStartDate, result.WeekEndDate, result.IsGroupRegistered,
+            result.IsLeader, result.GroupId, result.GroupCode);
 
     private static StudentSlotGridResponse Map(StudentSlotGridResult result) =>
         new(
@@ -102,5 +103,8 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
             result.WeekEndDate,
             result.RequiredAvailabilityCount,
             result.MyAvailability.Select(x => new StudentSlotRegistrationResponse(
-                x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray());
+                x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray(),
+            result.IsLeader,
+            result.GroupId,
+            result.GroupCode);
 }

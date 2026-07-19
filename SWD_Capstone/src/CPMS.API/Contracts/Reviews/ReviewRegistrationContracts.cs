@@ -21,7 +21,10 @@ public sealed record StudentReviewRoundResponse(
     ReviewRoundStatus Status,
     DateOnly WeekStartDate,
     DateOnly WeekEndDate,
-    bool IsGroupRegistered);
+    bool IsGroupRegistered,
+    bool IsLeader = false,
+    int? GroupId = null,
+    string? GroupCode = null);
 
 public sealed record StudentSlotGridResponse(
     int RoundId,
@@ -30,7 +33,10 @@ public sealed record StudentSlotGridResponse(
     DateOnly WeekStartDate,
     DateOnly WeekEndDate,
     int RequiredAvailabilityCount,
-    IReadOnlyCollection<StudentSlotRegistrationResponse> MyAvailability);
+    IReadOnlyCollection<StudentSlotRegistrationResponse> MyAvailability,
+    bool IsLeader = false,
+    int? GroupId = null,
+    string? GroupCode = null);
 
 public sealed record StudentSlotRegistrationResponse(
     int Id,

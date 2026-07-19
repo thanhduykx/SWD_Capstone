@@ -111,6 +111,10 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
                 x.GroupId.HasValue
                     ? dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId.Value)
                         .Select(group => (int?)group.SemesterId).SingleOrDefault()
+                    : null,
+                x.GroupId.HasValue
+                    ? dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId.Value)
+                        .Select(group => group.Code).SingleOrDefault()
                     : null))
             .SingleOrDefaultAsync(cancellationToken);
 

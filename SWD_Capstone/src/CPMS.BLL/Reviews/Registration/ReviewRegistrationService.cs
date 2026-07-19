@@ -75,7 +75,10 @@ public sealed class ReviewRegistrationService(
         return rows.Select(x => new StudentReviewRoundResult(
             x.Round.Id, x.Round.SemesterId, x.Round.Type, x.Round.Status,
             x.Round.WeekStartDate, x.Round.WeekEndDate,
-            x.RegistrationCount == AssignmentRules.RequiredStudentAvailabilityCount)).ToArray();
+            x.RegistrationCount == AssignmentRules.RequiredStudentAvailabilityCount,
+            student?.IsLeader ?? false,
+            student?.GroupId,
+            student?.GroupCode)).ToArray();
     }
 
     public async Task<StudentSlotGridResult> GetStudentSlotGridAsync(
@@ -86,7 +89,7 @@ public sealed class ReviewRegistrationService(
         IReadOnlyList<StudentRegistrationData> registrations = student?.GroupId is int groupId
             ? await store.GetStudentRegistrationsAsync(roundId, groupId, cancellationToken)
             : [];
-        return MapGrid(round, registrations);
+        return MapGrid(round, registrations, student?.IsLeader ?? false, student?.GroupId, student?.GroupCode);
     }
 
     public async Task<StudentSlotGridResult> SaveStudentAvailabilityAsync(
@@ -115,7 +118,7 @@ public sealed class ReviewRegistrationService(
         await store.ReplaceStudentAvailabilityAsync(
             roundId, student.GroupId!.Value, student.Id, slots.Distinct().ToArray(), cancellationToken);
         IReadOnlyList<StudentRegistrationData> registrations = await store.GetStudentRegistrationsAsync(roundId, student.GroupId.Value, cancellationToken);
-        return MapGrid(round, registrations);
+        return MapGrid(round, registrations, student.IsLeader, student.GroupId, student.GroupCode);
     }
 
     public async Task ClearStudentAvailabilityAsync(int userId, int roundId, CancellationToken cancellationToken)
@@ -199,9 +202,10 @@ public sealed class ReviewRegistrationService(
             state.SubmittedAt is not null, state.SubmittedAt, state.Slots);
 
     private static StudentSlotGridResult MapGrid(
-        ReviewRoundData round, IReadOnlyCollection<StudentRegistrationData> registrations) =>
+        ReviewRoundData round, IReadOnlyCollection<StudentRegistrationData> registrations, bool isLeader = false, int? groupId = null, string? groupCode = null) =>
         new(round.Id, round.Type, round.Status, round.WeekStartDate, round.WeekEndDate,
             AssignmentRules.RequiredStudentAvailabilityCount,
             registrations.Select(x => new StudentSlotRegistrationResult(
-                x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray());
+                x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray(),
+            isLeader, groupId, groupCode);
 }
