@@ -17,5 +17,7 @@ public interface ISemesterService
     Task<PagedResult<SemesterResult>> GetAllAsync(PagedRequest request, CancellationToken cancellationToken);
     Task<SemesterResult> ResolveAsync(DateOnly date, CancellationToken cancellationToken);
     Task<SemesterResult> CreateAsync(CreateSemesterCommand command, CancellationToken cancellationToken);
+    Task<SemesterResult> ToggleStatusAsync(int semesterId, CancellationToken cancellationToken);
+    Task DeleteAsync(int semesterId, CancellationToken cancellationToken);
     Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(int semesterId, CancellationToken cancellationToken);
 }

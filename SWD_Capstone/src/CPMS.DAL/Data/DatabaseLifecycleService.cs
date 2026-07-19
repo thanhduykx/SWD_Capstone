@@ -31,6 +31,11 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         if (seedDevelopmentData) await SeedDevelopmentDataAsync(cancellationToken);
     }
 
+    public Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken) =>
         dbContext.Database.CanConnectAsync(cancellationToken);
 
