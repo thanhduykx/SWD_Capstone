@@ -83,20 +83,22 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
     }
 
     [HttpGet("my")]
-    [Authorize(Roles = "Lecturer")]
+    [Authorize]
     public async Task<IReadOnlyList<MyReviewSessionResponse>> GetMySessions(CancellationToken cancellationToken)
     {
+        if (!User.IsInRole("Lecturer")) throw new UnauthorizedAccessException("Lecturer role required.");
         IReadOnlyList<MyReviewSessionResult> results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new MyReviewSessionResponse(
             x.SessionId, x.SubmissionId, x.Code, x.Type, x.SessionStatus, x.GroupId, x.GroupCode,
             x.TopicName, x.SessionDate, x.Slot, x.Room, x.SubmissionStatus, x.LastSavedAt)).ToArray();
     }
 
-    private int CurrentUserId() =>
-        int.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? throw new UnauthorizedAccessException("Missing user identifier."),
-            CultureInfo.InvariantCulture);
+    private int CurrentUserId()
+    {
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(idStr)) throw new UnauthorizedAccessException("Missing user identifier.");
+        return int.Parse(idStr, CultureInfo.InvariantCulture);
+    }
 
     private static AssignReviewSessionCommand ToCommand(
         string code,

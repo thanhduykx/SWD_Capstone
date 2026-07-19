@@ -11,5 +11,7 @@ public interface ISemesterStore
     Task<SemesterResult?> FindByCodeAsync(string code, CancellationToken cancellationToken);
     Task<SemesterResult> UpsertResolvedAsync(SemesterTermData term, CancellationToken cancellationToken);
     Task<SemesterResult> CreateAsync(SemesterTermData input, CancellationToken cancellationToken);
+    Task<SemesterResult> ToggleStatusAsync(int semesterId, CancellationToken cancellationToken);
+    Task DeleteAsync(int semesterId, CancellationToken cancellationToken);
     Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(int semesterId, CancellationToken cancellationToken);
 }

@@ -35,6 +35,12 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
             command.StartDate, command.EndDate, command.IsActive), cancellationToken);
     }
 
+    public Task<SemesterResult> ToggleStatusAsync(int semesterId, CancellationToken cancellationToken) =>
+        store.ToggleStatusAsync(semesterId, cancellationToken);
+
+    public Task DeleteAsync(int semesterId, CancellationToken cancellationToken) =>
+        store.DeleteAsync(semesterId, cancellationToken);
+
     public Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(
         int semesterId, CancellationToken cancellationToken) =>
         store.GetGroupsAsync(semesterId, cancellationToken);

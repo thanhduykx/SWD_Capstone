@@ -19,11 +19,11 @@ public sealed class GroupImportService(
     private const int InitialPasswordByteCount = 18;
 
     public async Task<GroupImportResult> ImportAsync(
-        Stream stream, int lecturerId, CancellationToken cancellationToken)
+        Stream stream, int? lecturerId = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        if (lecturerId <= 0 || !await store.LecturerExistsAsync(lecturerId, cancellationToken))
-            throw new BusinessRuleException($"Lecturer {lecturerId} does not exist.");
+        if (lecturerId.HasValue && (lecturerId.Value <= 0 || !await store.LecturerExistsAsync(lecturerId.Value, cancellationToken)))
+            throw new BusinessRuleException($"Lecturer {lecturerId.Value} does not exist.");
         SemesterResult semester = await semesterService.ResolveAsync(
             DateOnly.FromDateTime(DateTime.Today), cancellationToken);
         IReadOnlyList<ImportedGroupData> groups = parser.Parse(stream);
@@ -47,7 +47,7 @@ public sealed class GroupImportService(
     private async Task<PersistResult> PersistAsync(
         IReadOnlyList<ImportedGroupData> groups,
         int semesterId,
-        int lecturerId,
+        int? lecturerId,
         CancellationToken cancellationToken)
     {
         var groupsCreated = 0;
@@ -69,7 +69,7 @@ public sealed class GroupImportService(
     private async Task<PersistedGroup> PersistGroupAsync(
         ImportedGroupData importedGroup,
         int semesterId,
-        int lecturerId,
+        int? lecturerId,
         CancellationToken cancellationToken)
     {
         var suffix = $"{semesterId}_{importedGroup.FirstRowNumber}";

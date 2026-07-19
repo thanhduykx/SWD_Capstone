@@ -44,6 +44,34 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
         catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
+    [HttpPatch("{semesterId:int}/status")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<SemesterResponse>> ToggleStatus(
+        int semesterId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            SemesterResult result = await semesterService.ToggleStatusAsync(semesterId, cancellationToken);
+            return Ok(Map(result));
+        }
+        catch (InvalidOperationException) { return NotFound(new { error = "Semester not found." }); }
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
+    [HttpDelete("{semesterId:int}")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<IActionResult> Delete(
+        int semesterId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await semesterService.DeleteAsync(semesterId, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException) { return NotFound(new { error = "Semester not found." }); }
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
     [HttpGet("{semesterId:int}/groups")]
     public async Task<ActionResult<IReadOnlyList<SemesterGroupResponse>>> GetGroups(
         int semesterId, CancellationToken cancellationToken)
