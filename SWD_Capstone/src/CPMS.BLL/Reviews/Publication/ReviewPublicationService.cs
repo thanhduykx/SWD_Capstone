@@ -6,7 +6,9 @@ using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Reviews.Publication;
 
-public sealed class ReviewPublicationService(IReviewPublicationStore store) : IReviewPublicationService
+public sealed class ReviewPublicationService(
+    IReviewPublicationStore store,
+    IReviewPublicationDispatchScheduler dispatchScheduler) : IReviewPublicationService
 {
     public async Task<ReviewSchedulePublicationResult> PublishAsync(
         PublishReviewScheduleCommand command, CancellationToken cancellationToken)
@@ -25,16 +27,16 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 "A Training Department moderator profile is required for publishing review schedules.");
         var scope = new ReviewPublicationScope(
             command.SemesterId, command.ReviewType, ReviewWeek.NormalizeStart(command.WeekStart));
-        (int PublicationId, int SessionCount) persisted = await store.ExecuteLockedAsync(
+        (int PublicationId, int SessionCount, int EmailCount) persisted = await store.ExecuteLockedAsync(
             scope,
             token => PrepareAndPersistAsync(scope, command, moderatorId, subject, token),
             cancellationToken);
-        (int Sent, int Failed) delivery = await store.DispatchEmailsAsync(persisted.PublicationId, CancellationToken.None);
+        await dispatchScheduler.EnqueueAsync(persisted.PublicationId, CancellationToken.None);
         return new ReviewSchedulePublicationResult(
-            persisted.PublicationId, persisted.SessionCount, delivery.Sent, delivery.Failed);
+            persisted.PublicationId, persisted.SessionCount, persisted.EmailCount, 0, 0);
     }
 
-    private async Task<(int PublicationId, int SessionCount)> PrepareAndPersistAsync(
+    private async Task<(int PublicationId, int SessionCount, int EmailCount)> PrepareAndPersistAsync(
         ReviewPublicationScope scope,
         PublishReviewScheduleCommand command,
         int moderatorId,
@@ -70,7 +72,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 snapshot.ScheduledGroupCount);
         }
 
-        IReadOnlyList<PublicationEmail> emails = BuildEmails(command.Message, subject, snapshot);
+        List<PublicationEmail> emails = BuildEmails(command.Message, subject, snapshot);
         var publicationId = await store.PersistAsync(
             scope,
             new PersistReviewPublication(
@@ -85,7 +87,7 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 command.UserAgent,
                 DateTime.UtcNow),
             cancellationToken);
-        return (publicationId, snapshot.Sessions.Count);
+        return (publicationId, snapshot.Sessions.Count, emails.Count);
     }
 
     private static List<PublicationEmail> BuildEmails(
@@ -104,13 +106,13 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
                 BuildReviewerBody(moderatorMessage, recipient.DisplayName,
                     recipient.SessionIds.Select(id => sessions[id]))));
         }
-        foreach (PublicationRecipient recipient in snapshot.GroupLeaderRecipients)
+        foreach (PublicationRecipient recipient in snapshot.StudentRecipients)
         {
             emails.Add(new PublicationEmail(
                 recipient.UserId,
                 recipient.Email,
                 $"[CPMS] Review Schedule Notification for Group {recipient.GroupCode}",
-                BuildLeaderBody(moderatorMessage, recipient,
+                BuildStudentBody(moderatorMessage, recipient,
                     recipient.SessionIds.Select(id => sessions[id]))));
         }
         return emails;
@@ -126,15 +128,14 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string BuildLeaderBody(
+    private static string BuildStudentBody(
         string? moderatorMessage, PublicationRecipient recipient, IEnumerable<PublicationSession> sessions)
     {
         var lines = new List<string>
         {
-            $"Dear {recipient.DisplayName} (Leader of Group {recipient.GroupCode} - {recipient.ProjectName}),",
+            $"Dear {recipient.DisplayName} (Group {recipient.GroupCode} - {recipient.ProjectName}),",
             "",
-            "Your group's capstone review schedule has been published.",
-            "As the group leader, you are automatically notified. Please inform all team members of this schedule."
+            "Your group's capstone review schedule has been published."
         };
         AddMessageAndSessions(lines, moderatorMessage, sessions);
         lines.Add("");
@@ -159,11 +160,11 @@ public sealed class ReviewPublicationService(IReviewPublicationStore store) : IR
 
     private static string SlotTimeLabel(int slot) => slot switch
     {
-        1 => "Slot 1 (07:00-09:15)",
-        2 => "Slot 2 (09:30-11:45)",
-        3 => "Slot 3 (12:30-14:45)",
-        4 => "Slot 4 (15:00-17:15)",
-        5 => "Slot 5 (17:30-19:45)",
+        1 => "Slot 1 (07:30-09:00)",
+        2 => "Slot 2 (09:10-10:40)",
+        3 => "Slot 3 (10:50-12:20)",
+        4 => "Slot 4 (12:50-14:20)",
+        5 => "Slot 5 (14:30-16:00)",
         _ => $"Slot {slot}"
     };
 }

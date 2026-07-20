@@ -21,7 +21,7 @@ public sealed record ReviewPublicationSnapshot(
     int FullyRegisteredGroupCount,
     int ScheduledGroupCount,
     IReadOnlyList<PublicationRecipient> ReviewerRecipients,
-    IReadOnlyList<PublicationRecipient> GroupLeaderRecipients);
+    IReadOnlyList<PublicationRecipient> StudentRecipients);
 public sealed record PublicationEmail(int RecipientUserId, string RecipientEmail, string Subject, string Body);
 public sealed record PersistReviewPublication(
     int RoundId,
@@ -50,4 +50,5 @@ public interface IReviewPublicationStore
         CancellationToken cancellationToken);
     Task<(int Sent, int Failed)> DispatchEmailsAsync(
         int publicationId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<int>> GetPendingPublicationIdsAsync(CancellationToken cancellationToken);
 }

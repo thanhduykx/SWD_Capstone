@@ -13,7 +13,11 @@ public sealed record PublishReviewScheduleCommand(
     string? IpAddress,
     string? UserAgent);
 public sealed record ReviewSchedulePublicationResult(
-    int PublicationId, int PublishedSessionCount, int SentEmailCount, int FailedEmailCount);
+    int PublicationId,
+    int PublishedSessionCount,
+    int QueuedEmailCount,
+    int SentEmailCount,
+    int FailedEmailCount);
 public sealed class IncompleteReviewScheduleException(
     string message,
     int activeGroups,
@@ -28,4 +32,9 @@ public interface IReviewPublicationService
 {
     Task<ReviewSchedulePublicationResult> PublishAsync(
         PublishReviewScheduleCommand command, CancellationToken cancellationToken);
+}
+
+public interface IReviewPublicationDispatchScheduler
+{
+    ValueTask EnqueueAsync(int publicationId, CancellationToken cancellationToken);
 }

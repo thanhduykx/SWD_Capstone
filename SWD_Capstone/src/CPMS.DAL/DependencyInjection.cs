@@ -47,6 +47,10 @@ public static class DependencyInjection
         services.AddScoped<IReviewAssignmentStore, ReviewAssignmentStore>();
         services.AddScoped<IReviewSessionStore, ReviewSessionStore>();
         services.AddScoped<IReviewPublicationStore, ReviewPublicationStore>();
+        services.AddSingleton<ReviewPublicationDispatchScheduler>();
+        services.AddSingleton<IReviewPublicationDispatchScheduler>(provider =>
+            provider.GetRequiredService<ReviewPublicationDispatchScheduler>());
+        services.AddHostedService<ReviewPublicationEmailWorker>();
         services.AddScoped<IReviewAttendanceStore, ReviewAttendanceStore>();
         services.AddScoped<IReviewSubmissionStore, ReviewSubmissionStore>();
         services.AddScoped<ISemesterStore, SemesterStore>();

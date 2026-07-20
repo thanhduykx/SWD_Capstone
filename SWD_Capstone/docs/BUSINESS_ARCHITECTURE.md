@@ -58,6 +58,8 @@ Rules:
 - A checkpoint Review does not assign a numeric score or a `Pass`/`Fail` verdict.
 - The assigned lecturer records attendance, writes a required reviewer comment and completes the Review.
 - Students can read only submitted feedback for their own group.
+- Publishing a completed schedule creates durable email-outbox entries for every assigned reviewer and every student in each scheduled group.
+- The publish request returns after queuing those entries; a hosted background worker sends SMTP mail and recovers pending entries after an application restart.
 
 ### Defense Board And Round Management
 

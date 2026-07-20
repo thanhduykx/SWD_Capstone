@@ -122,24 +122,27 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
                     user.Email
                 })
             .ToListAsync(cancellationToken);
-        var leaderRecipients = new List<PublicationRecipient>();
+        var studentRecipients = new List<PublicationRecipient>();
         foreach (var group in groupRows)
         {
-            var leader = studentRows.Where(x => x.GroupId == group.Id)
-                .OrderByDescending(x => x.IsLeader).ThenBy(x => x.Code).FirstOrDefault();
-            if (leader is null || string.IsNullOrWhiteSpace(leader.Email)) continue;
-            leaderRecipients.Add(new PublicationRecipient(
-                leader.UserId,
-                leader.Email,
-                leader.FullName,
-                group.Code,
-                group.ProjectName,
-                groupSessionRows.Where(x => x.GroupId == group.Id).Select(x => x.SessionId).ToArray()));
+            int[] groupSessionIds = groupSessionRows.Where(x => x.GroupId == group.Id)
+                .Select(x => x.SessionId).Distinct().ToArray();
+            foreach (var student in studentRows.Where(x => x.GroupId == group.Id && !string.IsNullOrWhiteSpace(x.Email))
+                         .OrderByDescending(x => x.IsLeader).ThenBy(x => x.Code))
+            {
+                studentRecipients.Add(new PublicationRecipient(
+                    student.UserId,
+                    student.Email,
+                    student.FullName,
+                    group.Code,
+                    group.ProjectName,
+                    groupSessionIds));
+            }
         }
 
         return new ReviewPublicationSnapshot(
             round.Id, round.Status, alreadyPublished, sessions, activeGroupIds.Count,
-            fullyRegisteredCount, scheduledGroupIds.Length, reviewerRecipients, leaderRecipients);
+            fullyRegisteredCount, scheduledGroupIds.Length, reviewerRecipients, studentRecipients);
     }
 
     public async Task<int> PersistAsync(
@@ -228,6 +231,14 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
         await dbContext.SaveChangesAsync(cancellationToken);
         return (sent, failed);
     }
+
+    public async Task<IReadOnlyList<int>> GetPendingPublicationIdsAsync(CancellationToken cancellationToken) =>
+        await dbContext.EmailDeliveryLogs
+            .Where(x => x.Status == EmailDeliveryStatus.Pending && x.PublicationId.HasValue)
+            .Select(x => x.PublicationId!.Value)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
 
     private static ReviewPublicationSnapshot EmptySnapshot() =>
         new(null, null, false, [], 0, 0, 0, [], []);

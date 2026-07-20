@@ -9,4 +9,8 @@ public sealed record PublishReviewScheduleRequest(
     string? Subject,
     string? Message);
 public sealed record ReviewSchedulePublishResponse(
-    int PublicationId, int PublishedSessionCount, int SentEmailCount, int FailedEmailCount);
+    int PublicationId,
+    int PublishedSessionCount,
+    int QueuedEmailCount,
+    int SentEmailCount,
+    int FailedEmailCount);

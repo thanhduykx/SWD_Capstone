@@ -38,6 +38,7 @@ public sealed class ReviewSchedulesController(IReviewPublicationService publicat
             return Ok(new ReviewSchedulePublishResponse(
                 result.PublicationId,
                 result.PublishedSessionCount,
+                result.QueuedEmailCount,
                 result.SentEmailCount,
                 result.FailedEmailCount));
         }
