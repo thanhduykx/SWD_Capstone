@@ -20,6 +20,19 @@ try
         .Options;
     await using var db = new CpmsDbContext(options);
     await db.Database.OpenConnectionAsync();
+
+    if (args.Contains("--cleanup-legacy-summer", StringComparer.OrdinalIgnoreCase))
+    {
+        await CleanupLegacySummerAsync(db);
+        return 0;
+    }
+
+    if (args.Contains("--audit-semesters", StringComparer.OrdinalIgnoreCase))
+    {
+        await AuditSemestersAsync(db);
+        return 0;
+    }
+
     await db.Database.MigrateAsync();
 
     var before = await CountTablesAsync(db);
@@ -51,6 +64,68 @@ catch (Exception exception)
 {
     Console.Error.WriteLine($"Demo seed failed; transaction was not committed. {exception.Message}");
     return 1;
+}
+
+static async Task CleanupLegacySummerAsync(CpmsDbContext db)
+{
+    await using var transaction = await db.Database.BeginTransactionAsync();
+    await db.Database.ExecuteSqlRawAsync(
+        """
+        DO $cleanup$
+        DECLARE canonical_id integer; legacy_id integer;
+        BEGIN
+            SELECT id INTO canonical_id FROM semesters WHERE upper(code) = 'SU26' LIMIT 1;
+            SELECT id INTO legacy_id FROM semesters WHERE upper(code) = 'SU2026' LIMIT 1;
+            IF canonical_id IS NULL THEN RAISE EXCEPTION 'SU26 does not exist'; END IF;
+            IF legacy_id IS NOT NULL THEN
+                INSERT INTO data_normalization_archives (batch_key, entity_type, source_id, payload)
+                SELECT 'remove-regenerated-su2026-v1', 'semester', id::text, to_jsonb(s)
+                FROM semesters s WHERE id = legacy_id ON CONFLICT DO NOTHING;
+                IF EXISTS (SELECT 1 FROM topics WHERE semester_id = legacy_id)
+                   OR EXISTS (SELECT 1 FROM capstone_groups WHERE semester_id = legacy_id)
+                   OR EXISTS (SELECT 1 FROM review_rounds WHERE semester_id = legacy_id)
+                   OR EXISTS (SELECT 1 FROM review_sessions WHERE semester_id = legacy_id) THEN
+                    RAISE EXCEPTION 'SU2026 contains academic data; refusing unsafe deletion';
+                END IF;
+                UPDATE semesters SET is_active = false WHERE id = legacy_id;
+                DELETE FROM semesters WHERE id = legacy_id;
+            END IF;
+            UPDATE semesters SET is_active = false WHERE is_active AND id <> canonical_id;
+            UPDATE semesters SET is_active = true WHERE id = canonical_id;
+        END
+        $cleanup$;
+        """);
+    await transaction.CommitAsync();
+    Console.WriteLine("Legacy Summer semester cleanup committed.");
+}
+
+static async Task AuditSemestersAsync(CpmsDbContext db)
+{
+    var semesters = await db.Semesters.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
+    Console.WriteLine($"SEMESTERS={semesters.Count}");
+
+    foreach (var semester in semesters)
+    {
+        var rounds = await db.ReviewRounds.AsNoTracking()
+            .Where(x => x.SemesterId == semester.Id)
+            .OrderBy(x => x.Type)
+            .Select(x => new { x.Id, x.Type, x.Status, x.WeekStartDate })
+            .ToListAsync();
+
+        Console.WriteLine($"SEMESTER id={semester.Id} code={semester.Code} name={semester.Name} year={semester.AcademicYear} active={semester.IsActive} rounds={rounds.Count}");
+        foreach (var round in rounds)
+        {
+            Console.WriteLine($"  ROUND id={round.Id} type={round.Type} status={round.Status} week={round.WeekStartDate:yyyy-MM-dd}");
+        }
+    }
+
+    Console.WriteLine($"TOTALS topics={await db.Topics.CountAsync()} groups={await db.CapstoneGroups.CountAsync()} sessions={await db.ReviewSessions.CountAsync()} councils={await db.Councils.CountAsync()} defenseRounds={await db.DefenseRounds.CountAsync()} groupResults={await db.GroupResults.CountAsync()}");
+    Console.WriteLine($"REVIEW_TOTALS rounds={await db.ReviewRounds.CountAsync()} studentSlots={await db.StudentSlotRegistrations.CountAsync()} availability={await db.ReviewAvailabilities.CountAsync()} submissions={await db.ReviewAvailabilitySubmissions.CountAsync()} publications={await db.ReviewSchedulePublications.CountAsync()}");
+
+    await using var command = db.Database.GetDbConnection().CreateCommand();
+    command.CommandText = "SELECT count(*) FROM data_normalization_archives WHERE batch_key = 'normalize-2026-semesters-v1'";
+    var archived = await command.ExecuteScalarAsync();
+    Console.WriteLine($"ARCHIVED_ROWS={archived}");
 }
 
 static async Task SeedAsync(CpmsDbContext db)

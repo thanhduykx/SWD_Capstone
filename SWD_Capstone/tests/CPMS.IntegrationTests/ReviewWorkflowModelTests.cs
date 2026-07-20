@@ -80,6 +80,17 @@ public sealed class ReviewWorkflowModelTests
     }
 
     [Fact]
+    public void ReviewRound_IsUniquePerSemesterAndType()
+    {
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewRound))!;
+
+        Assert.Contains(entity.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ReviewRound.SemesterId), nameof(ReviewRound.Type)]));
+    }
+
+    [Fact]
     public void EmailDeliveryLog_PersistsBodyForPostCommitDispatch()
     {
         using CpmsDbContext context = CreateContext();

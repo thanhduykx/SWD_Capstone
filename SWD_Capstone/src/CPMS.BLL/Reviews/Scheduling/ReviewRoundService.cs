@@ -27,9 +27,9 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
         var moderatorId = await store.FindModeratorIdAsync(userId, allowModeratorFallback, cancellationToken)
             ?? throw new UnauthorizedAccessException("A Training Department moderator profile is required.");
         DateOnly normalizedStart = ReviewWeek.NormalizeStart(weekStartDate);
-        if (await store.RoundExistsAsync(semesterId, reviewType, normalizedStart, cancellationToken))
+        if (await store.RoundExistsAsync(semesterId, reviewType, cancellationToken))
         {
-            throw new BusinessRuleException("A review round already exists for this semester, type, and week.");
+            throw new BusinessRuleException("This semester already has a review round of the selected type.");
         }
 
         ReviewRoundState state = await store.CreateRoundAsync(

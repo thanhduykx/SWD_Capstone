@@ -26,6 +26,25 @@ public sealed class ReviewRoundServiceTests
     }
 
     [Fact]
+    public async Task CreateRound_RejectsDuplicateTypeWithinSemesterEvenForAnotherWeek()
+    {
+        var store = new FakeStore
+        {
+            SemesterExists = true,
+            ModeratorId = 12,
+            RoundExists = true
+        };
+        var service = new ReviewRoundService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.CreateRoundAsync(
+                7, false, 3, ReviewType.Review1, new DateOnly(2026, 8, 3), CancellationToken.None));
+
+        Assert.Contains("already has a review round", exception.Message);
+        Assert.Null(store.CreatedByModeratorId);
+    }
+
+    [Fact]
     public async Task UpdateStatus_RejectsInvalidTransitionWithoutWriting()
     {
         var store = new FakeStore { CurrentRound = Round(status: ReviewRoundStatus.Draft) };
@@ -79,6 +98,7 @@ public sealed class ReviewRoundServiceTests
     private sealed class FakeStore : IReviewRoundStore
     {
         public bool SemesterExists { get; init; }
+        public bool RoundExists { get; init; }
         public int? ModeratorId { get; init; }
         public ReviewRoundState? CurrentRound { get; init; }
         public (int ActiveGroups, int CompletedRegistrations) RegistrationCompletion { get; init; }
@@ -94,8 +114,8 @@ public sealed class ReviewRoundServiceTests
         public Task<int?> FindModeratorIdAsync(int userId, bool allowFallback, CancellationToken cancellationToken) =>
             Task.FromResult(ModeratorId);
 
-        public Task<bool> RoundExistsAsync(int semesterId, ReviewType reviewType, DateOnly weekStartDate, CancellationToken cancellationToken) =>
-            Task.FromResult(false);
+        public Task<bool> RoundExistsAsync(int semesterId, ReviewType reviewType, CancellationToken cancellationToken) =>
+            Task.FromResult(RoundExists);
 
         public Task<ReviewRoundState> CreateRoundAsync(
             int semesterId,

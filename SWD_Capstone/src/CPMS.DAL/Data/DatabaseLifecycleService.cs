@@ -230,16 +230,20 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
     private async Task<Semester> EnsureSemesterAsync(CancellationToken cancellationToken)
     {
-        Semester? semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken)
-            ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU2026", cancellationToken);
+        Semester? semester = await dbContext.Semesters.FirstOrDefaultAsync(x => x.Code == "SU26", cancellationToken)
+            ?? await dbContext.Semesters.FirstOrDefaultAsync(x => x.IsActive, cancellationToken);
         if (semester is not null)
         {
+            Semester[] otherActiveSemesters = await dbContext.Semesters
+                .Where(x => x.IsActive && x.Id != semester.Id)
+                .ToArrayAsync(cancellationToken);
+            foreach (Semester other in otherActiveSemesters) other.IsActive = false;
             semester.IsActive = true;
             return semester;
         }
         semester = new Semester
         {
-            Code = "SU2026", Name = "Summer 2026", AcademicYear = "2025-2026",
+            Code = "SU26", Name = "Summer 2026", AcademicYear = "2026",
             StartDate = new DateOnly(2026, 5, 1), EndDate = new DateOnly(2026, 8, 31), IsActive = true
         };
         dbContext.Semesters.Add(semester);

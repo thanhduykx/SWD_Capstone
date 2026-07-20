@@ -58,7 +58,7 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
         var end = new DateOnly(year, endMonth, DateTime.DaysInMonth(year, endMonth));
         var today = DateOnly.FromDateTime(DateTime.Today);
         return new SemesterTermData(
-            $"{prefix}{year}", $"{name} {year}", year.ToString(CultureInfo.InvariantCulture),
+            $"{prefix}{year % 100:D2}", $"{name} {year}", year.ToString(CultureInfo.InvariantCulture),
             start, end, today >= start && today <= end);
     }
 }

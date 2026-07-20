@@ -36,9 +36,9 @@ public sealed class ReviewRoundStore(CpmsDbContext dbContext) : IReviewRoundStor
     }
 
     public Task<bool> RoundExistsAsync(
-        int semesterId, ReviewType reviewType, DateOnly weekStartDate, CancellationToken cancellationToken) =>
+        int semesterId, ReviewType reviewType, CancellationToken cancellationToken) =>
         dbContext.ReviewRounds.AnyAsync(x =>
-            x.SemesterId == semesterId && x.Type == reviewType && x.WeekStartDate == weekStartDate,
+            x.SemesterId == semesterId && x.Type == reviewType,
             cancellationToken);
 
     public async Task<ReviewRoundState> CreateRoundAsync(

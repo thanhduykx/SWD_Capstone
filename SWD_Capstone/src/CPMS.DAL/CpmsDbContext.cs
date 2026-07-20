@@ -106,7 +106,9 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
 
         modelBuilder.Entity<Semester>(entity =>
         {
-            entity.ToTable("semesters");
+            entity.ToTable("semesters", table => table.HasCheckConstraint(
+                "ck_semesters_supported_codes",
+                "upper(\"code\") IN ('SP26', 'SU26', 'FA26')"));
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasIndex(x => x.IsActive).IsUnique().HasFilter("\"is_active\" = TRUE");
         });
@@ -393,7 +395,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         modelBuilder.Entity<ReviewRound>(entity =>
         {
             entity.ToTable("review_rounds");
-            entity.HasIndex(x => new { x.SemesterId, x.Type, x.WeekStartDate }).IsUnique();
+            entity.HasIndex(x => new { x.SemesterId, x.Type }).IsUnique();
             entity.Property(x => x.Type).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewRoundStatus.Draft);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);

@@ -1538,9 +1538,9 @@ namespace CPMS.DAL.Data.Migrations
                     b.HasIndex("CreatedByModeratorId")
                         .HasDatabaseName("ix_review_rounds_created_by_moderator_id");
 
-                    b.HasIndex("SemesterId", "Type", "WeekStartDate")
+                    b.HasIndex("SemesterId", "Type")
                         .IsUnique()
-                        .HasDatabaseName("ix_review_rounds_semester_id_type_week_start_date");
+                        .HasDatabaseName("ix_review_rounds_semester_id_type");
 
                     b.ToTable("review_rounds", (string)null);
                 });
@@ -1930,7 +1930,10 @@ namespace CPMS.DAL.Data.Migrations
                         .HasDatabaseName("ix_semesters_is_active")
                         .HasFilter("\"is_active\" = TRUE");
 
-                    b.ToTable("semesters", (string)null);
+                    b.ToTable("semesters", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_semesters_supported_codes", "upper(\"code\") IN ('SP26', 'SU26', 'FA26')");
+                        });
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.Student", b =>
