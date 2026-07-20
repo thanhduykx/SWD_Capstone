@@ -154,13 +154,13 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
                      !await dbContext.Lecturers.AnyAsync(x => x.UserId == user.Id, cancellationToken))
                 dbContext.Lecturers.Add(new Lecturer
                 {
-                    UserId = user.Id, Code = "LEC_TEST", FullName = "Dr. Test Lecturer", Department = "SWD"
+                    UserId = user.Id, Code = "LEC_TEST", FullName = "Đỗ Anh Tuấn", Department = "SWD"
                 });
             else if (account.Item3 == UserRole.Student &&
                      !await dbContext.Students.AnyAsync(x => x.UserId == user.Id, cancellationToken))
                 dbContext.Students.Add(new Student
                 {
-                    UserId = user.Id, Code = "SE190000", FullName = "Test Student",
+                    UserId = user.Id, Code = "SE190000", FullName = "Nguyễn Minh Khang",
                     ClassCode = "SE1901", Major = "SWD", IsLeader = false
                 });
             await dbContext.SaveChangesAsync(cancellationToken);

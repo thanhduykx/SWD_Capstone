@@ -1,4 +1,5 @@
 using CPMS.BLL.Common.Exceptions;
+using CPMS.BLL.Exceptions;
 using CPMS.BLL.Reviews.Scheduling;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Services;
@@ -51,7 +52,7 @@ public sealed class ReviewRoundServiceTests
         var service = new ReviewRoundService(store, new AssignmentRules());
 
         await Assert.ThrowsAsync<ConflictException>(() =>
-            service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None));
+            service.UpdateStatusAsync(1, ReviewRoundStatus.Published, CancellationToken.None));
 
         Assert.False(store.StatusUpdated);
     }

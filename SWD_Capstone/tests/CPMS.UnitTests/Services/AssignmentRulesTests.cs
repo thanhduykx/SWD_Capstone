@@ -33,13 +33,13 @@ public sealed class AssignmentRulesTests
     }
 
     [Fact]
-    public void ReviewRound_RejectsSkippingFromDraftToClosed()
+    public void ReviewRound_AllowsModeratorToCloseDraftRegistration()
     {
-        Action action = () => _rules.EnsureReviewRoundTransition(
+        Exception? exception = Record.Exception(() => _rules.EnsureReviewRoundTransition(
             CPMS.BLL.Enums.ReviewRoundStatus.Draft,
-            CPMS.BLL.Enums.ReviewRoundStatus.Closed);
+            CPMS.BLL.Enums.ReviewRoundStatus.Closed));
 
-        Assert.Throws<BusinessRuleException>(action);
+        Assert.Null(exception);
     }
 
     [Fact]

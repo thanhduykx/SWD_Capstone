@@ -27,6 +27,12 @@ try
         return 0;
     }
 
+    if (args.Contains("--audit-data-quality", StringComparer.OrdinalIgnoreCase))
+    {
+        await AuditDataQualityAsync(db);
+        return 0;
+    }
+
     if (args.Contains("--audit-semesters", StringComparer.OrdinalIgnoreCase))
     {
         await AuditSemestersAsync(db);
@@ -64,6 +70,41 @@ catch (Exception exception)
 {
     Console.Error.WriteLine($"Demo seed failed; transaction was not committed. {exception.Message}");
     return 1;
+}
+
+static async Task AuditDataQualityAsync(CpmsDbContext db)
+{
+    var lecturers = await (from lecturer in db.Lecturers.AsNoTracking()
+                           join user in db.Users.AsNoTracking() on lecturer.UserId equals user.Id
+                           orderby lecturer.Id
+                           select new { lecturer.Id, lecturer.Code, lecturer.FullName, user.Username, user.Email })
+        .ToListAsync();
+    Console.WriteLine($"LECTURERS={lecturers.Count}");
+    foreach (var item in lecturers)
+        Console.WriteLine($"  id={item.Id} code={item.Code} name={item.FullName} username={item.Username} email={item.Email}");
+
+    var students = await (from student in db.Students.AsNoTracking()
+                          join user in db.Users.AsNoTracking() on student.UserId equals user.Id
+                          orderby student.Id
+                          select new { student.Id, student.Code, student.FullName, student.GroupId, user.Username, user.Email })
+        .ToListAsync();
+    Console.WriteLine($"STUDENTS={students.Count}");
+    foreach (var item in students)
+        Console.WriteLine($"  id={item.Id} code={item.Code} name={item.FullName} group={item.GroupId} username={item.Username} email={item.Email}");
+
+    var defenseRounds = await db.DefenseRounds.AsNoTracking().OrderBy(x => x.Id)
+        .Select(x => new { x.Id, x.Code, x.Name, x.Status, x.StartDate, x.EndDate }).ToListAsync();
+    Console.WriteLine($"DEFENSE_ROUNDS={defenseRounds.Count}");
+    foreach (var item in defenseRounds)
+        Console.WriteLine($"  id={item.Id} code={item.Code} name={item.Name} status={item.Status} dates={item.StartDate:yyyy-MM-dd}..{item.EndDate:yyyy-MM-dd} sessions={await db.DefenseSessions.CountAsync(x => x.DefenseRoundId == item.Id)}");
+
+    var groups = await db.CapstoneGroups.AsNoTracking().OrderBy(x => x.Id)
+        .Select(x => new { x.Id, x.Code, x.TopicId }).ToListAsync();
+    Console.WriteLine("GROUPS=" + string.Join(" | ", groups.Select(x => $"{x.Id}:{x.Code}:topic{x.TopicId}")));
+    var topics = await db.Topics.AsNoTracking().OrderBy(x => x.Id)
+        .Select(x => new { x.Id, x.Code, x.NameVn, x.NameEn }).ToListAsync();
+    foreach (var item in topics.Where(x => x.Code.Contains("DEMO") || x.NameVn.Contains("Demo") || x.NameEn.Contains("Demo")))
+        Console.WriteLine($"DEMO_TOPIC id={item.Id} code={item.Code} vn={item.NameVn} en={item.NameEn}");
 }
 
 static async Task CleanupLegacySummerAsync(CpmsDbContext db)

@@ -63,6 +63,9 @@ public sealed class GroupImportServiceTests
         public Task<bool> LecturerExistsAsync(int lecturerId, CancellationToken cancellationToken) =>
             Task.FromResult(true);
 
+        public Task<int> FindDefaultLecturerIdAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(1);
+
         public Task<(int Id, bool Created)> UpsertTopicAsync(
             int semesterId,
             string code,
@@ -73,7 +76,7 @@ public sealed class GroupImportServiceTests
             int semesterId,
             string code,
             int topicId,
-            int lecturerId,
+            int? lecturerId,
             CancellationToken cancellationToken) => Task.FromResult((1, true));
 
         public Task<ImportUserState?> FindUserAsync(
@@ -116,6 +119,14 @@ public sealed class GroupImportServiceTests
 
         public Task<SemesterResult> CreateAsync(
             CreateSemesterCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<SemesterResult> ToggleStatusAsync(
+            int semesterId,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteAsync(
+            int semesterId,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(
