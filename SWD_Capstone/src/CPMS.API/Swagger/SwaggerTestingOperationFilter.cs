@@ -234,7 +234,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("effortHours", Double(3.5)),
             ("reviewerComment", Str("Draft review comment.")),
             ("suggestion", Str("Improve scope and validation evidence.")),
-            ("resultText", Str("Pass with minor revisions")),
+            ("resultText", Str("Nhận xét: cần bổ sung tài liệu kiểm thử và làm rõ phạm vi chức năng.")),
             ("items", Arr(Obj(
                 ("itemKey", Str("sample-item-key-from-get-response")),
                 ("answer", Str("Yes")),
