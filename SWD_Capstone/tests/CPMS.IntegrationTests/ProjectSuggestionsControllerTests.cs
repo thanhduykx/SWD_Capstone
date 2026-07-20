@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using CPMS.API.Contracts.AI;
 using CPMS.API.Controllers;
@@ -10,6 +11,18 @@ namespace CPMS.IntegrationTests;
 
 public sealed class ProjectSuggestionsControllerTests
 {
+    [Fact]
+    public void RequestValidationMetadata_IsDeclaredOnPrimaryConstructorParameters()
+    {
+        Type requestType = typeof(GenerateProjectSuggestionRequest);
+        ConstructorInfo constructor = Assert.Single(requestType.GetConstructors());
+
+        Assert.All(constructor.GetParameters(), parameter =>
+            Assert.NotEmpty(parameter.GetCustomAttributes<ValidationAttribute>()));
+        Assert.All(requestType.GetProperties(), property =>
+            Assert.Empty(property.GetCustomAttributes<ValidationAttribute>()));
+    }
+
     [Fact]
     public async Task GenerateSummary_ExposesLecturerOnlyPostEndpointAndMapsAllSections()
     {

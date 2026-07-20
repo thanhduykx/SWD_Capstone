@@ -31,8 +31,8 @@ public sealed class ImportControllerTests
 
         public Task<GroupImportResult> ImportAsync(
             Stream stream,
-            int lecturerId,
-            CancellationToken cancellationToken)
+            int? lecturerId = null,
+            CancellationToken cancellationToken = default)
         {
             WasCalled = true;
             return Task.FromResult(new GroupImportResult(0, 0, 0, 0, 0, 0));
