@@ -92,8 +92,23 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(geminiOptions.TimeoutSeconds);
         });
 
-        var documentStorageOptions = configuration.GetSection(ProjectDocumentStorageOptions.SectionName)
+        var configuredDocumentStorage = configuration.GetSection(ProjectDocumentStorageOptions.SectionName)
             .Get<ProjectDocumentStorageOptions>() ?? new ProjectDocumentStorageOptions();
+        // Accept the conventional deployment names as well as the nested appsettings keys.
+        // This keeps the service-role key out of source control and out of the frontend.
+        var supabaseUrl = configuration["SUPABASE_URL"] ?? configuredDocumentStorage.SupabaseUrl;
+        var serviceRoleKey = configuration["SUPABASE_SERVICE_ROLE_KEY"]
+            ?? configuration["SUPABASE_SERVICE_KEY"]
+            ?? configuredDocumentStorage.ServiceRoleKey;
+        var bucket = configuration["SUPABASE_STORAGE_BUCKET"] ?? configuredDocumentStorage.Bucket;
+        var documentStorageOptions = new ProjectDocumentStorageOptions
+        {
+            Provider = !string.IsNullOrWhiteSpace(serviceRoleKey) ? "Supabase" : configuredDocumentStorage.Provider,
+            LocalRoot = configuredDocumentStorage.LocalRoot,
+            SupabaseUrl = supabaseUrl,
+            ServiceRoleKey = serviceRoleKey,
+            Bucket = bucket
+        };
         services.AddSingleton(documentStorageOptions);
         services.AddHttpClient<IProjectDocumentStorage, ProjectDocumentStorage>();
 

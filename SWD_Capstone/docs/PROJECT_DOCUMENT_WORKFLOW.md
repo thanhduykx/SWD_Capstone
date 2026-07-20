@@ -30,6 +30,8 @@ Create `cpms-documents` as a private bucket with a 50 MB limit and these MIME ty
 
 On Render, configuration keys can be supplied as `DocumentStorage__Provider`, `DocumentStorage__SupabaseUrl`, `DocumentStorage__ServiceRoleKey`, and `DocumentStorage__Bucket`. Never expose the service-role key through Vite or any frontend variable.
 
+The BE also accepts the conventional deployment names `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SERVICE_KEY`), and `SUPABASE_STORAGE_BUCKET`; when a service key is present, the provider automatically switches to Supabase.
+
 ## Stable API contracts
 
 ### Upload
