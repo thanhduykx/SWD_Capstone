@@ -158,6 +158,7 @@ app.MapGet("/health/database", async (
     }
 });
 app.MapHub<DefenseScoringHub>("/hubs/defense");
+app.MapHub<PresenceHub>("/hubs/presence");
 app.MapGet("/", () => Results.Redirect("/swagger"));
 await app.RunAsync();
 
