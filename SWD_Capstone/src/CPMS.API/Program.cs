@@ -16,6 +16,7 @@ using CPMS.BLL.Reviews.Assessment;
 using CPMS.BLL.Services;
 using CPMS.DAL;
 using CPMS.DAL.Data;
+using CPMS.DAL.ExternalServices;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -142,6 +143,14 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready", StringComparer.OrdinalIgnoreCase)
 });
+app.MapGet("/health/storage", (ProjectDocumentStorageOptions options) => Results.Ok(new
+{
+    status = "Healthy",
+    provider = options.Provider,
+    configured = string.Equals(options.Provider, "Supabase", StringComparison.OrdinalIgnoreCase)
+        ? !string.IsNullOrWhiteSpace(options.SupabaseUrl) && !string.IsNullOrWhiteSpace(options.ServiceRoleKey)
+        : true
+}));
 app.MapGet("/health/database", async (
     IDatabaseLifecycleService database, CancellationToken cancellationToken) =>
 {
