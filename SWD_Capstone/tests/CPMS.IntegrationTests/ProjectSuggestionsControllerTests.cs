@@ -68,5 +68,9 @@ public sealed class ProjectSuggestionsControllerTests
             LastInput = input;
             return Task.FromResult(result);
         }
+
+        public Task<ProjectSuggestionResult> GenerateFromDocumentAsync(
+            ProjectDocumentSuggestionInput input,
+            CancellationToken cancellationToken) => Task.FromResult(result);
     }
 }

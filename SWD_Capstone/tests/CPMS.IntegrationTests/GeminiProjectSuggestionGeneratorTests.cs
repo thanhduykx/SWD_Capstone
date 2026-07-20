@@ -82,6 +82,28 @@ public sealed class GeminiProjectSuggestionGeneratorTests
     }
 
     [Fact]
+    public async Task GenerateFromDocumentAsync_SendsPdfInlineAndKeepsResponseContract()
+    {
+        const string responseBody = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"contentSummary\\\":\\\"Summary\\\",\\\"strengthsSummary\\\":\\\"Strengths\\\",\\\"improvementSummary\\\":\\\"Improvements\\\"}\"}]}}]}";
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
+        });
+        using HttpClient httpClient = CreateHttpClient(handler);
+        GeminiProjectSuggestionGenerator generator = CreateGenerator(httpClient);
+
+        ProjectSuggestionResult result = await generator.GenerateFromDocumentAsync(
+            new ProjectDocumentSuggestionInput("CPMS", "report.pdf", "application/pdf", "%PDF-test"u8.ToArray()),
+            CancellationToken.None);
+
+        Assert.Equal("Summary", result.ContentSummary);
+        using var requestJson = JsonDocument.Parse(Assert.IsType<string>(handler.RequestBody));
+        JsonElement parts = requestJson.RootElement.GetProperty("contents")[0].GetProperty("parts");
+        Assert.Equal("application/pdf", parts[1].GetProperty("inlineData").GetProperty("mimeType").GetString());
+        Assert.Equal(Convert.ToBase64String("%PDF-test"u8), parts[1].GetProperty("inlineData").GetProperty("data").GetString());
+    }
+
+    [Fact]
     public async Task GenerateAsync_WhenGeminiRateLimits_ReportsTemporaryUnavailability()
     {
         var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));

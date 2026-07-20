@@ -48,15 +48,36 @@ public sealed class ProjectSuggestionServiceTests
             CancellationToken.None));
     }
 
+    [Fact]
+    public async Task GenerateFromDocumentAsync_AcceptsPdfAndPreservesStructuredResult()
+    {
+        var expected = new ProjectSuggestionResult("Content", "Strengths", "Improvements");
+        var generator = new StubGenerator(expected);
+        var service = new ProjectSuggestionService(generator);
+        var input = new ProjectDocumentSuggestionInput(" CPMS ", "report.pdf", "application/pdf", "%PDF"u8.ToArray());
+
+        ProjectSuggestionResult actual = await service.GenerateFromDocumentAsync(input, CancellationToken.None);
+
+        Assert.Equal(expected, actual);
+        Assert.Equal("CPMS", generator.LastDocumentInput?.ProjectName);
+    }
+
     private sealed class StubGenerator(ProjectSuggestionResult result) : IProjectSuggestionGenerator
     {
         public ProjectSuggestionInput? LastInput { get; private set; }
+        public ProjectDocumentSuggestionInput? LastDocumentInput { get; private set; }
 
         public Task<ProjectSuggestionResult> GenerateAsync(
             ProjectSuggestionInput input,
             CancellationToken cancellationToken)
         {
             LastInput = input;
+            return Task.FromResult(result);
+        }
+
+        public Task<ProjectSuggestionResult> GenerateFromDocumentAsync(ProjectDocumentSuggestionInput input, CancellationToken cancellationToken)
+        {
+            LastDocumentInput = input;
             return Task.FromResult(result);
         }
     }

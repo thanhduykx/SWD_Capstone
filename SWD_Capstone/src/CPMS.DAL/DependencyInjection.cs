@@ -23,6 +23,7 @@ using CPMS.DAL.Repositories.Defense;
 using CPMS.BLL.Defense.Sessions;
 using CPMS.BLL.Academic.Import;
 using CPMS.BLL.AI.ProjectSuggestions;
+using CPMS.BLL.Documents;
 using CPMS.DAL.UnitOfWork;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(configuration);
         services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
         services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IProjectDocumentStore, ProjectDocumentStore>();
         services.AddScoped<IReviewRegistrationStore, ReviewRegistrationStore>();
         services.AddScoped<IReviewRoundStore, ReviewRoundStore>();
         services.AddScoped<IReviewSchedulingBoardStore, ReviewSchedulingBoardStore>();
@@ -89,6 +91,11 @@ public static class DependencyInjection
 #pragma warning restore S1075
             client.Timeout = TimeSpan.FromSeconds(geminiOptions.TimeoutSeconds);
         });
+
+        var documentStorageOptions = configuration.GetSection(ProjectDocumentStorageOptions.SectionName)
+            .Get<ProjectDocumentStorageOptions>() ?? new ProjectDocumentStorageOptions();
+        services.AddSingleton(documentStorageOptions);
+        services.AddHttpClient<IProjectDocumentStorage, ProjectDocumentStorage>();
 
         var redisConnection = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redisConnection))

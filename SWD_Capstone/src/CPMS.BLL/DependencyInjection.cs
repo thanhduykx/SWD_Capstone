@@ -13,6 +13,7 @@ using CPMS.BLL.Defense.Management;
 using CPMS.BLL.Defense.Sessions;
 using CPMS.BLL.Academic.Import;
 using CPMS.BLL.AI.ProjectSuggestions;
+using CPMS.BLL.Documents;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IDefenseSessionService, DefenseSessionService>();
         services.AddScoped<IGroupImportService, GroupImportService>();
         services.AddScoped<IProjectSuggestionService, ProjectSuggestionService>();
+        services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
         return services;
     }
 }
