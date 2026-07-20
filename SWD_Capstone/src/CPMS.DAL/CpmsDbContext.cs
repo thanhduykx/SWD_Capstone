@@ -21,6 +21,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<Clo> Clos => Set<Clo>();
     public DbSet<RuleKeyword> RuleKeywords => Set<RuleKeyword>();
     public DbSet<CapstoneDocument> Documents => Set<CapstoneDocument>();
+    public DbSet<DocumentPayload> DocumentPayloads => Set<DocumentPayload>();
     public DbSet<EvaluationReport> EvaluationReports => Set<EvaluationReport>();
     public DbSet<EvaluationDetail> EvaluationDetails => Set<EvaluationDetail>();
     public DbSet<InlineComment> InlineComments => Set<InlineComment>();
@@ -158,6 +159,14 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Syllabus>().WithMany().HasForeignKey(x => x.SyllabusId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UploadedById).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<DocumentPayload>(entity =>
+        {
+            entity.ToTable("document_payloads");
+            entity.HasKey(x => x.StorageKey);
+            entity.Property(x => x.StorageKey).HasMaxLength(500);
+            entity.Property(x => x.ContentType).HasMaxLength(200);
+            entity.Property(x => x.Content).HasColumnType("bytea");
         });
         modelBuilder.Entity<EvaluationReport>(entity =>
         {

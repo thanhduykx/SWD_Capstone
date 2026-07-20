@@ -19,6 +19,14 @@ public sealed class CapstoneDocument : AuditableEntity
     public bool IsDeleted { get; set; }
 }
 
+public sealed class DocumentPayload
+{
+    public required string StorageKey { get; set; }
+    public required byte[] Content { get; set; }
+    public required string ContentType { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public sealed class EvaluationReport
 {
     public int Id { get; set; }

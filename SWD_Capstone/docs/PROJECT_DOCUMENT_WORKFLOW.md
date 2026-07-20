@@ -10,7 +10,7 @@ Documents are private resources. The browser never receives a Supabase service-r
 4. A student in the group, an assigned reviewer, the supervisor, or an administrator requests the file through the CPMS API.
 5. The API checks authorization again and streams the object to the browser.
 
-Supabase Storage is the production provider. Local storage is retained for development only.
+Supabase Storage is the preferred production provider. When no Supabase key is available, the deployed fallback is `Database`, which stores bounded capstone files in PostgreSQL so the Render filesystem is not used. This fallback is suitable for capstone scale; migrate to Supabase Storage for larger cohorts or files.
 
 ```json
 "DocumentStorage": {

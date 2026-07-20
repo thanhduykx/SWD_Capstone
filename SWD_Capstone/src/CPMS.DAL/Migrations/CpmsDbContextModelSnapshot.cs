@@ -604,6 +604,34 @@ namespace CPMS.DAL.Data.Migrations
                     b.ToTable("defense_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("CPMS.DAL.Entities.DocumentPayload", b =>
+                {
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("StorageKey")
+                        .HasName("pk_document_payloads");
+
+                    b.ToTable("document_payloads", (string)null);
+                });
+
             modelBuilder.Entity("CPMS.DAL.Entities.EmailDeliveryLog", b =>
                 {
                     b.Property<int>("Id")
