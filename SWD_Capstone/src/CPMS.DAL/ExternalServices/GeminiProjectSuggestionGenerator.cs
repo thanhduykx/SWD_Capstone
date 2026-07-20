@@ -18,6 +18,34 @@ internal sealed class GeminiProjectSuggestionGenerator(
         ProjectSuggestionInput input,
         CancellationToken cancellationToken)
     {
+        try
+        {
+            return await GenerateCoreAsync(input, cancellationToken);
+        }
+        catch (ExternalServiceException)
+        {
+            throw;
+        }
+        catch (ExternalServiceUnavailableException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Unexpected failure while generating project suggestions.");
+            throw new ExternalServiceException(
+                "Gemini could not generate a project suggestion.", exception);
+        }
+    }
+
+    private async Task<ProjectSuggestionResult> GenerateCoreAsync(
+        ProjectSuggestionInput input,
+        CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(options.ApiKey))
             throw new ExternalServiceUnavailableException(
                 "Gemini is not configured. Set Gemini:ApiKey before using project suggestions.");
@@ -75,9 +103,7 @@ internal sealed class GeminiProjectSuggestionGenerator(
                     "Gemini returned an invalid response.", exception);
             }
 
-            GeminiCandidate? candidate = payload?.Candidates is { Count: > 0 } candidates ? candidates[0] : null;
-            string? text = candidate?.Content?.Parts?
-                .FirstOrDefault(part => !string.IsNullOrWhiteSpace(part.Text))?.Text;
+            string? text = ExtractSuggestionJson(payload);
             if (string.IsNullOrWhiteSpace(text))
                 throw new ExternalServiceException("Gemini did not return a project suggestion.");
 
@@ -106,6 +132,42 @@ internal sealed class GeminiProjectSuggestionGenerator(
                 result.StrengthsSummary.Trim(),
                 result.ImprovementSummary.Trim());
         }
+    }
+
+    /// Gemini 2.5 có thể trả thought parts + markdown fence quanh JSON.
+    private static string? ExtractSuggestionJson(GeminiGenerateContentResponse? payload)
+    {
+        IReadOnlyList<GeminiPart>? parts = payload?.Candidates is { Count: > 0 } candidates
+            ? candidates[0].Content?.Parts
+            : null;
+        if (parts is null || parts.Count == 0) return null;
+
+        IEnumerable<string> texts = parts
+            .Where(part => part.Thought != true && !string.IsNullOrWhiteSpace(part.Text))
+            .Select(part => part.Text!.Trim());
+
+        string? jsonLike = texts.LastOrDefault(text =>
+            text.StartsWith('{') || text.Contains("contentSummary", StringComparison.Ordinal));
+        return NormalizeJsonPayload(jsonLike ?? texts.LastOrDefault());
+    }
+
+    private static string? NormalizeJsonPayload(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var trimmed = text.Trim();
+        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            int firstLineEnd = trimmed.IndexOf('\n');
+            if (firstLineEnd > 0) trimmed = trimmed[(firstLineEnd + 1)..].Trim();
+            if (trimmed.EndsWith("```", StringComparison.Ordinal))
+                trimmed = trimmed[..^3].Trim();
+        }
+
+        int start = trimmed.IndexOf('{');
+        int end = trimmed.LastIndexOf('}');
+        if (start >= 0 && end > start)
+            return trimmed[start..(end + 1)];
+        return trimmed;
     }
 
     private static object BuildRequest(ProjectSuggestionInput input) => new
@@ -143,7 +205,7 @@ internal sealed class GeminiProjectSuggestionGenerator(
         generationConfig = new
         {
             temperature = 0.3,
-            maxOutputTokens = 1_024,
+            maxOutputTokens = 2_048,
             responseMimeType = "application/json",
             responseSchema = new
             {
@@ -174,5 +236,5 @@ internal sealed class GeminiProjectSuggestionGenerator(
     private sealed record GeminiGenerateContentResponse(IReadOnlyList<GeminiCandidate>? Candidates);
     private sealed record GeminiCandidate(GeminiContent? Content);
     private sealed record GeminiContent(IReadOnlyList<GeminiPart>? Parts);
-    private sealed record GeminiPart(string? Text);
+    private sealed record GeminiPart(string? Text, bool? Thought);
 }
