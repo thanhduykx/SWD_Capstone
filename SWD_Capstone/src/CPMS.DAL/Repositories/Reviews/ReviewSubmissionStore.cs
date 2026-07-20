@@ -1,4 +1,3 @@
-using System.Globalization;
 using CPMS.BLL.Reviews.Assessment;
 using CPMS.DAL.Entities;
 using CPMS.BLL.Enums;
@@ -22,8 +21,8 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
             .OrderByDescending(x => x.LastSavedAt)
             .Select(x => new ReviewSubmissionSummary(
                 x.Id, x.SessionId, x.GroupId, x.Type.ToString(), x.Status.ToString(),
-                x.ResultText ?? "Pass",
-                x.EffortHours.HasValue ? x.EffortHours.Value.ToString("F1", CultureInfo.InvariantCulture) : "N/A",
+                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.ReviewerId)
+                    .Select(lecturer => lecturer.FullName).Single(),
                 x.ReviewerComment ?? x.Suggestion ?? string.Empty,
                 x.SubmittedAt ?? x.LastSavedAt))
             .ToListAsync(cancellationToken);
@@ -45,12 +44,9 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
                    submission.GroupId,
                    submission.Type.ToString(),
                    submission.Status.ToString(),
-                   slot.Result != null ? slot.Result.ToString()! : submission.ResultText ?? "Pass",
-                   submission.EffortHours.HasValue
-                       ? submission.EffortHours.Value.ToString("F1", CultureInfo.InvariantCulture)
-                       : "8.5",
-                   submission.ReviewerComment ?? submission.Suggestion ?? slot.Notes ??
-                       "Đã hoàn thành đánh giá review checkpoint",
+                   dbContext.Lecturers.Where(lecturer => lecturer.Id == submission.ReviewerId)
+                       .Select(lecturer => lecturer.FullName).Single(),
+                   submission.ReviewerComment ?? submission.Suggestion ?? slot.Notes ?? string.Empty,
                    submission.SubmittedAt ?? submission.LastSavedAt))
             .ToListAsync(cancellationToken);
 
@@ -133,12 +129,6 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
         }
         await dbContext.SaveChangesAsync(cancellationToken);
     }
-
-    public Task<int> CountAnsweredItemsAsync(
-        int submissionId, IReadOnlyCollection<string> requiredKeys, CancellationToken cancellationToken) =>
-        dbContext.ReviewChecklistItemResponses.CountAsync(x =>
-            x.SubmissionId == submissionId && requiredKeys.Contains(x.ItemKey) && x.Answer != null,
-            cancellationToken);
 
     public async Task SubmitAsync(int submissionId, DateTime submittedAt, CancellationToken cancellationToken)
     {

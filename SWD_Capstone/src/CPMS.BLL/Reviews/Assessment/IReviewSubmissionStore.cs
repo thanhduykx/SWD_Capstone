@@ -57,8 +57,6 @@ public interface IReviewSubmissionStore
     Task<ReviewSubmissionState?> FindStateAsync(int submissionId, CancellationToken cancellationToken);
     Task<ReviewSubmissionData> GetDataAsync(int submissionId, CancellationToken cancellationToken);
     Task SaveDraftAsync(int submissionId, PersistReviewDraft draft, CancellationToken cancellationToken);
-    Task<int> CountAnsweredItemsAsync(
-        int submissionId, IReadOnlyCollection<string> requiredKeys, CancellationToken cancellationToken);
     Task SubmitAsync(int submissionId, DateTime submittedAt, CancellationToken cancellationToken);
     Task<ReviewChecklistExportData> GetExportDataAsync(
         int sessionId, int groupId, CancellationToken cancellationToken);

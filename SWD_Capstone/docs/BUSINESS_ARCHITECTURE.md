@@ -46,7 +46,7 @@ Rules:
 
 ### Review Management
 
-Owns Review 1, Review 2, Review 3 sessions, reviewer assignment, room/slot/day data and group review result.
+Owns Review 1, Review 2, Review 3 sessions, reviewer assignment, room/slot/day data, attendance, reviewer feedback and completion state.
 
 Rules:
 
@@ -55,7 +55,9 @@ Rules:
 - Supervisor cannot review their own group.
 - Review 2 cannot reuse Review 1 reviewers.
 - Review 3 should prefer matching at least one Review 2 reviewer when applicable.
-- Review results are `Pass`, `Fail`, `Defense2` or `Drop`.
+- A checkpoint Review does not assign a numeric score or a `Pass`/`Fail` verdict.
+- The assigned lecturer records attendance, writes a required reviewer comment and completes the Review.
+- Students can read only submitted feedback for their own group.
 
 ### Defense Board And Round Management
 
@@ -144,7 +146,7 @@ CPMS.DAL must enforce low-level integrity such as unique indexes, FK constraints
 - Import Excel is not implemented yet.
 - TEF writer/export history is not implemented yet.
 - Council creation and project-scoped defense assignment APIs exist, but need broader integration tests.
-- Review result lifecycle is not fully connected to group final result.
+- Legacy Review result fields remain in the database for backward compatibility but are not exposed by the Review feedback API.
 - Dashboard/workload APIs must be derived from database queries, not static values.
 - Audit immutability is enforced by EF but still needs database trigger protection.
 
@@ -152,7 +154,7 @@ CPMS.DAL must enforce low-level integrity such as unique indexes, FK constraints
 
 1. Move business workflows from controllers into CPMS.BLL feature handlers.
 2. Implement official account/import flow for lecturers, students, groups and topics.
-3. Complete review scheduling and result lifecycle.
+3. Complete review scheduling, attendance, feedback and completion lifecycle.
 4. Complete council management before expanding realtime scoring APIs.
 5. Implement TEF export history and format validation.
 6. Build dashboard/workload from database projections.

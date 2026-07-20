@@ -76,12 +76,8 @@ public sealed class ReviewSubmissionService(
             throw new ConflictException("This review submission has already been submitted.");
         if (state.SessionStatus != ReviewSessionStatus.Published)
             throw new ConflictException("Review feedback can only be submitted for a published session.");
-        var requiredKeys = templateProvider.GetItems(state.Type).Where(x => !x.IsSection)
-            .Select(x => x.ItemKey).ToArray();
-        var answered = await store.CountAnsweredItemsAsync(submissionId, requiredKeys, cancellationToken);
-        if (answered != requiredKeys.Length || string.IsNullOrWhiteSpace(state.ReviewerComment))
-            throw new ConflictException(
-                "Every checklist item and the reviewer comment are required before submission.");
+        if (string.IsNullOrWhiteSpace(state.ReviewerComment))
+            throw new ConflictException("Reviewer comment is required before completing the review.");
         await store.SubmitAsync(submissionId, DateTime.UtcNow, cancellationToken);
         return Map(await store.GetDataAsync(submissionId, cancellationToken));
     }

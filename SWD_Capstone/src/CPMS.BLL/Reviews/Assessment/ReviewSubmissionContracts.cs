@@ -50,8 +50,7 @@ public sealed record ReviewSubmissionSummary(
     int GroupId,
     string ReviewType,
     string Status,
-    string Result,
-    string Score,
+    string ReviewerName,
     string Notes,
     DateTime SubmittedAt);
 public sealed record ScheduledReviewExport(int SessionId, int GroupId);

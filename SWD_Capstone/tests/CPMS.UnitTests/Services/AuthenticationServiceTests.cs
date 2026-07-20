@@ -53,6 +53,22 @@ public sealed class AuthenticationServiceTests
     }
 
     [Fact]
+    public async Task GoogleLogin_WithMatchingActiveAccountIssuesApplicationTokens()
+    {
+        var store = new AuthenticationStoreFake { CurrentUser = User() };
+        var verifier = new GoogleVerifierFake { Email = "lecturer@fpt.edu.vn" };
+        AuthenticationService service = CreateService(store, new PasswordHasherFake(), verifier);
+
+        AuthenticationResult? result = await service.GoogleLoginAsync(
+            "valid-google-id-token", "chrome", CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("access", result.AccessToken);
+        Assert.Equal(7, store.SuccessfulLoginUserId);
+        Assert.Equal("refresh-hash", store.SavedRefreshToken?.TokenHash);
+    }
+
+    [Fact]
     public async Task Refresh_RejectsLockedAccountWithoutRotatingToken()
     {
         var store = new AuthenticationStoreFake
@@ -69,8 +85,8 @@ public sealed class AuthenticationServiceTests
     }
 
     private static AuthenticationService CreateService(
-        AuthenticationStoreFake store, PasswordHasherFake hasher) =>
-        new(store, hasher, new TokenIssuerFake(), new GoogleVerifierFake());
+        AuthenticationStoreFake store, PasswordHasherFake hasher, GoogleVerifierFake? verifier = null) =>
+        new(store, hasher, new TokenIssuerFake(), verifier ?? new GoogleVerifierFake());
 
     private static AuthenticationUser User(int failedAttempts = 0, DateTime? lockedUntil = null) =>
         new(7, "lecturer", "lecturer@fpt.edu.vn", "hash", UserRole.Lecturer,
@@ -97,8 +113,9 @@ public sealed class AuthenticationServiceTests
 
     private sealed class GoogleVerifierFake : IGoogleIdentityVerifier
     {
+        public string? Email { get; init; }
         public Task<string?> VerifyEmailAsync(string idToken, CancellationToken cancellationToken) =>
-            Task.FromResult<string?>(null);
+            Task.FromResult(Email);
     }
 
     private sealed class AuthenticationStoreFake : IAuthenticationStore
