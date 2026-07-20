@@ -16,7 +16,6 @@ using CPMS.BLL.Reviews.Assessment;
 using CPMS.BLL.Services;
 using CPMS.DAL;
 using CPMS.DAL.Data;
-using CPMS.DAL.ExternalServices;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -55,9 +54,8 @@ builder.Services.AddDbContext<CpmsDbContext>(options =>
     options.UseNpgsql(cpmsConnectionString).UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<CpmsDbContext>());
 builder.Services.AddBLLServices();
-builder.Services.AddDALServices(
-    builder.Configuration,
-    appSettingsConfiguration.GetSection(GeminiOptions.SectionName));
+// Đọc Gemini từ builder.Configuration (appsettings + env Gemini__ApiKey trên Render).
+builder.Services.AddDALServices(builder.Configuration);
 builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddSingleton<ReviewChecklistTemplateService>();
 builder.Services.AddSingleton<IReviewChecklistTemplateProvider>(provider =>
