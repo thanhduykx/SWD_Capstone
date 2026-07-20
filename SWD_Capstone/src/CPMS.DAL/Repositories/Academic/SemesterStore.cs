@@ -56,6 +56,10 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
         dbContext.Semesters.Where(x => x.Code == code).Select(x => MapProjection(x))
             .SingleOrDefaultAsync(cancellationToken);
 
+    public Task<SemesterResult?> FindByIdAsync(int semesterId, CancellationToken cancellationToken) =>
+        dbContext.Semesters.Where(x => x.Id == semesterId).Select(x => MapProjection(x))
+            .SingleOrDefaultAsync(cancellationToken);
+
     public async Task<SemesterResult> UpsertResolvedAsync(
         SemesterTermData term, CancellationToken cancellationToken)
     {

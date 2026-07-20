@@ -9,6 +9,7 @@ public interface ISemesterStore
     Task<(IReadOnlyList<SemesterResult> Items, int Total)> GetAllAsync(
         SemesterQuery request, CancellationToken cancellationToken);
     Task<SemesterResult?> FindByCodeAsync(string code, CancellationToken cancellationToken);
+    Task<SemesterResult?> FindByIdAsync(int semesterId, CancellationToken cancellationToken);
     Task<SemesterResult> UpsertResolvedAsync(SemesterTermData term, CancellationToken cancellationToken);
     Task<SemesterResult> CreateAsync(SemesterTermData input, CancellationToken cancellationToken);
     Task<SemesterResult> ToggleStatusAsync(int semesterId, CancellationToken cancellationToken);
