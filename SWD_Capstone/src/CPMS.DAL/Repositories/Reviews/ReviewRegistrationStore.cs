@@ -1,4 +1,5 @@
 using CPMS.BLL.Reviews.Registration;
+using CPMS.BLL.Enums;
 using CPMS.DAL.Entities;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
@@ -185,6 +186,64 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
                     session.Id, session.Code, session.Type, session.SessionDate, session.Slot, session.Room,
                     session.Status, slot.Status, slot.CompletedAt))
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<StudentCheckInData>> GetStudentCheckInsAsync(
+        int studentId, int groupId, CancellationToken cancellationToken) =>
+        await dbContext.GroupReviewSlots.Where(slot => slot.GroupId == groupId)
+            .Join(dbContext.ReviewSessions, slot => slot.SessionId, session => session.Id,
+                (slot, session) => new StudentCheckInData(
+                    session.Id, session.Code, session.Type, session.SessionDate, session.Slot, session.Room,
+                    session.Status, slot.Status,
+                    dbContext.ReviewAttendances
+                        .Where(attendance => attendance.SessionId == session.Id && attendance.StudentId == studentId)
+                        .Select(attendance => attendance.StudentConfirmedAt)
+                        .SingleOrDefault()))
+            .ToListAsync(cancellationToken);
+
+    public async Task<DateTime> ConfirmStudentCheckInAsync(
+        int userId, int studentId, int groupId, int sessionId, DateTime confirmedAt,
+        CancellationToken cancellationToken)
+    {
+        var assigned = await dbContext.GroupReviewSlots.AnyAsync(slot =>
+            slot.SessionId == sessionId && slot.GroupId == groupId &&
+            dbContext.ReviewSessions.Any(session => session.Id == slot.SessionId &&
+                session.Status == ReviewSessionStatus.Published), cancellationToken);
+        if (!assigned) throw new KeyNotFoundException("The review session is not assigned to your group.");
+        ReviewAttendance? attendance = await dbContext.ReviewAttendances.SingleOrDefaultAsync(
+            x => x.SessionId == sessionId && x.StudentId == studentId, cancellationToken);
+        if (attendance is null)
+        {
+            attendance = new ReviewAttendance
+            {
+                SessionId = sessionId,
+                StudentId = studentId,
+                IsPresent = false,
+                MarkedByLecturerId = null,
+                MarkedAt = confirmedAt,
+                StudentConfirmedAt = confirmedAt
+            };
+            dbContext.ReviewAttendances.Add(attendance);
+        }
+        else if (attendance.StudentConfirmedAt is null)
+        {
+            attendance.StudentConfirmedAt = confirmedAt;
+        }
+        else
+        {
+            return attendance.StudentConfirmedAt.Value;
+        }
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            UserId = userId,
+            Action = "STUDENT_CONFIRM_REVIEW_ATTENDANCE",
+            EntityType = nameof(ReviewAttendance),
+            EntityId = sessionId,
+            NewValue = $"studentId={studentId};confirmedAt={confirmedAt:O}",
+            CreatedAt = confirmedAt
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return attendance.StudentConfirmedAt.Value;
+    }
 
     public async Task<IReadOnlyList<StudentAttendanceData>> GetStudentAttendanceAsync(
         int studentId, CancellationToken cancellationToken)

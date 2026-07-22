@@ -4,7 +4,7 @@ namespace CPMS.BLL.Reviews.Assessment;
 
 public sealed record ReviewActor(int UserId, UserRole Role);
 public sealed record AttendanceEntry(int StudentId, bool IsPresent, string? Note);
-public sealed record AttendanceStudent(int StudentId, string StudentCode, string FullName, bool? IsPresent, string? Note);
+public sealed record AttendanceStudent(int StudentId, string StudentCode, string FullName, bool? IsPresent, string? Note, DateTime? StudentConfirmedAt);
 public sealed record ReviewAttendanceResult(
     int SessionId,
     string SessionCode,

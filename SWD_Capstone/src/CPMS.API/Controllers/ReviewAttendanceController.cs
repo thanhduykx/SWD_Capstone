@@ -103,7 +103,7 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
         new(result.SessionId, result.SessionCode, result.GroupId, result.GroupCode,
             result.GroupStatus.ToString(), result.SessionDate, result.Slot, result.Room,
             result.Students.Select(x => new AttendanceStudentResponse(
-                x.StudentId, x.StudentCode, x.FullName, x.IsPresent, x.Note)).ToArray());
+                x.StudentId, x.StudentCode, x.FullName, x.IsPresent, x.Note, x.StudentConfirmedAt)).ToArray());
     private static ReviewCommentResponse MapComment(ReviewCommentResult result) =>
         new(result.Id, result.AuthorUserId, result.AuthorName, result.Content, result.CreatedAt, result.UpdatedAt);
 }

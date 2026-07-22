@@ -77,6 +77,39 @@ public sealed class ReviewRegistrationServiceTests
         Assert.False(result[1].IsGroupRegistered);
     }
 
+    [Fact]
+    public async Task ConfirmStudentCheckIn_RecordsSignatureForAssignedPublishedSession()
+    {
+        var past = DateTime.UtcNow.AddHours(-1);
+        var store = new FakeStore
+        {
+            Student = new StudentProfileData(10, 20, false, 30),
+            CheckIns = [new(2, "PUBLISHED", ReviewType.Review1, past, 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
+        };
+        var service = new ReviewRegistrationService(store, new AssignmentRules());
+
+        StudentCheckInResult result = await service.ConfirmStudentCheckInAsync(1, 2, CancellationToken.None);
+
+        Assert.NotNull(result.ConfirmedAt);
+        Assert.True(store.StudentCheckInConfirmed);
+        Assert.False(result.CanConfirm);
+    }
+
+    [Fact]
+    public async Task ConfirmStudentCheckIn_RejectsSigningTooEarly()
+    {
+        var store = new FakeStore
+        {
+            Student = new StudentProfileData(10, 20, false, 30),
+            CheckIns = [new(2, "FUTURE", ReviewType.Review1, DateTime.UtcNow.AddHours(2), 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
+        };
+        var service = new ReviewRegistrationService(store, new AssignmentRules());
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.ConfirmStudentCheckInAsync(1, 2, CancellationToken.None));
+        Assert.False(store.StudentCheckInConfirmed);
+    }
+
     private static ReviewRoundData OpenRound(int id = 1) =>
         new(id, 30, ReviewType.Review1, ReviewRoundStatus.Open, new DateOnly(2026, 7, 13), new DateOnly(2026, 7, 18));
 
@@ -91,8 +124,10 @@ public sealed class ReviewRegistrationServiceTests
         public StudentProfileData? Student { get; init; }
         public IReadOnlyList<StudentRoundData> StudentRounds { get; init; } = [];
         public IReadOnlyList<StudentScheduleData> Schedules { get; init; } = [];
+        public IReadOnlyList<StudentCheckInData> CheckIns { get; init; } = [];
         public bool StudentAvailabilityReplaced { get; private set; }
         public bool LecturerAvailabilitySubmitted { get; private set; }
+        public bool StudentCheckInConfirmed { get; private set; }
 
         public Task<int?> FindLecturerIdByUserIdAsync(int userId, CancellationToken cancellationToken) => Task.FromResult(LecturerId);
         public Task<ReviewRoundData?> FindRoundAsync(int roundId, CancellationToken cancellationToken) => Task.FromResult(Round);
@@ -107,6 +142,8 @@ public sealed class ReviewRegistrationServiceTests
         public Task<bool> ClearStudentAvailabilityAsync(int roundId, int groupId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<IReadOnlyList<StudentScheduleData>> GetStudentScheduleAsync(int groupId, CancellationToken cancellationToken) => Task.FromResult(Schedules);
         public Task<IReadOnlyList<StudentAttendanceData>> GetStudentAttendanceAsync(int studentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StudentAttendanceData>>([]);
+        public Task<IReadOnlyList<StudentCheckInData>> GetStudentCheckInsAsync(int studentId, int groupId, CancellationToken cancellationToken) => Task.FromResult(CheckIns);
+        public Task<DateTime> ConfirmStudentCheckInAsync(int userId, int studentId, int groupId, int sessionId, DateTime confirmedAt, CancellationToken cancellationToken) { StudentCheckInConfirmed = true; return Task.FromResult(confirmedAt); }
         public Task<StudentCommentAccessData?> GetStudentCommentAccessAsync(int sessionId, int groupId, CancellationToken cancellationToken) => Task.FromResult<StudentCommentAccessData?>(null);
         public Task<IReadOnlyList<StudentCommentData>> GetStudentCommentsAsync(int sessionId, int groupId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StudentCommentData>>([]);
     }

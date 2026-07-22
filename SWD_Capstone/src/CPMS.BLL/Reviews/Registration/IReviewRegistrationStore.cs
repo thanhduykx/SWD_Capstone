@@ -17,6 +17,9 @@ public sealed record StudentRegistrationData(int Id, int GroupId, string GroupCo
 public sealed record StudentScheduleData(
     int SessionId, string SessionCode, ReviewType Type, DateTime SessionDate, int Slot, string Room,
     ReviewSessionStatus SessionStatus, ReviewGroupStatus GroupStatus, DateTime? CompletedAt);
+public sealed record StudentCheckInData(
+    int SessionId, string SessionCode, ReviewType Type, DateTime SessionDate, int Slot, string Room,
+    ReviewSessionStatus SessionStatus, ReviewGroupStatus GroupStatus, DateTime? ConfirmedAt);
 public sealed record StudentAttendanceData(
     int SessionId, string SessionCode, bool IsPresent, string? Note, DateTime MarkedAt, ReviewGroupStatus GroupStatus);
 public sealed record StudentCommentAccessData(ReviewSessionStatus SessionStatus, ReviewGroupStatus GroupStatus);
@@ -38,6 +41,8 @@ public interface IReviewRegistrationStore
     Task<bool> ClearStudentAvailabilityAsync(int roundId, int groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentScheduleData>> GetStudentScheduleAsync(int groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentAttendanceData>> GetStudentAttendanceAsync(int studentId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StudentCheckInData>> GetStudentCheckInsAsync(int studentId, int groupId, CancellationToken cancellationToken);
+    Task<DateTime> ConfirmStudentCheckInAsync(int userId, int studentId, int groupId, int sessionId, DateTime confirmedAt, CancellationToken cancellationToken);
     Task<StudentCommentAccessData?> GetStudentCommentAccessAsync(int sessionId, int groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentCommentData>> GetStudentCommentsAsync(int sessionId, int groupId, CancellationToken cancellationToken);
 }

@@ -1196,7 +1196,7 @@ namespace CPMS.DAL.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("marked_at");
 
-                    b.Property<int>("MarkedByLecturerId")
+                    b.Property<int?>("MarkedByLecturerId")
                         .HasColumnType("integer")
                         .HasColumnName("marked_by_lecturer_id");
 
@@ -1208,6 +1208,10 @@ namespace CPMS.DAL.Data.Migrations
                     b.Property<int>("SessionId")
                         .HasColumnType("integer")
                         .HasColumnName("session_id");
+
+                    b.Property<DateTime?>("StudentConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("student_confirmed_at");
 
                     b.Property<int>("StudentId")
                         .HasColumnType("integer")
@@ -2695,7 +2699,6 @@ namespace CPMS.DAL.Data.Migrations
                         .WithMany()
                         .HasForeignKey("MarkedByLecturerId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_review_attendances_lecturers_marked_by_lecturer_id");
 
                     b.HasOne("CPMS.DAL.Entities.ReviewSession", null)

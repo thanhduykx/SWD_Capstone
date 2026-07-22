@@ -51,7 +51,9 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
                 dbContext.ReviewAttendances.Where(a => a.SessionId == sessionId && a.StudentId == x.Id)
                     .Select(a => (bool?)a.IsPresent).SingleOrDefault(),
                 dbContext.ReviewAttendances.Where(a => a.SessionId == sessionId && a.StudentId == x.Id)
-                    .Select(a => a.Note).SingleOrDefault()))
+                    .Select(a => a.Note).SingleOrDefault(),
+                dbContext.ReviewAttendances.Where(a => a.SessionId == sessionId && a.StudentId == x.Id)
+                    .Select(a => a.StudentConfirmedAt).SingleOrDefault()))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlySet<int>> GetStudentIdsAsync(int groupId, CancellationToken cancellationToken) =>
@@ -127,17 +129,20 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
             comment.Id, comment.AuthorUserId, authorName, comment.Content, comment.CreatedAt, comment.UpdatedAt);
     }
 
-    public async Task<(int StudentCount, int AttendanceCount, int SubmittedCount)> GetCompletionCountsAsync(
+    public async Task<(int StudentCount, int AttendanceCount, int SubmittedCount, int ConfirmationCount)> GetCompletionCountsAsync(
         int sessionId, int groupId, CancellationToken cancellationToken)
     {
         var studentCount = await dbContext.Students.CountAsync(x => x.GroupId == groupId, cancellationToken);
         var attendanceCount = await dbContext.ReviewAttendances.CountAsync(x =>
             x.SessionId == sessionId && dbContext.Students.Any(student =>
                 student.Id == x.StudentId && student.GroupId == groupId), cancellationToken);
+        var confirmationCount = await dbContext.ReviewAttendances.CountAsync(x =>
+            x.SessionId == sessionId && x.StudentConfirmedAt != null && dbContext.Students.Any(student =>
+                student.Id == x.StudentId && student.GroupId == groupId), cancellationToken);
         var submittedCount = await dbContext.ReviewChecklistSubmissions.CountAsync(x =>
             x.SessionId == sessionId && x.GroupId == groupId &&
             x.Status == ReviewSubmissionStatus.Submitted, cancellationToken);
-        return (studentCount, attendanceCount, submittedCount);
+        return (studentCount, attendanceCount, submittedCount, confirmationCount);
     }
 
     public async Task<CompleteReviewResult> CompleteAsync(

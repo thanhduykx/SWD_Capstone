@@ -260,7 +260,8 @@ public sealed class ReviewAttendance
     public int StudentId { get; set; }
     public bool IsPresent { get; set; }
     public string? Note { get; set; }
-    public int MarkedByLecturerId { get; set; }
+    public int? MarkedByLecturerId { get; set; }
+    public DateTime? StudentConfirmedAt { get; set; }
     public DateTime MarkedAt { get; set; } = DateTime.UtcNow;
 }
 

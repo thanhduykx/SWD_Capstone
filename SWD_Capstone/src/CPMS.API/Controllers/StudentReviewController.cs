@@ -65,6 +65,29 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
             x.Status, x.GroupStatus, x.CompletedAt)).ToArray();
     }
 
+    [HttpGet("check-ins")]
+    [Authorize(Roles = "Student")]
+    public async Task<IReadOnlyList<StudentCheckInResponse>> GetMyCheckIns(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<StudentCheckInResult> results = await registrationService.GetStudentCheckInsAsync(
+            CurrentUserId(), cancellationToken);
+        return results.Select(Map).ToArray();
+    }
+
+    [HttpPost("check-ins/{sessionId:int}")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<StudentCheckInResponse>> ConfirmCheckIn(
+        int sessionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(Map(await registrationService.ConfirmStudentCheckInAsync(
+                CurrentUserId(), sessionId, cancellationToken)));
+        }
+        catch (KeyNotFoundException exception) { return NotFound(new { error = exception.Message }); }
+        catch (CPMS.BLL.Exceptions.BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
     [HttpGet("attendance")]
     public async Task<IReadOnlyList<StudentAttendanceResponse>> GetMyAttendance(CancellationToken cancellationToken)
     {
@@ -93,6 +116,10 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
         new(result.Id, result.SemesterId, result.Type, result.Status,
             result.WeekStartDate, result.WeekEndDate, result.IsGroupRegistered,
             result.IsLeader, result.GroupId, result.GroupCode);
+
+    private static StudentCheckInResponse Map(StudentCheckInResult result) =>
+        new(result.SessionId, result.SessionCode, result.Type, result.SessionDate, result.Slot,
+            result.Room, result.GroupStatus.ToString(), result.ConfirmedAt, result.CanConfirm);
 
     private static StudentSlotGridResponse Map(StudentSlotGridResult result) =>
         new(

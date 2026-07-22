@@ -11,7 +11,7 @@ public sealed record ReviewAttendanceListResponse(
     string Room,
     IReadOnlyCollection<AttendanceStudentResponse> Students);
 public sealed record AttendanceStudentResponse(
-    int StudentId, string StudentCode, string FullName, bool? IsPresent, string? Note);
+    int StudentId, string StudentCode, string FullName, bool? IsPresent, string? Note, DateTime? StudentConfirmedAt);
 public sealed record SubmitAttendanceRequest(
     [property: JsonRequired] int GroupId,
     IReadOnlyCollection<AttendanceEntryRequest> Entries);

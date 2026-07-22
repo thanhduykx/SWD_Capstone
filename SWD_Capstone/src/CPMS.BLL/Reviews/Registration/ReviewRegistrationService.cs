@@ -148,6 +148,42 @@ public sealed class ReviewRegistrationService(
                 x.SessionStatus, x.GroupStatus, x.CompletedAt)).ToArray();
     }
 
+    public async Task<IReadOnlyList<StudentCheckInResult>> GetStudentCheckInsAsync(
+        int userId, CancellationToken cancellationToken)
+    {
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        if (student?.GroupId is not int groupId) return [];
+        DateTime now = DateTime.UtcNow;
+        IReadOnlyList<StudentCheckInData> rows = await store.GetStudentCheckInsAsync(student.Id, groupId, cancellationToken);
+        return rows.Where(x => x.SessionStatus == ReviewSessionStatus.Published)
+            .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
+            .Select(x => MapCheckIn(x, now)).ToArray();
+    }
+
+    public async Task<StudentCheckInResult> ConfirmStudentCheckInAsync(
+        int userId, int sessionId, CancellationToken cancellationToken)
+    {
+        StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);
+        if (student?.GroupId is not int groupId)
+            throw new BusinessRuleException("You must belong to a capstone group to confirm attendance.");
+        IReadOnlyList<StudentCheckInData> rows = await store.GetStudentCheckInsAsync(student.Id, groupId, cancellationToken);
+        StudentCheckInData row = rows.FirstOrDefault(x => x.SessionId == sessionId)
+            ?? throw new KeyNotFoundException("The review session is not assigned to your group.");
+        if (row.SessionStatus != ReviewSessionStatus.Published)
+            throw new BusinessRuleException("Only a published review session can be confirmed.");
+        DateTime now = DateTime.UtcNow;
+        if (now < row.SessionDate.AddMinutes(-30))
+            throw new BusinessRuleException("You can sign attendance from 30 minutes before the review session starts.");
+        DateTime confirmedAt = row.ConfirmedAt ?? await store.ConfirmStudentCheckInAsync(
+            userId, student.Id, groupId, sessionId, now, cancellationToken);
+        return MapCheckIn(row with { ConfirmedAt = confirmedAt }, now);
+    }
+
+    private static StudentCheckInResult MapCheckIn(StudentCheckInData row, DateTime now) =>
+        new(row.SessionId, row.SessionCode, row.Type, row.SessionDate, row.Slot, row.Room,
+            row.GroupStatus, row.ConfirmedAt,
+            row.ConfirmedAt is null && now >= row.SessionDate.AddMinutes(-30));
+
     public async Task<IReadOnlyList<StudentAttendanceResult>> GetStudentAttendanceAsync(int userId, CancellationToken cancellationToken)
     {
         StudentProfileData? student = await store.FindStudentByUserIdAsync(userId, cancellationToken);

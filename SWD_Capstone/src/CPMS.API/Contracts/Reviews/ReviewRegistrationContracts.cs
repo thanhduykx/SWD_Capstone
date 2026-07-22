@@ -61,6 +61,17 @@ public sealed record StudentScheduleResponse(
     ReviewGroupStatus GroupStatus,
     DateTime? CompletedAt);
 
+public sealed record StudentCheckInResponse(
+    int SessionId,
+    string SessionCode,
+    ReviewType Type,
+    DateTime SessionDate,
+    int Slot,
+    string Room,
+    string GroupStatus,
+    DateTime? ConfirmedAt,
+    bool CanConfirm);
+
 public sealed record StudentAttendanceResponse(
     int SessionId,
     string SessionCode,

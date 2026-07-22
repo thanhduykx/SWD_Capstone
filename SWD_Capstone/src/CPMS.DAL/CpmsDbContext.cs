@@ -430,7 +430,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.Note).HasMaxLength(1000);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.MarkedByLecturerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.MarkedByLecturerId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
         });
         modelBuilder.Entity<ReviewComment>(entity =>
         {

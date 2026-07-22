@@ -109,12 +109,12 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             return new CompleteReviewResult(
                 sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
-        (int StudentCount, int AttendanceCount, int SubmittedCount) counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
+        (int StudentCount, int AttendanceCount, int SubmittedCount, int ConfirmationCount) counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
         if (counts.StudentCount == 0 || counts.AttendanceCount != counts.StudentCount ||
-            counts.SubmittedCount != context.ReviewerIds.Count)
+            counts.SubmittedCount != context.ReviewerIds.Count || counts.ConfirmationCount != counts.StudentCount)
         {
             throw new ConflictException(
-                "Attendance for every student and all reviewer submissions are required before completion.");
+                "Attendance, every student signature, and all reviewer submissions are required before completion.");
         }
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
