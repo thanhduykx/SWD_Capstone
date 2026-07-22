@@ -178,13 +178,18 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
     }
 
     public async Task<IReadOnlyList<StudentScheduleData>> GetStudentScheduleAsync(
-        int groupId, CancellationToken cancellationToken) =>
-        await dbContext.GroupReviewSlots.Where(x => x.GroupId == groupId)
+        int groupId, CancellationToken cancellationToken)
+    {
+        string groupCode = await dbContext.CapstoneGroups.Where(x => x.Id == groupId)
+            .Select(x => x.Code).SingleAsync(cancellationToken);
+        return await dbContext.GroupReviewSlots.Where(x => x.GroupId == groupId)
             .Join(dbContext.ReviewSessions, slot => slot.SessionId, session => session.Id,
                 (slot, session) => new StudentScheduleData(
-                    session.Id, session.Code, session.Type, session.SessionDate, session.Slot, session.Room,
+                    session.Id, session.Code, groupId, groupCode,
+                    session.Type, session.SessionDate, session.Slot, session.Room,
                     session.Status, slot.Status, slot.CompletedAt))
             .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<StudentAttendanceData>> GetStudentAttendanceAsync(
         int studentId, CancellationToken cancellationToken)

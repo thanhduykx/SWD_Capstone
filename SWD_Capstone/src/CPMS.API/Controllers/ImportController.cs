@@ -35,7 +35,8 @@ public sealed class ImportController(IGroupImportService importService) : Contro
         }
 
         using Stream stream = request.File.OpenReadStream();
-        GroupImportResult result = await importService.ImportAsync(stream, request.LecturerId, cancellationToken);
+        GroupImportResult result = await importService.ImportAsync(
+            stream, request.SemesterId, request.LecturerId, cancellationToken);
         return Ok(result);
     }
 }

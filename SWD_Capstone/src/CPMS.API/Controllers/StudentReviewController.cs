@@ -61,7 +61,8 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
     {
         IReadOnlyList<StudentScheduleResult> results = await registrationService.GetStudentScheduleAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new StudentScheduleResponse(
-            x.SessionId, x.SessionCode, x.Type, x.SessionDate, x.Slot, x.Room,
+            x.SessionId, x.SessionCode, x.GroupId, x.GroupCode,
+            x.Type, x.SessionDate, x.Slot, x.Room,
             x.Status, x.GroupStatus, x.CompletedAt)).ToArray();
     }
 

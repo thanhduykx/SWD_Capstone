@@ -23,7 +23,7 @@ public sealed class GroupImportServiceTests
             new RecordingPasswordHasher(),
             notifications);
 
-        GroupImportResult result = await service.ImportAsync(new MemoryStream([1]), 7, CancellationToken.None);
+        GroupImportResult result = await service.ImportAsync(new MemoryStream([1]), 1, 7, CancellationToken.None);
 
         Assert.Equal(2, result.StudentAccountsCreated);
         Assert.Equal(2, store.PasswordHashes.Count);
@@ -109,6 +109,11 @@ public sealed class GroupImportServiceTests
 
     private sealed class FakeSemesterService : ISemesterService
     {
+        public Task<SemesterResult?> FindByIdAsync(int semesterId, CancellationToken cancellationToken) =>
+            Task.FromResult<SemesterResult?>(new SemesterResult(
+                semesterId, "SU26", "Summer 2026", "2025-2026",
+                new DateOnly(2026, 5, 1), new DateOnly(2026, 8, 31), true));
+
         public Task<SemesterResult> ResolveAsync(DateOnly date, CancellationToken cancellationToken) =>
             Task.FromResult(new SemesterResult(
                 1, "SU26", "Summer 2026", "2025-2026", date, date.AddMonths(3), true));

@@ -49,8 +49,8 @@ public sealed class ReviewRegistrationServiceTests
             Student = new StudentProfileData(10, 20, true, 30),
             Schedules =
             [
-                new(1, "DRAFT", ReviewType.Review1, DateTime.UtcNow, 1, "A", ReviewSessionStatus.Draft, ReviewGroupStatus.Scheduled, null),
-                new(2, "PUBLISHED", ReviewType.Review1, DateTime.UtcNow, 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)
+                new(1, "DRAFT", 20, "GROUP-20", ReviewType.Review1, DateTime.UtcNow, 1, "A", ReviewSessionStatus.Draft, ReviewGroupStatus.Scheduled, null),
+                new(2, "PUBLISHED", 20, "GROUP-20", ReviewType.Review1, DateTime.UtcNow, 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)
             ]
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());

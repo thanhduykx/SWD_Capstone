@@ -15,7 +15,8 @@ public sealed record StudentProfileData(int Id, int? GroupId, bool IsLeader, int
 public sealed record StudentRoundData(ReviewRoundData Round, int RegistrationCount);
 public sealed record StudentRegistrationData(int Id, int GroupId, string GroupCode, int DayOfWeek, int Slot);
 public sealed record StudentScheduleData(
-    int SessionId, string SessionCode, ReviewType Type, DateTime SessionDate, int Slot, string Room,
+    int SessionId, string SessionCode, int GroupId, string GroupCode,
+    ReviewType Type, DateTime SessionDate, int Slot, string Room,
     ReviewSessionStatus SessionStatus, ReviewGroupStatus GroupStatus, DateTime? CompletedAt);
 public sealed record StudentAttendanceData(
     int SessionId, string SessionCode, bool IsPresent, string? Note, DateTime MarkedAt, ReviewGroupStatus GroupStatus);

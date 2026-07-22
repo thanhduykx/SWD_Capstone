@@ -144,7 +144,8 @@ public sealed class ReviewRegistrationService(
         return rows.Where(x => x.SessionStatus == ReviewSessionStatus.Published)
             .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
             .Select(x => new StudentScheduleResult(
-                x.SessionId, x.SessionCode, x.Type, x.SessionDate, x.Slot, x.Room,
+                x.SessionId, x.SessionCode, x.GroupId, x.GroupCode,
+                x.Type, x.SessionDate, x.Slot, x.Room,
                 x.SessionStatus, x.GroupStatus, x.CompletedAt)).ToArray();
     }
 

@@ -53,6 +53,8 @@ public sealed record SaveStudentAvailabilityRequest(
 public sealed record StudentScheduleResponse(
     int SessionId,
     string SessionCode,
+    int GroupId,
+    string GroupCode,
     ReviewType Type,
     DateTime SessionDate,
     int Slot,

@@ -47,6 +47,8 @@ public sealed record StudentSlotGridResult(
 public sealed record StudentScheduleResult(
     int SessionId,
     string SessionCode,
+    int GroupId,
+    string GroupCode,
     ReviewType Type,
     DateTime SessionDate,
     int Slot,

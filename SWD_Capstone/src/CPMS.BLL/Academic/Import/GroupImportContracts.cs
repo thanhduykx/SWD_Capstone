@@ -18,5 +18,5 @@ public interface IGroupWorkbookParser
 public interface IGroupImportService
 {
     Task<GroupImportResult> ImportAsync(
-        Stream stream, int? lecturerId = null, CancellationToken cancellationToken = default);
+        Stream stream, int semesterId, int? lecturerId = null, CancellationToken cancellationToken = default);
 }

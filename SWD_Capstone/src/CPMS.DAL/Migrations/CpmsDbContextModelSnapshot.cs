@@ -1960,7 +1960,7 @@ namespace CPMS.DAL.Data.Migrations
 
                     b.ToTable("semesters", null, t =>
                         {
-                            t.HasCheckConstraint("ck_semesters_supported_codes", "upper(\"code\") IN ('SP26', 'SU26', 'FA26')");
+                            t.HasCheckConstraint("ck_semesters_supported_codes", "upper(\"code\") ~ '^(SP|SU|FA)[0-9]{2}$'");
                         });
                 });
 
