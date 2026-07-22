@@ -15,4 +15,4 @@ public sealed record SemesterGroupResponse(
     int Id, string Code, string TopicName, string SupervisorName, GroupStatus Status,
     IReadOnlyList<GroupMemberResponse> Members);
 public sealed record GroupMemberResponse(
-    int Id, string Code, string FullName, string ClassCode, string Major, string Email, bool IsLeader);
+    int Id, int UserId, string Code, string FullName, string ClassCode, string Major, string Email, bool IsLeader);

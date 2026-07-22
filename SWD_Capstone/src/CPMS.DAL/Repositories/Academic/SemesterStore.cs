@@ -138,7 +138,7 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
                 x.Status,
                 dbContext.Students.Where(student => student.GroupId == x.Id).OrderBy(student => student.Code)
                     .Select(student => new SemesterGroupMemberResult(
-                        student.Id, student.Code, student.FullName, student.ClassCode, student.Major,
+                        student.Id, student.UserId, student.Code, student.FullName, student.ClassCode, student.Major,
                         dbContext.Users.Where(user => user.Id == student.UserId).Select(user => user.Email)
                             .FirstOrDefault() ?? string.Empty,
                         student.IsLeader)).ToList()))

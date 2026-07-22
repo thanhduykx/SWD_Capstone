@@ -80,7 +80,7 @@ public sealed class SemestersController(ISemesterService semesterService) : Cont
         return Ok(groups.Select(x => new SemesterGroupResponse(
             x.Id, x.Code, x.TopicName, x.SupervisorName, x.Status,
             x.Members.Select(member => new GroupMemberResponse(
-                member.Id, member.Code, member.FullName, member.ClassCode, member.Major,
+                member.Id, member.UserId, member.Code, member.FullName, member.ClassCode, member.Major,
                 member.Email, member.IsLeader)).ToArray())).ToArray());
     }
 

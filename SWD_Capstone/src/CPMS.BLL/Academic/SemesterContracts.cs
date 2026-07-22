@@ -11,7 +11,7 @@ public sealed record SemesterGroupResult(
     int Id, string Code, string TopicName, string SupervisorName, GroupStatus Status,
     IReadOnlyList<SemesterGroupMemberResult> Members);
 public sealed record SemesterGroupMemberResult(
-    int Id, string Code, string FullName, string ClassCode, string Major, string Email, bool IsLeader);
+    int Id, int UserId, string Code, string FullName, string ClassCode, string Major, string Email, bool IsLeader);
 public interface ISemesterService
 {
     Task<PagedResult<SemesterResult>> GetAllAsync(PagedRequest request, CancellationToken cancellationToken);
