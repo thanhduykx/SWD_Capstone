@@ -9,7 +9,7 @@ public enum UserRole
 }
 
 public enum GroupStatus { Active, Completed, Dropped }
-public enum DocumentType { Review1, Review2, Review3 }
+public enum DocumentType { Review1, Review2, Review3, General }
 public enum DocumentStatus { Submitted, Evaluating, NeedsRevision, Approved, Rejected }
 public enum EvaluationTriggerType { Auto, Manual }
 public enum ReviewType { Review1, Review2, Review3 }

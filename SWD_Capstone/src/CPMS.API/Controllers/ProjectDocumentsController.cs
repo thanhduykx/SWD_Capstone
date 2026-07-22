@@ -33,7 +33,7 @@ public sealed class ProjectDocumentsController(IProjectDocumentService documentS
         ArgumentNullException.ThrowIfNull(request);
         await using var content = request.File.OpenReadStream();
         var document = await documentService.UploadAsync(CurrentActor(), new UploadProjectDocumentInput(
-            request.GroupId, request.DocType, request.File.FileName, request.File.Length, content), cancellationToken);
+            request.GroupId, request.File.FileName, request.File.Length, content), cancellationToken);
         return Created($"/api/documents/{document.Id}", Map(document));
     }
 
@@ -61,5 +61,5 @@ public sealed class ProjectDocumentsController(IProjectDocumentService documentS
         User.FindFirstValue(ClaimTypes.Role) ?? throw new UnauthorizedAccessException(), ignoreCase: true);
     private static ProjectDocumentResponse Map(ProjectDocumentData x) => new(
         x.Id, x.GroupId, x.DocType.ToString(), x.FileName, x.FileSize,
-        x.VersionNo, x.Status.ToString(), x.UploadedAt, x.UploadedById);
+        x.VersionNo, x.Status.ToString(), x.UploadedAt, x.UploadedById, x.UploadedByName);
 }

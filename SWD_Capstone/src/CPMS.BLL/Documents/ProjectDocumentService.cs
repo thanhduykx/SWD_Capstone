@@ -38,13 +38,13 @@ public sealed class ProjectDocumentService(
 
         var syllabusId = await store.FindActiveSyllabusIdAsync(cancellationToken)
             ?? throw new ConflictException("Chưa có cấu hình học kỳ đang hoạt động để lưu tài liệu review.");
-        var version = await store.GetNextVersionAsync(input.GroupId, input.DocType, cancellationToken);
-        var objectPath = $"groups/{input.GroupId.ToString(CultureInfo.InvariantCulture)}/{input.DocType.ToString().ToLowerInvariant()}/v{version.ToString(CultureInfo.InvariantCulture)}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var version = await store.GetNextVersionAsync(input.GroupId, cancellationToken);
+        var objectPath = $"groups/{input.GroupId.ToString(CultureInfo.InvariantCulture)}/history/v{version.ToString(CultureInfo.InvariantCulture)}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
         var stored = await storage.SaveAsync(objectPath, GetContentType(fileName), input.Content, cancellationToken);
         try
         {
             return await store.CreateAsync(new CreateProjectDocumentData(
-                input.GroupId, syllabusId, actor.UserId, input.DocType, fileName,
+                input.GroupId, syllabusId, actor.UserId, DocumentType.General, fileName,
                 stored.StorageKey, input.FileSize, version), cancellationToken);
         }
         catch

@@ -22,19 +22,16 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
     public Task<int?> FindActiveSyllabusIdAsync(CancellationToken cancellationToken) =>
         db.Syllabuses.Where(x => x.IsActive).Select(x => (int?)x.Id).FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<int> GetNextVersionAsync(int groupId, DocumentType docType, CancellationToken cancellationToken) =>
-        (await db.Documents.Where(x => x.GroupId == groupId && x.DocType == docType)
-            .MaxAsync(x => (int?)x.VersionNo, cancellationToken) ?? 0) + 1;
+    public async Task<int> GetNextVersionAsync(int groupId, CancellationToken cancellationToken) =>
+        await db.Documents.CountAsync(x => x.GroupId == groupId, cancellationToken) + 1;
 
     public async Task<IReadOnlyList<ProjectDocumentData>> ListAsync(int groupId, CancellationToken cancellationToken) =>
-        await db.Documents.AsNoTracking().Where(x => x.GroupId == groupId).OrderByDescending(x => x.UploadedAt)
-            .Select(x => new ProjectDocumentData(x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath,
-                x.FileSize, x.VersionNo, x.Status, x.UploadedAt, x.UploadedById)).ToListAsync(cancellationToken);
+        await DocumentHistoryQuery().Where(x => x.GroupId == groupId)
+            .OrderByDescending(x => x.UploadedAt).ThenByDescending(x => x.Id)
+            .ToListAsync(cancellationToken);
 
     public async Task<ProjectDocumentData?> FindAsync(int documentId, CancellationToken cancellationToken) =>
-        await db.Documents.AsNoTracking().Where(x => x.Id == documentId)
-            .Select(x => new ProjectDocumentData(x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath,
-                x.FileSize, x.VersionNo, x.Status, x.UploadedAt, x.UploadedById)).SingleOrDefaultAsync(cancellationToken);
+        await DocumentHistoryQuery().SingleOrDefaultAsync(x => x.Id == documentId, cancellationToken);
 
     public async Task<ProjectDocumentData> CreateAsync(CreateProjectDocumentData input, CancellationToken cancellationToken)
     {
@@ -45,7 +42,8 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
             FileSize = input.FileSize, VersionNo = input.VersionNo
         };
         db.Documents.Add(entity); await db.SaveChangesAsync(cancellationToken);
-        return Map(entity);
+        return await FindAsync(entity.Id, cancellationToken)
+            ?? throw new InvalidOperationException("The uploaded document could not be reloaded.");
     }
 
     public Task<string> GetProjectNameAsync(int groupId, CancellationToken cancellationToken) =>
@@ -53,7 +51,14 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
             .Select(x => db.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameVn).FirstOrDefault() ?? x.Code)
             .SingleAsync(cancellationToken);
 
-    private static ProjectDocumentData Map(CapstoneDocument x) => new(
-        x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath, x.FileSize,
-        x.VersionNo, x.Status, x.UploadedAt, x.UploadedById);
+    private IQueryable<ProjectDocumentData> DocumentHistoryQuery() =>
+        db.Documents.AsNoTracking().Select(x => new ProjectDocumentData(
+            x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath, x.FileSize,
+            x.VersionNo, x.Status, x.UploadedAt, x.UploadedById,
+            db.Students.Where(student => student.UserId == x.UploadedById)
+                .Select(student => student.FullName).FirstOrDefault()
+            ?? db.Lecturers.Where(lecturer => lecturer.UserId == x.UploadedById)
+                .Select(lecturer => lecturer.FullName).FirstOrDefault()
+            ?? db.Users.Where(user => user.Id == x.UploadedById)
+                .Select(user => user.Username).First()));
 }

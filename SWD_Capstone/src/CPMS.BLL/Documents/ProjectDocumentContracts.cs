@@ -6,12 +6,13 @@ namespace CPMS.BLL.Documents;
 public sealed record ProjectDocumentActor(int UserId, UserRole Role);
 public sealed record ProjectDocumentData(
     int Id, int GroupId, DocumentType DocType, string FileName, string StorageKey,
-    long FileSize, int VersionNo, DocumentStatus Status, DateTime UploadedAt, int UploadedById);
+    long FileSize, int VersionNo, DocumentStatus Status, DateTime UploadedAt,
+    int UploadedById, string UploadedByName);
 public sealed record CreateProjectDocumentData(
     int GroupId, int SyllabusId, int UploadedById, DocumentType DocType,
     string FileName, string StorageKey, long FileSize, int VersionNo);
 public sealed record UploadProjectDocumentInput(
-    int GroupId, DocumentType DocType, string FileName, long FileSize, Stream Content);
+    int GroupId, string FileName, long FileSize, Stream Content);
 public sealed record ProjectDocumentDownload(Stream Content, string FileName, string ContentType);
 
 public interface IProjectDocumentStore
@@ -19,7 +20,7 @@ public interface IProjectDocumentStore
     Task<bool> IsStudentInGroupAsync(int userId, int groupId, CancellationToken cancellationToken);
     Task<bool> CanLecturerAccessGroupAsync(int userId, int groupId, CancellationToken cancellationToken);
     Task<int?> FindActiveSyllabusIdAsync(CancellationToken cancellationToken);
-    Task<int> GetNextVersionAsync(int groupId, DocumentType docType, CancellationToken cancellationToken);
+    Task<int> GetNextVersionAsync(int groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ProjectDocumentData>> ListAsync(int groupId, CancellationToken cancellationToken);
     Task<ProjectDocumentData?> FindAsync(int documentId, CancellationToken cancellationToken);
     Task<ProjectDocumentData> CreateAsync(CreateProjectDocumentData input, CancellationToken cancellationToken);
