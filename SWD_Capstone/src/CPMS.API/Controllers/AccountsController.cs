@@ -74,6 +74,24 @@ public sealed class AccountsController(IAccountAdministrationService accountServ
         catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
+    [HttpPatch("{userId:int}/identity")]
+    public async Task<ActionResult<AccountResponse>> UpdateIdentity(
+        int userId, UpdateAccountIdentityRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        try
+        {
+            return Ok(Map(await accountService.UpdateIdentityAsync(
+                userId,
+                new UpdateAccountIdentityData(request.Username, request.IdentityCode),
+                CurrentAudit(),
+                cancellationToken)));
+        }
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (ConflictException exception) { return Conflict(new { error = exception.Message }); }
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
     private AccountAuditContext CurrentAudit() => new(
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("Missing user identifier."), CultureInfo.InvariantCulture),

@@ -87,6 +87,22 @@ public sealed class AccountAdministrationService(
             : await store.UpdateRoleAsync(userId, role, current.Seed, audit, cancellationToken);
     }
 
+    public async Task<AccountResult> UpdateIdentityAsync(
+        int userId,
+        UpdateAccountIdentityData data,
+        AccountAuditContext audit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(audit);
+        var username = Required(data.Username, "Username is required.");
+        var identityCode = Required(data.IdentityCode, "Identity code is required.");
+        if (await store.UsernameExistsForOtherUserAsync(username, userId, cancellationToken))
+            throw new ConflictException("Username already exists.");
+        return await store.UpdateIdentityAsync(userId, username, identityCode, audit, cancellationToken)
+            ?? throw new KeyNotFoundException("Account not found.");
+    }
+
     private static string Required(string? value, string message) =>
         string.IsNullOrWhiteSpace(value) ? throw new BusinessRuleException(message) : value.Trim();
     private static string Optional(string? value, string fallback) =>

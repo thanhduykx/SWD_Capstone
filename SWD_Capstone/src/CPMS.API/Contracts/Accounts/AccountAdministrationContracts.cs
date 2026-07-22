@@ -23,6 +23,7 @@ public sealed record UpdateAccountStatusRequest(
     [property: JsonRequired] bool IsActive,
     [property: JsonRequired] bool Unlock);
 public sealed record UpdateAccountRoleRequest([property: JsonRequired] UserRole Role);
+public sealed record UpdateAccountIdentityRequest(string Username, string IdentityCode);
 public sealed record AccountCreatedResponse(
     int Id,
     string Username,

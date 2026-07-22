@@ -33,6 +33,7 @@ public sealed record AccountCreatedResult(
     string EmailDeliveryStatus,
     string? EmailDeliveryError);
 public sealed record AccountAuditContext(int ActorUserId, string? IpAddress, string? UserAgent);
+public sealed record UpdateAccountIdentityData(string Username, string IdentityCode);
 public sealed record AccountNotificationResult(string Status, string? Error);
 
 public interface IAccountWelcomeNotificationSender
@@ -54,4 +55,6 @@ public interface IAccountAdministrationService
         int userId, bool isActive, bool unlock, AccountAuditContext audit, CancellationToken cancellationToken);
     Task<AccountResult> UpdateRoleAsync(
         int userId, UserRole role, AccountAuditContext audit, CancellationToken cancellationToken);
+    Task<AccountResult> UpdateIdentityAsync(
+        int userId, UpdateAccountIdentityData data, AccountAuditContext audit, CancellationToken cancellationToken);
 }

@@ -37,4 +37,11 @@ public interface IAccountAdministrationStore
         AccountProfileSeed seed,
         AccountAuditContext audit,
         CancellationToken cancellationToken);
+    Task<bool> UsernameExistsForOtherUserAsync(string username, int userId, CancellationToken cancellationToken);
+    Task<AccountResult?> UpdateIdentityAsync(
+        int userId,
+        string username,
+        string identityCode,
+        AccountAuditContext audit,
+        CancellationToken cancellationToken);
 }

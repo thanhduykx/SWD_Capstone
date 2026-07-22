@@ -136,6 +136,47 @@ public sealed class AccountAdministrationStore(CpmsDbContext dbContext) : IAccou
         return Map(user);
     }
 
+    public Task<bool> UsernameExistsForOtherUserAsync(
+        string username, int userId, CancellationToken cancellationToken) =>
+        dbContext.Users.AnyAsync(x => x.Username == username && x.Id != userId, cancellationToken);
+
+    public async Task<AccountResult?> UpdateIdentityAsync(
+        int userId,
+        string username,
+        string identityCode,
+        AccountAuditContext audit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        User? user = await dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        if (user is null) return null;
+        string oldValue = user.Username;
+        user.Username = username;
+        user.UpdatedAt = DateTime.UtcNow;
+        switch (user.Role)
+        {
+            case UserRole.Student:
+                Student student = await dbContext.Students.SingleAsync(x => x.UserId == userId, cancellationToken);
+                student.Code = identityCode;
+                break;
+            case UserRole.Lecturer:
+                Lecturer lecturer = await dbContext.Lecturers.SingleAsync(x => x.UserId == userId, cancellationToken);
+                lecturer.Code = identityCode;
+                break;
+            case UserRole.TrainingDepartment:
+                TrainingDepartment department = await dbContext.TrainingDepartments.SingleAsync(x => x.UserId == userId, cancellationToken);
+                department.StaffCode = identityCode;
+                break;
+        }
+        dbContext.AuditLogs.Add(NewAudit(
+            audit.ActorUserId, "UPDATE_ACCOUNT_IDENTITY", userId, oldValue,
+            $"{username}:{identityCode}", audit.IpAddress, audit.UserAgent));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Map(user);
+    }
+
     private Task<bool> RoleProfileExistsAsync(int userId, UserRole role, CancellationToken cancellationToken) =>
         role switch
         {
