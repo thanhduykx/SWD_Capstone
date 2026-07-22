@@ -20,28 +20,59 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         if (semesterId.HasValue)
             query = query.Where(x => dbContext.DefenseRounds.Any(round =>
                 round.Id == x.DefenseRoundId && round.SemesterId == semesterId.Value));
-        return await query.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
-            .Select(x => new DefenseSessionListResult(
+        var rows = await query.OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
+            .Select(x => new
+            {
                 x.Id,
                 x.Code,
-                dbContext.DefenseRounds.Where(round => round.Id == x.DefenseRoundId)
+                RoundName = dbContext.DefenseRounds.Where(round => round.Id == x.DefenseRoundId)
                     .Select(round => round.Name).FirstOrDefault() ?? "Defense",
-                dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId)
+                RoundType = dbContext.DefenseRounds.Where(round => round.Id == x.DefenseRoundId)
+                    .Select(round => round.Type).FirstOrDefault(),
+                GroupCode = dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId)
                     .Select(group => group.Code).FirstOrDefault() ?? $"Group #{x.GroupId}",
-                dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId)
+                ProjectTitle = dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId)
                     .Join(dbContext.Topics, group => group.TopicId, topic => topic.Id, (_, topic) => topic.NameEn)
                     .FirstOrDefault() ?? "Capstone Project System",
+                x.SessionDate,
+                x.Slot,
+                x.Room,
+                Reviewers = dbContext.CouncilMembers.Where(member => member.CouncilId == x.CouncilId)
+                    .Join(dbContext.Lecturers, member => member.LecturerId, lecturer => lecturer.Id,
+                        (_, lecturer) => lecturer.FullName).ToArray(),
+                x.EndedAt,
+                Defense1Result = dbContext.GroupResults.Where(result => result.GroupId == x.GroupId)
+                    .Select(result => result.Defense1Result).FirstOrDefault(),
+                Defense2Result = dbContext.GroupResults.Where(result => result.GroupId == x.GroupId)
+                    .Select(result => result.Defense2Result).FirstOrDefault(),
+                AverageScore = dbContext.Scores.Where(score => score.DefenseSessionId == x.Id)
+                    .Select(score => (decimal?)score.ScoreValue).Average()
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(x =>
+        {
+            FinalResult? result = x.RoundType == CouncilType.Defense2
+                ? x.Defense2Result
+                : x.Defense1Result;
+            string? resultText = x.EndedAt is not null && result is not null && result != FinalResult.Pending
+                ? result.Value.ToString()
+                : null;
+            return new DefenseSessionListResult(
+                x.Id,
+                x.Code,
+                x.RoundName,
+                x.GroupCode,
+                x.ProjectTitle,
                 x.SessionDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 x.Slot,
                 x.Room,
-                dbContext.CouncilMembers.Where(member => member.CouncilId == x.CouncilId)
-                    .Join(dbContext.Lecturers, member => member.LecturerId, lecturer => lecturer.Id,
-                        (_, lecturer) => lecturer.FullName).ToArray(),
-                x.EndedAt != null ? "Completed" : "Scheduled",
-                x.EndedAt != null ? "Pass" : null,
-                8.5m,
-                string.Empty))
-            .ToListAsync(cancellationToken);
+                x.Reviewers,
+                x.EndedAt is not null ? "Completed" : "Scheduled",
+                resultText,
+                x.AverageScore ?? 0m,
+                string.Empty);
+        }).ToArray();
     }
 
     public async Task<DefenseSessionAccessState?> ResolveAsync(
