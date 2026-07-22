@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 const string sessionCode = "SU26_R2_TODAY_20260723";
 const int sessionSlot = 3;
+const string demoPassword = "Test@123456";
+string[] targetReviewerCodes = ["GV24001", "GV24002", "GV24003", "GV24004"];
 var sessionDate = new DateTime(2026, 7, 23, 0, 0, 0, DateTimeKind.Utc);
 
 try
@@ -27,17 +29,22 @@ try
     var group = await db.CapstoneGroups.SingleAsync(x =>
         x.SemesterId == semester.Id && x.Code == "GROUP_2_2_SMART_HOME_INVENTORY");
     var reviewers = await db.Lecturers
-        .Where(x => x.Code == "GV24001" || x.Code == "GV24002")
+        .Where(x => targetReviewerCodes.Contains(x.Code))
         .OrderBy(x => x.Code)
         .ToArrayAsync();
 
-    if (reviewers.Length != 2)
-        throw new InvalidOperationException("The two reviewers for the target session are missing.");
+    if (reviewers.Length != targetReviewerCodes.Length)
+        throw new InvalidOperationException("The four reviewers for the target session are missing.");
     if (reviewers.Any(x => x.Id == group.LecturerId))
         throw new InvalidOperationException("A selected reviewer supervises the target group.");
 
     foreach (var reviewer in reviewers)
     {
+        var reviewerUser = await db.Users.SingleAsync(x => x.Id == reviewer.UserId);
+        if (!BCrypt.Net.BCrypt.Verify(demoPassword, reviewerUser.PasswordHash))
+            reviewerUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(demoPassword, workFactor: 12);
+        reviewerUser.IsActive = true;
+
         var hasTargetAvailability = await db.ReviewAvailabilities.AnyAsync(x =>
             x.ReviewRoundId == round.Id && x.LecturerId == reviewer.Id &&
             x.DayOfWeek == 4 && x.Slot == sessionSlot);
@@ -53,6 +60,25 @@ try
                 Slot = sessionSlot,
                 CreatedAt = DateTime.UtcNow
             });
+        }
+        var availabilitySubmission = await db.ReviewAvailabilitySubmissions.SingleOrDefaultAsync(x =>
+            x.ReviewRoundId == round.Id && x.LecturerId == reviewer.Id);
+        if (availabilitySubmission is null)
+        {
+            db.ReviewAvailabilitySubmissions.Add(new ReviewAvailabilitySubmission
+            {
+                ReviewRoundId = round.Id,
+                SemesterId = semester.Id,
+                LecturerId = reviewer.Id,
+                WeekStartDate = round.WeekStartDate,
+                UpdatedAt = DateTime.UtcNow,
+                SubmittedAt = DateTime.UtcNow
+            });
+        }
+        else if (availabilitySubmission.SubmittedAt is null)
+        {
+            availabilitySubmission.SubmittedAt = DateTime.UtcNow;
+            availabilitySubmission.UpdatedAt = DateTime.UtcNow;
         }
     }
 
@@ -109,8 +135,6 @@ try
             Slot = sessionSlot,
             Room = "B206",
             Type = ReviewType.Review2,
-            Reviewer1Id = reviewers[0].Id,
-            Reviewer2Id = reviewers[1].Id,
             SessionDate = sessionDate,
             Status = ReviewSessionStatus.Published,
             PublishedAt = now,
@@ -122,22 +146,6 @@ try
         db.ReviewSessions.Add(session);
         await db.SaveChangesAsync();
 
-        db.GroupReviewSlots.Add(new GroupReviewSlot
-        {
-            SessionId = session.Id,
-            GroupId = group.Id,
-            GroupPosition = 1,
-            ConflictFlag = false
-        });
-        db.ReviewChecklistSubmissions.AddRange(reviewers.Select(reviewer => new ReviewChecklistSubmission
-        {
-            SessionId = session.Id,
-            GroupId = group.Id,
-            ReviewerId = reviewer.Id,
-            Type = ReviewType.Review2,
-            Status = ReviewSubmissionStatus.Draft,
-            LastSavedAt = now
-        }));
         operation = "created";
     }
     else if (session.SessionDate != sessionDate || session.DayOfWeek != 4 || session.Slot != sessionSlot)
@@ -148,9 +156,59 @@ try
         operation = "updated";
     }
 
+    var reviewerIds = reviewers.Select(x => x.Id).ToArray();
+    var existingReviewerAssignments = await db.ReviewSessionReviewers
+        .Where(x => x.SessionId == session.Id).ToListAsync();
+    db.ReviewSessionReviewers.RemoveRange(existingReviewerAssignments.Where(x => !reviewerIds.Contains(x.LecturerId)));
+    foreach (var reviewer in reviewers.Select((value, index) => new { value, position = index + 1 }))
+    {
+        var assignment = existingReviewerAssignments.SingleOrDefault(x => x.LecturerId == reviewer.value.Id);
+        if (assignment is null)
+        {
+            db.ReviewSessionReviewers.Add(new ReviewSessionReviewer
+            {
+                SessionId = session.Id,
+                LecturerId = reviewer.value.Id,
+                Position = reviewer.position
+            });
+            operation = operation == "created" ? operation : "updated";
+        }
+        else
+        {
+            assignment.Position = reviewer.position;
+        }
+    }
+
+    if (!await db.GroupReviewSlots.AnyAsync(x => x.SessionId == session.Id && x.GroupId == group.Id))
+    {
+        db.GroupReviewSlots.Add(new GroupReviewSlot
+        {
+            SessionId = session.Id,
+            GroupId = group.Id,
+            GroupPosition = 1,
+            ConflictFlag = false
+        });
+    }
+    foreach (var reviewer in reviewers)
+    {
+        if (!await db.ReviewChecklistSubmissions.AnyAsync(x =>
+                x.SessionId == session.Id && x.GroupId == group.Id && x.ReviewerId == reviewer.Id))
+        {
+            db.ReviewChecklistSubmissions.Add(new ReviewChecklistSubmission
+            {
+                SessionId = session.Id,
+                GroupId = group.Id,
+                ReviewerId = reviewer.Id,
+                Type = ReviewType.Review2,
+                Status = ReviewSubmissionStatus.Draft,
+                LastSavedAt = DateTime.UtcNow
+            });
+            operation = operation == "created" ? operation : "updated";
+        }
+    }
+
     await db.SaveChangesAsync();
 
-    var reviewerIds = reviewers.Select(x => x.Id).ToArray();
     var isValid = session.SessionDate == sessionDate &&
                   session.DayOfWeek == 4 &&
                   session.Slot == sessionSlot &&
@@ -162,17 +220,21 @@ try
                       x.DayOfWeek == 4 && x.Slot == sessionSlot) &&
                   await db.ReviewAvailabilities.CountAsync(x =>
                       x.ReviewRoundId == round.Id && x.DayOfWeek == 4 && x.Slot == sessionSlot &&
-                      reviewerIds.Contains(x.LecturerId)) == 2 &&
+                      reviewerIds.Contains(x.LecturerId)) == reviewerIds.Length &&
+                  await db.ReviewSessionReviewers.CountAsync(x =>
+                      x.SessionId == session.Id && reviewerIds.Contains(x.LecturerId)) == reviewerIds.Length &&
                   await db.GroupReviewSlots.AnyAsync(x => x.SessionId == session.Id && x.GroupId == group.Id) &&
                   await db.ReviewChecklistSubmissions.CountAsync(x =>
-                      x.SessionId == session.Id && x.GroupId == group.Id && reviewerIds.Contains(x.ReviewerId)) == 2;
+                      x.SessionId == session.Id && x.GroupId == group.Id &&
+                      reviewerIds.Contains(x.ReviewerId)) == reviewerIds.Length;
     if (!isValid)
         throw new InvalidOperationException("The 2026-07-23 review session failed validation.");
 
     await transaction.CommitAsync();
     Console.WriteLine(
         $"TODAY_REVIEW operation={operation} sessionId={session.Id} date={session.SessionDate:yyyy-MM-dd} slot={session.Slot} " +
-        $"group={group.Code} reviewers={string.Join(',', reviewers.Select(x => x.Code))}");
+        $"group={group.Code} reviewers={string.Join(',', reviewers.Select(x => x.Code))} " +
+        $"accounts={string.Join(',', await db.Users.Where(x => reviewers.Select(r => r.UserId).Contains(x.Id)).OrderBy(x => x.Email).Select(x => x.Email).ToArrayAsync())}");
     return 0;
 }
 catch (Exception exception)

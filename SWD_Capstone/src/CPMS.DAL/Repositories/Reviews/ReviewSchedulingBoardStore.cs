@@ -72,8 +72,6 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                         .Select(group => group.Code).Single(),
                     session.Type,
                     session.Status,
-                    session.Reviewer1Id,
-                    session.Reviewer2Id,
                     session.SessionDate,
                     session.DayOfWeek,
                     session.Slot,
@@ -85,6 +83,11 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
             .ToListAsync(cancellationToken);
 
         int[] sessionIds = sessionRows.Select(x => x.Id).Distinct().ToArray();
+        var reviewerRowsBySession = await dbContext.ReviewSessionReviewers
+            .Where(x => sessionIds.Contains(x.SessionId))
+            .OrderBy(x => x.Position)
+            .Select(x => new { x.SessionId, x.LecturerId })
+            .ToListAsync(cancellationToken);
         int[] groupIds = sessionRows.Select(x => x.GroupId).Distinct().ToArray();
         var feedbackRows = await dbContext.ReviewChecklistSubmissions
             .Where(x => sessionIds.Contains(x.SessionId) && groupIds.Contains(x.GroupId) &&
@@ -115,7 +118,8 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
 
         ReviewSchedulingSession[] sessions = sessionRows.Select(x => new ReviewSchedulingSession(
             x.Id, x.Code, x.GroupId, x.GroupCode, x.Type, x.Status,
-            new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
+            reviewerRowsBySession.Where(reviewer => reviewer.SessionId == x.Id)
+                .Select(reviewer => reviewer.LecturerId).ToArray(),
             x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty, x.GroupStatus,
             feedbackBySessionGroup.GetValueOrDefault((x.Id, x.GroupId), []))).ToArray();
 

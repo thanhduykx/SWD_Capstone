@@ -34,12 +34,17 @@ public sealed class ReviewSession
     public int Slot { get; set; }
     public required string Room { get; set; }
     public ReviewType Type { get; set; }
-    public int? Reviewer1Id { get; set; }
-    public int? Reviewer2Id { get; set; }
     public DateTime SessionDate { get; set; }
     public ReviewSessionStatus Status { get; set; } = ReviewSessionStatus.Draft;
     public DateTime? PublishedAt { get; set; }
     public int? PublishedByTrainingDepartmentId { get; set; }
+}
+
+public sealed class ReviewSessionReviewer
+{
+    public int SessionId { get; set; }
+    public int LecturerId { get; set; }
+    public int Position { get; set; }
 }
 
 public sealed class GroupReviewSlot
@@ -72,6 +77,16 @@ public sealed class ReviewChecklistSubmission
     public string? ResultText { get; set; }
     public DateTime LastSavedAt { get; set; } = DateTime.UtcNow;
     public DateTime? SubmittedAt { get; set; }
+}
+
+public sealed class ReviewSubmissionComment
+{
+    public int Id { get; set; }
+    public int SubmissionId { get; set; }
+    public required string Content { get; set; }
+    public int Position { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class ReviewChecklistItemResponse

@@ -26,7 +26,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
                 request.Code,
                 request.GroupId,
                 request.Type,
-                [request.Reviewer1Id, request.Reviewer2Id],
+                request.ReviewerIds,
                 request.PreviousReviewerIds,
                 request.Slot,
                 request.Room,
@@ -90,7 +90,7 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         IReadOnlyList<MyReviewSessionResult> results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new MyReviewSessionResponse(
             x.SessionId, x.SubmissionId, x.Code, x.Type, x.SessionStatus, x.GroupId, x.GroupCode,
-            x.TopicName, x.SessionDate, x.Slot, x.Room, x.SubmissionStatus, x.LastSavedAt)).ToArray();
+            x.TopicName, x.SessionDate, x.Slot, x.Room, x.ReviewerCount, x.SubmissionStatus, x.LastSavedAt)).ToArray();
     }
 
     private int CurrentUserId()

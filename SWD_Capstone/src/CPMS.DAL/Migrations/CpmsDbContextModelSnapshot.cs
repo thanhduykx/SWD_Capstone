@@ -1544,14 +1544,6 @@ namespace CPMS.DAL.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("published_by_training_department_id");
 
-                    b.Property<int?>("Reviewer1Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("reviewer1id");
-
-                    b.Property<int?>("Reviewer2Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("reviewer2id");
-
                     b.Property<string>("Room")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1587,12 +1579,6 @@ namespace CPMS.DAL.Data.Migrations
                     b.HasIndex("PublishedByTrainingDepartmentId")
                         .HasDatabaseName("ix_review_sessions_published_by_training_department_id");
 
-                    b.HasIndex("Reviewer1Id")
-                        .HasDatabaseName("ix_review_sessions_reviewer1id");
-
-                    b.HasIndex("Reviewer2Id")
-                        .HasDatabaseName("ix_review_sessions_reviewer2id");
-
                     b.HasIndex("Code", "SemesterId")
                         .IsUnique()
                         .HasDatabaseName("ix_review_sessions_code_semester_id");
@@ -1605,6 +1591,79 @@ namespace CPMS.DAL.Data.Migrations
                             t.HasCheckConstraint("ck_review_sessions_day_of_week", "status = 'Cancelled' OR day_of_week BETWEEN 1 AND 6");
 
                             t.HasCheckConstraint("ck_review_sessions_slot", "status = 'Cancelled' OR slot BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionReviewer", b =>
+                {
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("session_id");
+
+                    b.Property<int>("LecturerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lecturer_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.HasKey("SessionId", "LecturerId")
+                        .HasName("pk_review_session_reviewers");
+
+                    b.HasIndex("LecturerId")
+                        .HasDatabaseName("ix_review_session_reviewers_lecturer_id");
+
+                    b.HasIndex("SessionId", "Position")
+                        .HasDatabaseName("ix_review_session_reviewers_session_id_position");
+
+                    b.ToTable("review_session_reviewers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_review_session_reviewers_position", "position > 0");
+                        });
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSubmissionComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("SubmissionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("submission_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_submission_comments");
+
+                    b.HasIndex("SubmissionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_review_submission_comments_submission_id_position");
+
+                    b.ToTable("review_submission_comments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_review_submission_comments_position", "position > 0");
                         });
                 });
 
@@ -2670,24 +2729,39 @@ namespace CPMS.DAL.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_review_sessions_training_departments_published_by_training_");
 
-                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
-                        .WithMany()
-                        .HasForeignKey("Reviewer1Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_review_sessions_lecturers_reviewer1id");
-
-                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
-                        .WithMany()
-                        .HasForeignKey("Reviewer2Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_review_sessions_lecturers_reviewer2id");
-
                     b.HasOne("CPMS.DAL.Entities.Semester", null)
                         .WithMany()
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_sessions_semesters_semester_id");
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionReviewer", b =>
+                {
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("LecturerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_session_reviewers_lecturers_lecturer_id");
+
+                    b.HasOne("CPMS.DAL.Entities.ReviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_session_reviewers_review_sessions_session_id");
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSubmissionComment", b =>
+                {
+                    b.HasOne("CPMS.DAL.Entities.ReviewChecklistSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_submission_comments_review_checklist_submissions_sub");
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.Score", b =>

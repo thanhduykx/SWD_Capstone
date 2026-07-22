@@ -18,6 +18,24 @@ public sealed class ReviewSubmissionServiceTests
         Assert.Equal(ReviewSubmissionStatus.Submitted, result.Status);
     }
 
+    [Fact]
+    public async Task SaveDraft_NormalizesAndPersistsMultipleReviewerComments()
+    {
+        var store = new FakeStore();
+        var service = new ReviewSubmissionService(store, new TemplateProvider());
+
+        await service.SaveDraftAsync(
+            10,
+            new SaveReviewDraft(null, null, null, null,
+                ["Nhận xét kiến trúc", "  Bổ sung kiểm thử  ", "Nhận xét kiến trúc"],
+                null, null, []),
+            new ReviewActor(7, UserRole.Lecturer),
+            CancellationToken.None);
+
+        Assert.NotNull(store.LastDraft);
+        Assert.Equal(["Nhận xét kiến trúc", "Bổ sung kiểm thử"], store.LastDraft.ReviewerComments);
+    }
+
     private sealed class TemplateProvider : IReviewChecklistTemplateProvider
     {
         public IReadOnlyList<ReviewChecklistTemplateItem> GetItems(ReviewType type) =>
@@ -27,6 +45,7 @@ public sealed class ReviewSubmissionServiceTests
     private sealed class FakeStore : IReviewSubmissionStore
     {
         public bool Submitted { get; private set; }
+        public PersistReviewDraft? LastDraft { get; private set; }
 
         public Task<int?> FindLecturerIdAsync(int userId, CancellationToken cancellationToken) =>
             Task.FromResult<int?>(3);
@@ -48,12 +67,15 @@ public sealed class ReviewSubmissionServiceTests
                 Submitted ? ReviewSubmissionStatus.Submitted : ReviewSubmissionStatus.Draft,
                 ReviewSessionStatus.Published, new DateTime(2026, 7, 20, 0, 0, 0, DateTimeKind.Utc), 1, "P101", 3,
                 "GV001", "Nguyễn Văn An", null, null, null,
-                "Kiến trúc cần tách lớp rõ hơn.", null, null, DateTime.UtcNow,
+                "Kiến trúc cần tách lớp rõ hơn.", ["Kiến trúc cần tách lớp rõ hơn."], null, null, DateTime.UtcNow,
                 Submitted ? DateTime.UtcNow : null,
                 new Dictionary<string, (ReviewChecklistAnswer?, string?)>()));
         public Task SaveDraftAsync(
-            int submissionId, PersistReviewDraft draft, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+            int submissionId, PersistReviewDraft draft, CancellationToken cancellationToken)
+        {
+            LastDraft = draft;
+            return Task.CompletedTask;
+        }
         public Task SubmitAsync(int submissionId, DateTime submittedAt, CancellationToken cancellationToken)
         {
             Submitted = true;

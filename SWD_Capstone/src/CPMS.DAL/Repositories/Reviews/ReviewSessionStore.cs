@@ -102,12 +102,12 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
         int slot,
         IReadOnlyCollection<int> reviewerIds,
         CancellationToken cancellationToken) =>
-        dbContext.ReviewSessions.AnyAsync(session =>
-            (!excludedSessionId.HasValue || session.Id != excludedSessionId.Value) &&
-            session.SessionDate.Date == sessionDate.Date && session.Slot == slot &&
-            session.Status != ReviewSessionStatus.Cancelled &&
-            ((session.Reviewer1Id.HasValue && reviewerIds.Contains(session.Reviewer1Id.Value)) ||
-             (session.Reviewer2Id.HasValue && reviewerIds.Contains(session.Reviewer2Id.Value))),
+        dbContext.ReviewSessionReviewers.AnyAsync(assignment =>
+            reviewerIds.Contains(assignment.LecturerId) &&
+            (!excludedSessionId.HasValue || assignment.SessionId != excludedSessionId.Value) &&
+            dbContext.ReviewSessions.Any(session =>
+                session.Id == assignment.SessionId && session.SessionDate.Date == sessionDate.Date &&
+                session.Slot == slot && session.Status != ReviewSessionStatus.Cancelled),
             cancellationToken);
 
     public async Task<ReviewSessionResult> CreateSessionAsync(
@@ -122,13 +122,12 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
             Slot = input.Slot,
             Room = input.Room,
             Type = input.Type,
-            Reviewer1Id = input.ReviewerIds.ElementAtOrDefault(0),
-            Reviewer2Id = input.ReviewerIds.Count > 1 ? input.ReviewerIds[1] : null,
             SessionDate = input.SessionDate,
             Status = ReviewSessionStatus.Draft
         };
         dbContext.ReviewSessions.Add(session);
         await dbContext.SaveChangesAsync(cancellationToken);
+        ReviewSessionReviewerPersistence.Add(dbContext, session.Id, input.ReviewerIds);
         dbContext.GroupReviewSlots.Add(new GroupReviewSlot
         {
             SessionId = session.Id,
@@ -155,9 +154,9 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
         session.SessionDate = update.SessionDate;
         session.DayOfWeek = update.DayOfWeek;
         session.Slot = update.Slot;
-        session.Reviewer1Id = update.ReviewerIds.ElementAtOrDefault(0);
-        session.Reviewer2Id = update.ReviewerIds.Count > 1 ? update.ReviewerIds[1] : null;
         session.Status = update.Status;
+        await ReviewSessionReviewerPersistence.ReplaceAsync(
+            dbContext, sessionId, update.ReviewerIds, cancellationToken);
         List<int> groupIds = await dbContext.GroupReviewSlots.Where(x => x.SessionId == sessionId)
             .Select(x => x.GroupId).ToListAsync(cancellationToken);
         List<ReviewChecklistSubmission> submissions = await dbContext.ReviewChecklistSubmissions.Where(x => x.SessionId == sessionId)
@@ -214,6 +213,7 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
                     .Select(session => session.Slot).Single(),
                 dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId)
                     .Select(session => session.Room).Single(),
+                dbContext.ReviewSessionReviewers.Count(reviewer => reviewer.SessionId == submission.SessionId),
                 submission.Status,
                 submission.LastSavedAt))
             .ToListAsync(cancellationToken);
@@ -228,8 +228,8 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
                 dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId).Select(group => group.Code).Single(),
                 x.GroupPosition, x.Status, x.CompletedAt))
             .ToListAsync(cancellationToken);
-        var reviewers = new[] { session.Reviewer1Id, session.Reviewer2Id }
-            .Where(x => x.HasValue).Select(x => x!.Value).ToArray();
+        int[] reviewers = await ReviewSessionReviewerPersistence.ReviewerIds(dbContext, sessionId)
+            .ToArrayAsync(cancellationToken);
         return new ReviewSessionResult(
             session.Id, session.Code, session.SemesterId, groups, session.Type, session.Status,
             reviewers, session.SessionDate, session.Slot, session.Room);

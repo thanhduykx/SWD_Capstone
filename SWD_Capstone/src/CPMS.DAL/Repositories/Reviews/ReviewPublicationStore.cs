@@ -67,11 +67,18 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
             .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot)
             .Select(x => new
             {
-                x.Id, x.Code, x.Type, x.SessionDate, x.Slot, x.Room, x.Reviewer1Id, x.Reviewer2Id
+                x.Id, x.Code, x.Type, x.SessionDate, x.Slot, x.Room
             }).ToListAsync(cancellationToken);
+        var draftSessionIds = sessionRows.Select(x => x.Id).ToArray();
+        var sessionReviewerRows = await dbContext.ReviewSessionReviewers
+            .Where(x => draftSessionIds.Contains(x.SessionId))
+            .OrderBy(x => x.Position)
+            .Select(x => new { x.SessionId, x.LecturerId })
+            .ToListAsync(cancellationToken);
         PublicationSession[] sessions = sessionRows.Select(x => new PublicationSession(
             x.Id, x.Code, x.Type, x.SessionDate, x.Slot, x.Room,
-            new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray()))
+            sessionReviewerRows.Where(reviewer => reviewer.SessionId == x.Id)
+                .Select(reviewer => reviewer.LecturerId).ToArray()))
             .ToArray();
         List<int> activeGroupIds = await dbContext.CapstoneGroups
             .Where(x => x.SemesterId == scope.SemesterId && x.Status == GroupStatus.Active)

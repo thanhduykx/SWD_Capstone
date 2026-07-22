@@ -53,7 +53,7 @@ public sealed class AssignmentRulesTests
     [Fact]
     public void ReviewAssignment_RejectsSupervisorAsReviewer()
     {
-        Action action = () => _rules.ValidateReviewAssignment(10, 10, 12);
+        Action action = () => _rules.ValidateReviewAssignment(10, [10, 12]);
 
         Assert.Throws<BusinessRuleException>(action);
     }
@@ -69,7 +69,21 @@ public sealed class AssignmentRulesTests
     [Fact]
     public void ReviewTwo_RejectsReviewerRepeatedFromReviewOne()
     {
-        Action action = () => _rules.ValidateReviewAssignment(10, 11, 12, [9, 11]);
+        Action action = () => _rules.ValidateReviewAssignment(10, [11, 12], [9, 11]);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
+    public void ReviewAssignment_AcceptsFlexiblePanelWithFourReviewers()
+    {
+        _rules.ValidateReviewAssignment(10, [11, 12, 13, 14]);
+    }
+
+    [Fact]
+    public void ReviewAssignment_RejectsSingleReviewer()
+    {
+        Action action = () => _rules.ValidateReviewAssignment(10, [11]);
 
         Assert.Throws<BusinessRuleException>(action);
     }

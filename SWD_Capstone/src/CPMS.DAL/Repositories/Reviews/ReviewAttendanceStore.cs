@@ -14,7 +14,7 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
         var session = await dbContext.ReviewSessions.Where(x => x.Id == sessionId)
             .Select(x => new
             {
-                x.Id, x.Code, x.Status, x.Reviewer1Id, x.Reviewer2Id,
+                x.Id, x.Code, x.Status,
                 x.SessionDate, x.Slot, x.Room
             }).SingleOrDefaultAsync(cancellationToken);
         if (session is null) return new ReviewAttendanceContextLookup(false, null);
@@ -36,9 +36,11 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
             .Select(x => (int?)x.Id).SingleOrDefaultAsync(cancellationToken);
         var studentGroupId = await dbContext.Students.Where(x => x.UserId == userId)
             .Select(x => x.GroupId).SingleOrDefaultAsync(cancellationToken);
+        int[] reviewerIds = await ReviewSessionReviewerPersistence.ReviewerIds(dbContext, sessionId)
+            .ToArrayAsync(cancellationToken);
         return new ReviewAttendanceContextLookup(true, new ReviewAttendanceContext(
             session.Id, session.Code, session.Status,
-            new[] { session.Reviewer1Id, session.Reviewer2Id }.Where(x => x.HasValue).Select(x => x!.Value).ToArray(),
+            reviewerIds,
             session.SessionDate, session.Slot, session.Room, groupSlot.GroupId, groupCode,
             groupSlot.Status, groupSlot.CompletedAt, lecturerId, studentGroupId));
     }

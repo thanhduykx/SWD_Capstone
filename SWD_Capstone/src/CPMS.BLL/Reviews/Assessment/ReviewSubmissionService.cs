@@ -56,11 +56,16 @@ public sealed class ReviewSubmissionService(
             throw new BusinessRuleException(
                 $"Checklist item '{invalidItem.ItemKey}' does not belong to this review template.");
         }
+        string[] reviewerComments = NormalizeComments(draft.ReviewerComments, draft.ReviewerComment);
+        if (reviewerComments.Length > 50)
+            throw new BusinessRuleException("A review submission can contain at most 50 comments.");
+        if (reviewerComments.Any(comment => comment.Length > 4000))
+            throw new BusinessRuleException("Each reviewer comment must not exceed 4000 characters.");
         await store.SaveDraftAsync(
             submissionId,
             new PersistReviewDraft(
                 EmptyToNull(draft.WorkProductVersion), EmptyToNull(draft.WorkProductSize), draft.EffortHours,
-                EmptyToNull(draft.ReviewerComment), EmptyToNull(draft.Suggestion), EmptyToNull(draft.ResultText),
+                reviewerComments.FirstOrDefault(), reviewerComments, EmptyToNull(draft.Suggestion), EmptyToNull(draft.ResultText),
                 draft.Items.Select(x => x with { Comment = EmptyToNull(x.Comment) }).ToArray(), DateTime.UtcNow),
             cancellationToken);
         return Map(await store.GetDataAsync(submissionId, cancellationToken));
@@ -139,9 +144,20 @@ public sealed class ReviewSubmissionService(
             data.Id, data.SessionId, data.GroupId, data.GroupCode, data.ProjectName, data.Type,
             data.Status, data.SessionStatus, data.SessionDate, data.Slot, data.Room, data.ReviewerId,
             data.ReviewerCode, data.ReviewerName, data.WorkProductVersion, data.WorkProductSize,
-            data.EffortHours, data.ReviewerComment, data.Suggestion, data.ResultText,
+            data.EffortHours, data.ReviewerComment, data.ReviewerComments, data.Suggestion, data.ResultText,
             data.LastSavedAt, data.SubmittedAt, items);
     }
 
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string[] NormalizeComments(
+        IReadOnlyCollection<string>? comments,
+        string? legacyComment)
+    {
+        IEnumerable<string?> values = comments is { Count: > 0 }
+            ? comments.Select(comment => (string?)comment)
+            : [legacyComment];
+        return values.Select(EmptyToNull).Where(x => x is not null).Select(x => x!)
+            .Distinct(StringComparer.Ordinal).ToArray();
+    }
 }

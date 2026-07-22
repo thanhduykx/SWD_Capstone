@@ -7,6 +7,7 @@ public sealed record SaveReviewDraft(
     string? WorkProductSize,
     decimal? EffortHours,
     string? ReviewerComment,
+    IReadOnlyCollection<string>? ReviewerComments,
     string? Suggestion,
     string? ResultText,
     IReadOnlyCollection<SaveReviewItem> Items);
@@ -39,6 +40,7 @@ public sealed record ReviewSubmissionResult(
     string? WorkProductSize,
     decimal? EffortHours,
     string? ReviewerComment,
+    IReadOnlyList<string> ReviewerComments,
     string? Suggestion,
     string? ResultText,
     DateTime LastSavedAt,

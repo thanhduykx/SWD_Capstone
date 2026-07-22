@@ -40,7 +40,7 @@ public sealed class ReviewSubmissionsController(
         {
             var draft = new SaveReviewDraft(
                 request.WorkProductVersion, request.WorkProductSize, request.EffortHours,
-                request.ReviewerComment, request.Suggestion, request.ResultText,
+                request.ReviewerComment, request.ReviewerComments, request.Suggestion, request.ResultText,
                 request.Items.Select(x => new SaveReviewItem(x.ItemKey, x.Answer, x.Comment)).ToArray());
             return Ok(Map(await submissionService.SaveDraftAsync(
                 submissionId, draft, CurrentActor(), cancellationToken)));
@@ -116,7 +116,7 @@ public sealed class ReviewSubmissionsController(
         new(result.Id, result.SessionId, result.GroupId, result.GroupCode, result.ProjectName,
             result.Type, result.Status, result.SessionStatus, result.SessionDate, result.Slot, result.Room,
             result.ReviewerId, result.ReviewerCode, result.ReviewerName, result.WorkProductVersion,
-            result.WorkProductSize, result.EffortHours, result.ReviewerComment, result.Suggestion,
+            result.WorkProductSize, result.EffortHours, result.ReviewerComment, result.ReviewerComments, result.Suggestion,
             result.ResultText, result.LastSavedAt, result.SubmittedAt,
             result.Items.Select(x => new ReviewSubmissionItemResponse(
                 x.ItemKey, x.Label, x.Description, x.Priority, x.IsSection,

@@ -23,8 +23,10 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<ReviewAvailability> ReviewAvailabilities => Set<ReviewAvailability>();
     public DbSet<ReviewAvailabilitySubmission> ReviewAvailabilitySubmissions => Set<ReviewAvailabilitySubmission>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
+    public DbSet<ReviewSessionReviewer> ReviewSessionReviewers => Set<ReviewSessionReviewer>();
     public DbSet<GroupReviewSlot> GroupReviewSlots => Set<GroupReviewSlot>();
     public DbSet<ReviewChecklistSubmission> ReviewChecklistSubmissions => Set<ReviewChecklistSubmission>();
+    public DbSet<ReviewSubmissionComment> ReviewSubmissionComments => Set<ReviewSubmissionComment>();
     public DbSet<ReviewChecklistItemResponse> ReviewChecklistItemResponses => Set<ReviewChecklistItemResponse>();
     public DbSet<ReviewSchedulePublication> ReviewSchedulePublications => Set<ReviewSchedulePublication>();
     public DbSet<EmailDeliveryLog> EmailDeliveryLogs => Set<EmailDeliveryLog>();
@@ -190,9 +192,16 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.Type).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewSessionStatus.Draft);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer1Id).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.Reviewer2Id).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.PublishedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewSessionReviewer>(entity =>
+        {
+            entity.ToTable("review_session_reviewers", table =>
+                table.HasCheckConstraint("ck_review_session_reviewers_position", "position > 0"));
+            entity.HasKey(x => new { x.SessionId, x.LecturerId });
+            entity.HasIndex(x => new { x.SessionId, x.Position });
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<GroupReviewSlot>(entity =>
         {
@@ -221,6 +230,14 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewSubmissionComment>(entity =>
+        {
+            entity.ToTable("review_submission_comments", table =>
+                table.HasCheckConstraint("ck_review_submission_comments_position", "position > 0"));
+            entity.HasIndex(x => new { x.SubmissionId, x.Position }).IsUnique();
+            entity.Property(x => x.Content).HasMaxLength(4000);
+            entity.HasOne<ReviewChecklistSubmission>().WithMany().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<ReviewChecklistItemResponse>(entity =>
         {

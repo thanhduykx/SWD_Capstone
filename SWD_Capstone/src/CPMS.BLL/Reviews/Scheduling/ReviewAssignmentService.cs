@@ -14,9 +14,9 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
     {
         ArgumentNullException.ThrowIfNull(command);
         var reviewersPerSession = command.ReviewersPerSession == 0 ? 2 : command.ReviewersPerSession;
-        if (reviewersPerSession is < 1 or > 2)
+        if (reviewersPerSession < 2)
         {
-            throw new BusinessRuleException("Reviewers per session must be 1 or 2.");
+            throw new BusinessRuleException("Reviewers per session must be at least 2.");
         }
 
         var scope = new ReviewAssignmentScope(

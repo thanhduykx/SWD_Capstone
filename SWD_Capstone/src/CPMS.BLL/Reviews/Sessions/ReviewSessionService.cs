@@ -152,9 +152,9 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
     private async Task EnsureLecturersExistAsync(
         int[] reviewerIds, CancellationToken cancellationToken)
     {
-        if (reviewerIds.Length == 0)
+        if (reviewerIds.Length < 2)
         {
-            throw new BusinessRuleException("At least one reviewer is required.");
+            throw new BusinessRuleException("At least two reviewers are required.");
         }
         if (await store.CountExistingLecturersAsync(reviewerIds, cancellationToken) != reviewerIds.Length)
         {
@@ -178,7 +178,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
     }
 
     private static int[] NormalizeReviewers(IReadOnlyCollection<int>? reviewerIds) =>
-        reviewerIds?.Distinct().ToArray() ?? [];
+        reviewerIds?.ToArray() ?? [];
     private static DateTime NormalizeSessionDate(DateTime date) =>
         DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
     private static int IsoDayOfWeek(DateTime date) => date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;

@@ -18,37 +18,14 @@ public sealed class AssignmentRules
 
     public void ValidateReviewAssignment(
         int supervisorId,
-        int reviewer1Id,
-        int reviewer2Id,
-        IReadOnlyCollection<int>? previousRoundReviewerIds = null)
-    {
-        if (reviewer1Id == reviewer2Id)
-        {
-            throw new BusinessRuleException("A review session must have two different reviewers.");
-        }
-
-        if (reviewer1Id == supervisorId || reviewer2Id == supervisorId)
-        {
-            throw new BusinessRuleException("The supervisor cannot review their own capstone group.");
-        }
-
-        if (previousRoundReviewerIds is not null &&
-            (previousRoundReviewerIds.Contains(reviewer1Id) || previousRoundReviewerIds.Contains(reviewer2Id)))
-        {
-            throw new BusinessRuleException("Review 2 reviewers cannot repeat reviewers from Review 1.");
-        }
-    }
-
-    public void ValidateReviewAssignment(
-        int supervisorId,
         IReadOnlyCollection<int> reviewerIds,
         IReadOnlyCollection<int>? previousRoundReviewerIds = null)
     {
         ArgumentNullException.ThrowIfNull(reviewerIds);
 
-        if (reviewerIds.Count is < 1 or > 2)
+        if (reviewerIds.Count < 2)
         {
-            throw new BusinessRuleException("A review session must have one or two reviewers.");
+            throw new BusinessRuleException("A review session must have at least two reviewers.");
         }
 
         if (reviewerIds.Count != reviewerIds.Distinct().Count())

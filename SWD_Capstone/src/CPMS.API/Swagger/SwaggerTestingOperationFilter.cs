@@ -69,7 +69,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Moderator view. Creates draft assignments using only submitted availability, avoiding supervisor/self-review, previous-round reviewers, and reviewer slot conflicts. Notifications are sent only after publish."),
         ["POST /api/review-sessions"] = new(
             "Create one review session",
-            "Assigns one group to one or two reviewers. Reviewers must have submitted availability for the selected date and slot. Sends lecturer notification email after the assignment is created."),
+            "Assigns one group to a flexible panel of at least two reviewers. Reviewers must have submitted availability for the selected date and slot. Sends lecturer notification email after the assignment is created."),
         ["POST /api/review-sessions/bulk-assign"] = new(
             "Bulk assign review sessions",
             "Assigns multiple sessions in one transaction. Reviewers must have submitted availability for each selected date and slot. If one assignment violates a business rule, the whole batch is rejected. Sends lecturer notification email after commit and returns delivery counts."),
@@ -191,7 +191,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("semesterId", Int(1)),
             ("reviewType", Str("Review1")),
             ("weekStart", Str("2026-06-15")),
-            ("reviewersPerSession", Int(2)),
+            ("reviewersPerSession", Int(4)),
             ("roomPrefix", Str("AUTO")),
             ("seed", Null())),
 
@@ -200,8 +200,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("groupId", Int(1)),
             ("groupPosition", Int(1)),
             ("type", Str("Review1")),
-            ("reviewer1Id", Int(2)),
-            ("reviewer2Id", Int(3)),
+            ("reviewerIds", Arr(Int(2), Int(3), Int(4), Int(5))),
             ("previousReviewerIds", Arr()),
             ("slot", Int(1)),
             ("room", Str("NVH 601")),
@@ -236,6 +235,9 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("workProductSize", Str("45 pages")),
             ("effortHours", Double(3.5)),
             ("reviewerComment", Str("Draft review comment.")),
+            ("reviewerComments", Arr(
+                Str("Architecture boundaries need to be clearer."),
+                Str("Add deployment and monitoring evidence."))),
             ("suggestion", Str("Improve scope and validation evidence.")),
             ("resultText", Str("Nhận xét: cần bổ sung tài liệu kiểm thử và làm rõ phạm vi chức năng.")),
             ("items", Arr(Obj(

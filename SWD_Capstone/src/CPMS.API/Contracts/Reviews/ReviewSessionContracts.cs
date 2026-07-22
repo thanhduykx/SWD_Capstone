@@ -7,8 +7,7 @@ public sealed record CreateReviewSessionRequest(
     [property: JsonRequired] int GroupId,
     [property: JsonRequired] int GroupPosition,
     [property: JsonRequired] ReviewType Type,
-    [property: JsonRequired] int Reviewer1Id,
-    [property: JsonRequired] int Reviewer2Id,
+    [property: JsonRequired] IReadOnlyCollection<int> ReviewerIds,
     int[] PreviousReviewerIds,
     [property: JsonRequired] int Slot,
     string Room,
@@ -59,5 +58,6 @@ public sealed record MyReviewSessionResponse(
     DateTime SessionDate,
     int Slot,
     string Room,
+    int ReviewerCount,
     ReviewSubmissionStatus SubmissionStatus,
     DateTime LastSavedAt);

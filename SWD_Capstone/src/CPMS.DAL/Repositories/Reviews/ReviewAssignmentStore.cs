@@ -75,15 +75,22 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
         Dictionary<int, IReadOnlySet<int>> previousReviewers = await LoadPreviousReviewersAsync(
             scope, groupIds, cancellationToken);
 
-        var occupiedRows = await dbContext.ReviewSessions
-            .Where(session => session.SemesterId == scope.SemesterId &&
-                              session.SessionDate >= weekStartDate && session.SessionDate < weekEndDate &&
-                              session.Status != ReviewSessionStatus.Cancelled)
-            .Select(session => new { session.SessionDate, session.Slot, session.Reviewer1Id, session.Reviewer2Id })
+        var occupiedRows = await dbContext.ReviewSessionReviewers
+            .Where(assignment => dbContext.ReviewSessions.Any(session =>
+                session.Id == assignment.SessionId && session.SemesterId == scope.SemesterId &&
+                session.SessionDate >= weekStartDate && session.SessionDate < weekEndDate &&
+                session.Status != ReviewSessionStatus.Cancelled))
+            .Select(assignment => new
+            {
+                assignment.LecturerId,
+                SessionDate = dbContext.ReviewSessions.Where(session => session.Id == assignment.SessionId)
+                    .Select(session => session.SessionDate).Single(),
+                Slot = dbContext.ReviewSessions.Where(session => session.Id == assignment.SessionId)
+                    .Select(session => session.Slot).Single()
+            })
             .ToListAsync(cancellationToken);
-        OccupiedReviewerSlot[] occupied = occupiedRows.SelectMany(row => new[] { row.Reviewer1Id, row.Reviewer2Id }
-                .Where(id => id.HasValue)
-                .Select(id => new OccupiedReviewerSlot(id!.Value, row.SessionDate, row.Slot)))
+        OccupiedReviewerSlot[] occupied = occupiedRows
+            .Select(row => new OccupiedReviewerSlot(row.LecturerId, row.SessionDate, row.Slot))
             .ToArray();
         var usedCodes = (await dbContext.ReviewSessions.Where(x => x.SemesterId == scope.SemesterId)
                 .Select(x => x.Code).ToListAsync(cancellationToken))
@@ -105,8 +112,6 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
                 x.Code,
                 x.Type,
                 x.Status,
-                x.Reviewer1Id,
-                x.Reviewer2Id,
                 x.SessionDate,
                 x.DayOfWeek,
                 x.Slot,
@@ -114,10 +119,17 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
                 GroupCount = dbContext.GroupReviewSlots.Count(slot => slot.SessionId == x.Id)
             })
             .ToListAsync(cancellationToken);
+        var panelIds = panelRows.Select(x => x.Id).ToArray();
+        var panelReviewerRows = await dbContext.ReviewSessionReviewers
+            .Where(x => panelIds.Contains(x.SessionId))
+            .OrderBy(x => x.Position)
+            .Select(x => new { x.SessionId, x.LecturerId })
+            .ToListAsync(cancellationToken);
         AssignmentPanel[] panels = panelRows.Where(x => x.GroupCount < 3)
             .Select(x => new AssignmentPanel(
                 x.Id, x.Code, x.Type, x.Status,
-                new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
+                panelReviewerRows.Where(reviewer => reviewer.SessionId == x.Id)
+                    .Select(reviewer => reviewer.LecturerId).ToArray(),
                 x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty, x.GroupCount))
             .ToArray();
 
@@ -136,18 +148,18 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
         if (scope.ReviewType != ReviewType.Review2 || groupIds.Length == 0) return empty;
 
         var previousRows = await dbContext.GroupReviewSlots.Where(slot => groupIds.Contains(slot.GroupId))
-            .Join(
-                dbContext.ReviewSessions.Where(session =>
-                    session.SemesterId == scope.SemesterId && session.Type == ReviewType.Review1),
+            .Join(dbContext.ReviewSessionReviewers,
                 slot => slot.SessionId,
-                session => session.Id,
-                (slot, session) => new { slot.GroupId, session.Reviewer1Id, session.Reviewer2Id })
+                reviewer => reviewer.SessionId,
+                (slot, reviewer) => new { slot.GroupId, reviewer.SessionId, reviewer.LecturerId })
+            .Where(row => dbContext.ReviewSessions.Any(session =>
+                session.Id == row.SessionId && session.SemesterId == scope.SemesterId &&
+                session.Type == ReviewType.Review1))
             .ToListAsync(cancellationToken);
         Dictionary<int, HashSet<int>> mutable = groupIds.ToDictionary(groupId => groupId, _ => new HashSet<int>());
         foreach (var row in previousRows)
         {
-            if (row.Reviewer1Id.HasValue) mutable[row.GroupId].Add(row.Reviewer1Id.Value);
-            if (row.Reviewer2Id.HasValue) mutable[row.GroupId].Add(row.Reviewer2Id.Value);
+            mutable[row.GroupId].Add(row.LecturerId);
         }
         return mutable.ToDictionary(x => x.Key, x => (IReadOnlySet<int>)x.Value);
     }
@@ -164,12 +176,12 @@ public sealed class ReviewAssignmentStore(CpmsDbContext dbContext) : IReviewAssi
             Slot = panel.Slot,
             Room = panel.Room,
             Type = panel.Type,
-            Reviewer1Id = panel.ReviewerIds.ElementAtOrDefault(0),
-            Reviewer2Id = panel.ReviewerIds.Count > 1 ? panel.ReviewerIds[1] : null,
             SessionDate = panel.SessionDate,
             Status = ReviewSessionStatus.Draft
         };
         dbContext.ReviewSessions.Add(session);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        ReviewSessionReviewerPersistence.Add(dbContext, session.Id, panel.ReviewerIds);
         await dbContext.SaveChangesAsync(cancellationToken);
         return new AssignmentPanel(
             session.Id, session.Code, session.Type, session.Status, panel.ReviewerIds,

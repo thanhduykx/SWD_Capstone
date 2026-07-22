@@ -46,6 +46,7 @@ public sealed record MyReviewSessionResult(
     DateTime SessionDate,
     int Slot,
     string Room,
+    int ReviewerCount,
     ReviewSubmissionStatus SubmissionStatus,
     DateTime LastSavedAt);
 

@@ -237,13 +237,17 @@ static async Task SeedAsync(CpmsDbContext db)
     db.ReviewAvailabilities.AddRange(lecturers.Select((x, i) => new ReviewAvailability { ReviewRoundId = reviewRound.Id, SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, DayOfWeek = i + 2, Slot = 2, CreatedAt = now.AddDays(-30) }));
     db.ReviewAvailabilitySubmissions.AddRange(lecturers.Select(x => new ReviewAvailabilitySubmission { ReviewRoundId = reviewRound.Id, SemesterId = semester.Id, LecturerId = x.Id, WeekStartDate = week, UpdatedAt = now.AddDays(-30), SubmittedAt = now.AddDays(-29) }));
     db.StudentSlotRegistrations.AddRange(groups.Select((x, i) => new StudentSlotRegistration { ReviewRoundId = reviewRound.Id, GroupId = x.Id, RegisteredByStudentId = students[i * 3].Id, DayOfWeek = i + 2, Slot = 2, CreatedAt = now.AddDays(-33) }));
-    var reviewSession = new ReviewSession { Code = marker + "_REV01", SemesterId = semester.Id, DayOfWeek = 2, Slot = 2, Room = "DEMO-R101", Type = ReviewType.Review1, Reviewer1Id = lecturers[0].Id, Reviewer2Id = lecturers[1].Id, SessionDate = new DateTime(2026, 7, 7, 9, 0, 0, DateTimeKind.Utc), Status = ReviewSessionStatus.Published, PublishedAt = now.AddDays(-27), PublishedByTrainingDepartmentId = training.Id };
+    var reviewSession = new ReviewSession { Code = marker + "_REV01", SemesterId = semester.Id, DayOfWeek = 2, Slot = 2, Room = "DEMO-R101", Type = ReviewType.Review1, SessionDate = new DateTime(2026, 7, 7, 9, 0, 0, DateTimeKind.Utc), Status = ReviewSessionStatus.Published, PublishedAt = now.AddDays(-27), PublishedByTrainingDepartmentId = training.Id };
     db.ReviewSessions.Add(reviewSession);
     await db.SaveChangesAsync();
+    db.ReviewSessionReviewers.AddRange(
+        new ReviewSessionReviewer { SessionId = reviewSession.Id, LecturerId = lecturers[0].Id, Position = 1 },
+        new ReviewSessionReviewer { SessionId = reviewSession.Id, LecturerId = lecturers[1].Id, Position = 2 });
     db.GroupReviewSlots.Add(new GroupReviewSlot { SessionId = reviewSession.Id, GroupId = groups[0].Id, GroupPosition = 1, Result = ReviewResult.Pass, Notes = marker + " review passed", ConflictFlag = false });
     var submission = new ReviewChecklistSubmission { SessionId = reviewSession.Id, GroupId = groups[0].Id, ReviewerId = lecturers[0].Id, Type = ReviewType.Review1, Status = ReviewSubmissionStatus.Submitted, WorkProductVersion = "v1.0-demo", WorkProductSize = "1 MB", EffortHours = 120m, ReviewerComment = marker + " good progress", Suggestion = "Add monitoring dashboard", ResultText = "Pass", LastSavedAt = now.AddDays(-25), SubmittedAt = now.AddDays(-25) };
     db.ReviewChecklistSubmissions.Add(submission);
     await db.SaveChangesAsync();
+    db.ReviewSubmissionComments.Add(new ReviewSubmissionComment { SubmissionId = submission.Id, Content = marker + " good progress", Position = 1, CreatedAt = now.AddDays(-25), UpdatedAt = now.AddDays(-25) });
     db.ReviewChecklistItemResponses.AddRange(
         new ReviewChecklistItemResponse { SubmissionId = submission.Id, ItemKey = marker + "_SCOPE", Answer = ReviewChecklistAnswer.Yes, Comment = "Scope is complete", UpdatedAt = now.AddDays(-25) },
         new ReviewChecklistItemResponse { SubmissionId = submission.Id, ItemKey = marker + "_TEST", Answer = ReviewChecklistAnswer.Yes, Comment = "Automated tests included", UpdatedAt = now.AddDays(-25) });

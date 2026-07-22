@@ -80,6 +80,33 @@ public sealed class ReviewWorkflowModelTests
     }
 
     [Fact]
+    public void ReviewSession_UsesFlexibleReviewerPanelInsteadOfFixedReviewerColumns()
+    {
+        using CpmsDbContext context = CreateContext();
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        IEntityType session = model.FindEntityType(typeof(ReviewSession))!;
+        IEntityType panelMember = model.FindEntityType(typeof(ReviewSessionReviewer))!;
+
+        Assert.Null(session.FindProperty("Reviewer1Id"));
+        Assert.Null(session.FindProperty("Reviewer2Id"));
+        Assert.Equal(
+            [nameof(ReviewSessionReviewer.SessionId), nameof(ReviewSessionReviewer.LecturerId)],
+            panelMember.FindPrimaryKey()!.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public void ReviewSubmission_AllowsMultipleOrderedComments()
+    {
+        using CpmsDbContext context = CreateContext();
+        IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(ReviewSubmissionComment))!;
+
+        Assert.Contains(entity.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ReviewSubmissionComment.SubmissionId), nameof(ReviewSubmissionComment.Position)]));
+        Assert.Equal(4000, entity.FindProperty(nameof(ReviewSubmissionComment.Content))!.GetMaxLength());
+    }
+
+    [Fact]
     public void ReviewRound_IsUniquePerSemesterAndType()
     {
         using CpmsDbContext context = CreateContext();

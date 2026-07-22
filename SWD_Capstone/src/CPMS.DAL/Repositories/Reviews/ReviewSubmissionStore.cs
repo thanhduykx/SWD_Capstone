@@ -93,11 +93,19 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
                 x => new ValueTuple<ReviewChecklistAnswer?, string?>(x.Answer, x.Comment),
                 StringComparer.OrdinalIgnoreCase,
                 cancellationToken);
+        List<string> reviewerComments = await dbContext.ReviewSubmissionComments
+            .Where(x => x.SubmissionId == submissionId)
+            .OrderBy(x => x.Position)
+            .Select(x => x.Content)
+            .ToListAsync(cancellationToken);
+        if (reviewerComments.Count == 0 && !string.IsNullOrWhiteSpace(data.ReviewerComment))
+            reviewerComments.Add(data.ReviewerComment);
         return new ReviewSubmissionData(
             data.Id, data.SessionId, data.GroupId, data.GroupCode, data.ProjectName, data.Type, data.Status,
             data.SessionStatus, data.SessionDate, data.Slot, data.Room, data.ReviewerId, data.ReviewerCode,
             data.ReviewerName, data.WorkProductVersion, data.WorkProductSize, data.EffortHours,
-            data.ReviewerComment, data.Suggestion, data.ResultText, data.LastSavedAt, data.SubmittedAt, responses);
+            data.ReviewerComment, reviewerComments, data.Suggestion, data.ResultText,
+            data.LastSavedAt, data.SubmittedAt, responses);
     }
 
     public async Task SaveDraftAsync(
@@ -109,11 +117,26 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
         submission.WorkProductVersion = draft.WorkProductVersion;
         submission.WorkProductSize = draft.WorkProductSize;
         submission.EffortHours = draft.EffortHours;
-        submission.ReviewerComment = draft.ReviewerComment;
+        submission.ReviewerComment = draft.ReviewerComments.Count == 0
+            ? draft.ReviewerComment
+            : string.Join(Environment.NewLine, draft.ReviewerComments.Select(x => $"• {x}"));
         submission.Suggestion = draft.Suggestion;
         submission.ResultText = draft.ResultText;
         submission.Status = ReviewSubmissionStatus.Draft;
         submission.LastSavedAt = draft.ChangedAt;
+        List<ReviewSubmissionComment> existingComments = await dbContext.ReviewSubmissionComments
+            .Where(x => x.SubmissionId == submissionId)
+            .ToListAsync(cancellationToken);
+        dbContext.ReviewSubmissionComments.RemoveRange(existingComments);
+        dbContext.ReviewSubmissionComments.AddRange(draft.ReviewerComments.Select((content, index) =>
+            new ReviewSubmissionComment
+            {
+                SubmissionId = submissionId,
+                Content = content,
+                Position = index + 1,
+                CreatedAt = draft.ChangedAt,
+                UpdatedAt = draft.ChangedAt
+            }));
         Dictionary<string, ReviewChecklistItemResponse> existing = await dbContext.ReviewChecklistItemResponses.Where(x => x.SubmissionId == submissionId)
             .ToDictionaryAsync(x => x.ItemKey, StringComparer.OrdinalIgnoreCase, cancellationToken);
         foreach (SaveReviewItem item in draft.Items)
