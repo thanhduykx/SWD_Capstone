@@ -55,6 +55,7 @@ public sealed record ReviewRoundManagementResponse(
     int SemesterId,
     ReviewType Type,
     ReviewRoundStatus Status,
+    DateOnly RegistrationEndDate,
     DateOnly WeekStartDate,
     DateOnly WeekEndDate,
     DateTime CreatedAt,
@@ -64,5 +65,6 @@ public sealed record ReviewRoundManagementResponse(
 public sealed record CreateReviewRoundRequest(
     [property: JsonRequired] int SemesterId,
     [property: JsonRequired] ReviewType ReviewType,
-    [property: JsonRequired] DateOnly WeekStartDate);
+    DateOnly? RegistrationEndDate,
+    DateOnly? WeekStartDate);
 public sealed record UpdateRoundStatusRequest([property: JsonRequired] ReviewRoundStatus Status);

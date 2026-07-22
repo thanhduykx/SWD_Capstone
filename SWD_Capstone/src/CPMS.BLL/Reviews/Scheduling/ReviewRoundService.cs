@@ -16,7 +16,8 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
         bool allowModeratorFallback,
         int semesterId,
         ReviewType reviewType,
-        DateOnly weekStartDate,
+        DateOnly? registrationEndDate,
+        DateOnly? legacyWeekStartDate,
         CancellationToken cancellationToken)
     {
         if (!await store.SemesterExistsAsync(semesterId, cancellationToken))
@@ -26,7 +27,28 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
 
         var moderatorId = await store.FindModeratorIdAsync(userId, allowModeratorFallback, cancellationToken)
             ?? throw new UnauthorizedAccessException("A Training Department moderator profile is required.");
-        DateOnly normalizedStart = ReviewWeek.NormalizeStart(weekStartDate);
+        DateOnly normalizedStart;
+        if (registrationEndDate.HasValue)
+        {
+            normalizedStart = registrationEndDate.Value.AddDays(5);
+            if (normalizedStart.DayOfWeek != DayOfWeek.Monday)
+            {
+                throw new BusinessRuleException(
+                    "Registration must end on Wednesday so the Monday-Saturday review schedule starts exactly five days later.");
+            }
+            if (legacyWeekStartDate.HasValue && legacyWeekStartDate.Value != normalizedStart)
+            {
+                throw new BusinessRuleException("Review week must start exactly five days after registration ends.");
+            }
+        }
+        else if (legacyWeekStartDate.HasValue)
+        {
+            normalizedStart = ReviewWeek.NormalizeStart(legacyWeekStartDate.Value);
+        }
+        else
+        {
+            throw new BusinessRuleException("Registration end date is required.");
+        }
         if (await store.RoundExistsAsync(semesterId, reviewType, cancellationToken))
         {
             throw new BusinessRuleException("This semester already has a review round of the selected type.");
@@ -75,6 +97,6 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
     }
 
     private static ReviewRoundManagementResult Map(ReviewRoundState state) =>
-        new(state.Id, state.SemesterId, state.Type, state.Status, state.WeekStartDate, state.WeekEndDate,
+        new(state.Id, state.SemesterId, state.Type, state.Status, state.WeekStartDate.AddDays(-5), state.WeekStartDate, state.WeekEndDate,
             state.CreatedAt, state.OpenedAt, state.ClosedAt, state.RegisteredGroupCount);
 }

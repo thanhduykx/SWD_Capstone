@@ -9,7 +9,7 @@ namespace CPMS.UnitTests.Services;
 public sealed class ReviewRoundServiceTests
 {
     [Fact]
-    public async Task CreateRound_NormalizesWeekToMonday()
+    public async Task CreateRound_StartsReviewFiveDaysAfterRegistrationEnds()
     {
         var store = new FakeStore
         {
@@ -19,8 +19,10 @@ public sealed class ReviewRoundServiceTests
         var service = new ReviewRoundService(store, new AssignmentRules());
 
         ReviewRoundManagementResult result = await service.CreateRoundAsync(
-            7, false, 3, ReviewType.Review1, new DateOnly(2026, 7, 16), CancellationToken.None);
+            7, false, 3, ReviewType.Review1,
+            new DateOnly(2026, 7, 8), new DateOnly(2026, 7, 13), CancellationToken.None);
 
+        Assert.Equal(new DateOnly(2026, 7, 8), result.RegistrationEndDate);
         Assert.Equal(new DateOnly(2026, 7, 13), result.WeekStartDate);
         Assert.Equal(new DateOnly(2026, 7, 18), result.WeekEndDate);
         Assert.Equal(12, store.CreatedByModeratorId);
@@ -39,9 +41,40 @@ public sealed class ReviewRoundServiceTests
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
-                7, false, 3, ReviewType.Review1, new DateOnly(2026, 8, 3), CancellationToken.None));
+                7, false, 3, ReviewType.Review1,
+                new DateOnly(2026, 7, 29), new DateOnly(2026, 8, 3), CancellationToken.None));
 
         Assert.Contains("already has a review round", exception.Message);
+        Assert.Null(store.CreatedByModeratorId);
+    }
+
+    [Fact]
+    public async Task CreateRound_RejectsReviewDateThatIsNotFiveDaysAfterRegistrationEnds()
+    {
+        var store = new FakeStore { SemesterExists = true, ModeratorId = 12 };
+        var service = new ReviewRoundService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.CreateRoundAsync(
+                7, false, 3, ReviewType.Review1,
+                new DateOnly(2026, 7, 8), new DateOnly(2026, 7, 14), CancellationToken.None));
+
+        Assert.Contains("exactly five days", exception.Message);
+        Assert.Null(store.CreatedByModeratorId);
+    }
+
+    [Fact]
+    public async Task CreateRound_RejectsRegistrationDeadlineThatCannotStartMondayReviewWeek()
+    {
+        var store = new FakeStore { SemesterExists = true, ModeratorId = 12 };
+        var service = new ReviewRoundService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.CreateRoundAsync(
+                7, false, 3, ReviewType.Review1,
+                new DateOnly(2026, 7, 9), null, CancellationToken.None));
+
+        Assert.Contains("Wednesday", exception.Message);
         Assert.Null(store.CreatedByModeratorId);
     }
 

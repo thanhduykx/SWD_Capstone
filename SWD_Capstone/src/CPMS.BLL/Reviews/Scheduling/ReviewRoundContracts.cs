@@ -7,6 +7,7 @@ public sealed record ReviewRoundManagementResult(
     int SemesterId,
     ReviewType Type,
     ReviewRoundStatus Status,
+    DateOnly RegistrationEndDate,
     DateOnly WeekStartDate,
     DateOnly WeekEndDate,
     DateTime CreatedAt,
@@ -17,7 +18,7 @@ public sealed record ReviewRoundManagementResult(
 public interface IReviewRoundService
 {
     Task<IReadOnlyList<ReviewRoundManagementResult>> GetRoundsAsync(int semesterId, CancellationToken cancellationToken);
-    Task<ReviewRoundManagementResult> CreateRoundAsync(int userId, bool allowModeratorFallback, int semesterId, ReviewType reviewType, DateOnly weekStartDate, CancellationToken cancellationToken);
+    Task<ReviewRoundManagementResult> CreateRoundAsync(int userId, bool allowModeratorFallback, int semesterId, ReviewType reviewType, DateOnly? registrationEndDate, DateOnly? legacyWeekStartDate, CancellationToken cancellationToken);
     Task<ReviewRoundManagementResult> UpdateStatusAsync(int roundId, ReviewRoundStatus nextStatus, CancellationToken cancellationToken);
 }
 

@@ -130,6 +130,7 @@ public sealed class ReviewSchedulingController(
             User.IsInRole(nameof(UserRole.SystemAdministrator)),
             request.SemesterId,
             request.ReviewType,
+            request.RegistrationEndDate,
             request.WeekStartDate,
             cancellationToken);
         return Ok(MapRound(result));
@@ -180,7 +181,7 @@ public sealed class ReviewSchedulingController(
 
     private static ReviewRoundManagementResponse MapRound(ReviewRoundManagementResult result) =>
         new(result.Id, result.SemesterId, result.Type, result.Status,
-            result.WeekStartDate, result.WeekEndDate, result.CreatedAt,
+            result.RegistrationEndDate, result.WeekStartDate, result.WeekEndDate, result.CreatedAt,
             result.OpenedAt, result.ClosedAt, result.RegisteredGroupCount);
 
     private static ReviewSchedulingBoardResponse MapBoard(ReviewSchedulingBoardResult result) =>
