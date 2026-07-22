@@ -172,6 +172,8 @@ public sealed class ReviewRegistrationService(
             ?? throw new KeyNotFoundException("The review session is not assigned to your group.");
         if (row.SessionStatus != ReviewSessionStatus.Published)
             throw new BusinessRuleException("Only a published review session can be confirmed.");
+        if (row.GroupStatus == ReviewGroupStatus.Completed)
+            throw new BusinessRuleException("This review has ended. Missing signatures are recorded as absent.");
         DateTime now = DateTime.UtcNow;
         if (now < row.SessionDate.AddMinutes(-30))
             throw new BusinessRuleException("You can sign attendance from 30 minutes before the review session starts.");
@@ -183,7 +185,7 @@ public sealed class ReviewRegistrationService(
     private static StudentCheckInResult MapCheckIn(StudentCheckInData row, DateTime now) =>
         new(row.SessionId, row.SessionCode, row.Type, row.SessionDate, row.Slot, row.Room,
             row.GroupStatus, row.ConfirmedAt,
-            row.ConfirmedAt is null && now >= row.SessionDate.AddMinutes(-30));
+            row.GroupStatus != ReviewGroupStatus.Completed && row.ConfirmedAt is null && now >= row.SessionDate.AddMinutes(-30));
 
     public async Task<IReadOnlyList<StudentAttendanceResult>> GetStudentAttendanceAsync(int userId, CancellationToken cancellationToken)
     {

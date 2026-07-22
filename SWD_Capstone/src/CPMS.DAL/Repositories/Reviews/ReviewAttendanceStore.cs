@@ -129,20 +129,51 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
             comment.Id, comment.AuthorUserId, authorName, comment.Content, comment.CreatedAt, comment.UpdatedAt);
     }
 
-    public async Task<(int StudentCount, int AttendanceCount, int SubmittedCount, int ConfirmationCount)> GetCompletionCountsAsync(
+    public async Task FinalizeUnsignedCheckInsAsync(
+        int sessionId, int groupId, int lecturerId, DateTime finalizedAt,
+        CancellationToken cancellationToken)
+    {
+        int[] studentIds = await dbContext.Students.Where(x => x.GroupId == groupId)
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
+        Dictionary<int, ReviewAttendance> attendances = await dbContext.ReviewAttendances
+            .Where(x => x.SessionId == sessionId && studentIds.Contains(x.StudentId))
+            .ToDictionaryAsync(x => x.StudentId, cancellationToken);
+        foreach (int studentId in studentIds)
+        {
+            if (!attendances.TryGetValue(studentId, out ReviewAttendance? attendance))
+            {
+                dbContext.ReviewAttendances.Add(new ReviewAttendance
+                {
+                    SessionId = sessionId,
+                    StudentId = studentId,
+                    IsPresent = false,
+                    Note = "Không ký xác nhận tham dự",
+                    MarkedByLecturerId = lecturerId,
+                    MarkedAt = finalizedAt
+                });
+            }
+            else if (attendance.StudentConfirmedAt is null)
+            {
+                attendance.IsPresent = false;
+                attendance.Note ??= "Không ký xác nhận tham dự";
+                attendance.MarkedByLecturerId = lecturerId;
+                attendance.MarkedAt = finalizedAt;
+            }
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<(int StudentCount, int AttendanceCount, int SubmittedCount)> GetCompletionCountsAsync(
         int sessionId, int groupId, CancellationToken cancellationToken)
     {
         var studentCount = await dbContext.Students.CountAsync(x => x.GroupId == groupId, cancellationToken);
         var attendanceCount = await dbContext.ReviewAttendances.CountAsync(x =>
             x.SessionId == sessionId && dbContext.Students.Any(student =>
                 student.Id == x.StudentId && student.GroupId == groupId), cancellationToken);
-        var confirmationCount = await dbContext.ReviewAttendances.CountAsync(x =>
-            x.SessionId == sessionId && x.StudentConfirmedAt != null && dbContext.Students.Any(student =>
-                student.Id == x.StudentId && student.GroupId == groupId), cancellationToken);
         var submittedCount = await dbContext.ReviewChecklistSubmissions.CountAsync(x =>
             x.SessionId == sessionId && x.GroupId == groupId &&
             x.Status == ReviewSubmissionStatus.Submitted, cancellationToken);
-        return (studentCount, attendanceCount, submittedCount, confirmationCount);
+        return (studentCount, attendanceCount, submittedCount);
     }
 
     public async Task<CompleteReviewResult> CompleteAsync(

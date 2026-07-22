@@ -222,7 +222,7 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
             {
                 SessionId = sessionId,
                 StudentId = studentId,
-                IsPresent = false,
+                IsPresent = true,
                 MarkedByLecturerId = null,
                 MarkedAt = confirmedAt,
                 StudentConfirmedAt = confirmedAt
@@ -232,6 +232,7 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
         else if (attendance.StudentConfirmedAt is null)
         {
             attendance.StudentConfirmedAt = confirmedAt;
+            attendance.IsPresent = true;
         }
         else
         {

@@ -39,7 +39,9 @@ public interface IReviewAttendanceStore
         int authorUserId,
         string content,
         CancellationToken cancellationToken);
-    Task<(int StudentCount, int AttendanceCount, int SubmittedCount, int ConfirmationCount)> GetCompletionCountsAsync(
+    Task FinalizeUnsignedCheckInsAsync(
+        int sessionId, int groupId, int lecturerId, DateTime finalizedAt, CancellationToken cancellationToken);
+    Task<(int StudentCount, int AttendanceCount, int SubmittedCount)> GetCompletionCountsAsync(
         int sessionId, int groupId, CancellationToken cancellationToken);
     Task<CompleteReviewResult> CompleteAsync(
         int sessionId, int groupId, int lecturerId, DateTime completedAt, CancellationToken cancellationToken);
