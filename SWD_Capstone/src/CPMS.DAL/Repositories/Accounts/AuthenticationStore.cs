@@ -32,17 +32,27 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
         user.LockedUntil = lockedUntil;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
-    public async Task RecordSuccessfulLoginAsync(int userId, DateTime loginAt, CancellationToken cancellationToken)
+    public async Task CompleteSuccessfulLoginAsync(
+        int userId,
+        DateTime loginAt,
+        PersistRefreshToken token,
+        CancellationToken cancellationToken)
     {
-        User user = await dbContext.Users.SingleAsync(x => x.Id == userId, cancellationToken);
+        ArgumentNullException.ThrowIfNull(token);
+        var user = new User
+        {
+            Id = userId,
+            Username = string.Empty,
+            Email = string.Empty,
+            PasswordHash = string.Empty
+        };
+        dbContext.Users.Attach(user);
         user.FailedLoginAttempts = 0;
         user.LockedUntil = null;
         user.LastLoginAt = loginAt;
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-    public async Task SaveRefreshTokenAsync(PersistRefreshToken token, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(token);
+        dbContext.Entry(user).Property(x => x.FailedLoginAttempts).IsModified = true;
+        dbContext.Entry(user).Property(x => x.LockedUntil).IsModified = true;
+        dbContext.Entry(user).Property(x => x.LastLoginAt).IsModified = true;
         dbContext.RefreshTokens.Add(NewToken(token));
         await dbContext.SaveChangesAsync(cancellationToken);
     }

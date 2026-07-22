@@ -19,8 +19,11 @@ public interface IAuthenticationStore
     Task<AuthenticationUser?> FindByLoginAsync(string login, CancellationToken cancellationToken);
     Task<AuthenticationUser?> FindByEmailAsync(string email, CancellationToken cancellationToken);
     Task RecordFailedLoginAsync(int userId, int failedAttempts, DateTime? lockedUntil, CancellationToken cancellationToken);
-    Task RecordSuccessfulLoginAsync(int userId, DateTime loginAt, CancellationToken cancellationToken);
-    Task SaveRefreshTokenAsync(PersistRefreshToken token, CancellationToken cancellationToken);
+    Task CompleteSuccessfulLoginAsync(
+        int userId,
+        DateTime loginAt,
+        PersistRefreshToken token,
+        CancellationToken cancellationToken);
     Task<RefreshTokenState?> FindRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken);
     Task<AuthenticationUser?> FindUserAsync(int userId, CancellationToken cancellationToken);
     Task RotateRefreshTokenAsync(int existingTokenId, PersistRefreshToken replacement, CancellationToken cancellationToken);

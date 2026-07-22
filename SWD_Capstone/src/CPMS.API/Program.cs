@@ -147,9 +147,8 @@ app.MapGet("/health/storage", (ProjectDocumentStorageOptions options) => Results
 {
     status = "Healthy",
     provider = options.Provider,
-    configured = string.Equals(options.Provider, "Supabase", StringComparison.OrdinalIgnoreCase)
-        ? !string.IsNullOrWhiteSpace(options.SupabaseUrl) && !string.IsNullOrWhiteSpace(options.ServiceRoleKey)
-        : true
+    configured = !string.Equals(options.Provider, "Supabase", StringComparison.OrdinalIgnoreCase)
+        || (!string.IsNullOrWhiteSpace(options.SupabaseUrl) && !string.IsNullOrWhiteSpace(options.ServiceRoleKey))
 }));
 app.MapGet("/health/database", async (
     IDatabaseLifecycleService database, CancellationToken cancellationToken) =>

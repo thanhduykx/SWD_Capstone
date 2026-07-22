@@ -20,6 +20,12 @@ public sealed class ReviewSchedulingController(
     IReviewAssignmentService assignmentService,
     IDatabaseLifecycleService databaseLifecycle) : ControllerBase
 {
+    private static readonly string[] LecturerDatasetChecks =
+    [
+        "GET /api/review-sessions/my",
+        "GET /api/defense-management/my-board-sessions"
+    ];
+
     /// <summary>
     /// Idempotent upsert of shared lecturer review/defense sample rows on the active semester.
     /// Training Department only — does not require ExposeTestSupport and does not truncate site data.
@@ -34,11 +40,7 @@ public sealed class ReviewSchedulingController(
             message = "Lecturer dataset ensured on the active semester (web + mobile share the same rows).",
             loginEmail = "minhnd.gv24001@fpt.edu.vn",
             password = "Test@123456",
-            check = new[]
-            {
-                "GET /api/review-sessions/my",
-                "GET /api/defense-management/my-board-sessions"
-            }
+            check = LecturerDatasetChecks
         });
     }
 

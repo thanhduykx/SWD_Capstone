@@ -28,8 +28,11 @@ public sealed class ProjectDocumentServiceTests
     [Fact]
     public async Task GenerateSuggestionsAsync_AssignedLecturer_UsesPdfDocumentContract()
     {
-        var store = new StubStore { LecturerCanAccess = true };
-        store.Document = new ProjectDocumentData(6, 8, DocumentType.Review3, "report.pdf", "private:test-key", 9, 1, DocumentStatus.Submitted, DateTime.UtcNow, 11, "Sinh viên Duy");
+        var store = new StubStore
+        {
+            LecturerCanAccess = true,
+            Document = new ProjectDocumentData(6, 8, DocumentType.Review3, "report.pdf", "private:test-key", 9, 1, DocumentStatus.Submitted, DateTime.UtcNow, 11, "Sinh viên Duy")
+        };
         var suggestions = new StubSuggestionService();
         var service = new ProjectDocumentService(store, new StubStorage(), suggestions);
 

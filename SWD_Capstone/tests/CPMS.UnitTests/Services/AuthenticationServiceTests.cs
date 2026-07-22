@@ -139,14 +139,13 @@ public sealed class AuthenticationServiceTests
             RecordedLockedUntil = lockedUntil;
             return Task.CompletedTask;
         }
-        public Task RecordSuccessfulLoginAsync(
-            int userId, DateTime loginAt, CancellationToken cancellationToken)
+        public Task CompleteSuccessfulLoginAsync(
+            int userId,
+            DateTime loginAt,
+            PersistRefreshToken token,
+            CancellationToken cancellationToken)
         {
             SuccessfulLoginUserId = userId;
-            return Task.CompletedTask;
-        }
-        public Task SaveRefreshTokenAsync(PersistRefreshToken token, CancellationToken cancellationToken)
-        {
             SavedRefreshToken = token;
             return Task.CompletedTask;
         }

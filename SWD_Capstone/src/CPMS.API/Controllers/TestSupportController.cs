@@ -12,6 +12,14 @@ public sealed class TestSupportController(
     IConfiguration configuration,
     ITestDataResetService resetService) : ControllerBase
 {
+    private static readonly string[] DatasetChecks =
+    [
+        "GET /api/review-sessions/my",
+        "GET /api/review-submissions/my",
+        "GET /api/defense-management/my-board-sessions",
+        "GET /api/review-scheduling/rounds?semesterId={activeSemesterId}"
+    ];
+
     [HttpGet("swagger-guide")]
     public ActionResult<SwaggerTestGuideResponse> GetSwaggerGuide()
     {
@@ -84,6 +92,7 @@ public sealed class TestSupportController(
         [FromServices] CPMS.BLL.Abstractions.Persistence.IDatabaseLifecycleService lifecycle,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(lifecycle);
         if (!IsEnabled())
         {
             return NotFound();
@@ -96,13 +105,7 @@ public sealed class TestSupportController(
             loginEmail = "minhnd.gv24001@fpt.edu.vn",
             password = "Test@123456",
             note = "Groups SE2601–SE2606, published review/defense rows are visible to both web and mobile APIs.",
-            check = new[]
-            {
-                "GET /api/review-sessions/my",
-                "GET /api/review-submissions/my",
-                "GET /api/defense-management/my-board-sessions",
-                "GET /api/review-scheduling/rounds?semesterId={activeSemesterId}"
-            }
+            check = DatasetChecks
         });
     }
 

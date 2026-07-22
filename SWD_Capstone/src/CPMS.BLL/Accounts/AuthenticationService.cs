@@ -28,7 +28,6 @@ public sealed class AuthenticationService(
                 user.Id, attempts, attempts >= 10 ? DateTime.UtcNow.AddMinutes(5) : null, cancellationToken);
             return null;
         }
-        await store.RecordSuccessfulLoginAsync(user.Id, DateTime.UtcNow, cancellationToken);
         return await IssueAsync(user, deviceInfo, cancellationToken);
     }
 
@@ -40,7 +39,6 @@ public sealed class AuthenticationService(
         if (string.IsNullOrWhiteSpace(email)) return null;
         AuthenticationUser? user = await store.FindByEmailAsync(email.Trim(), cancellationToken);
         if (user is null || !user.IsActive || user.LockedUntil > DateTime.UtcNow) return null;
-        await store.RecordSuccessfulLoginAsync(user.Id, DateTime.UtcNow, cancellationToken);
         return await IssueAsync(user, deviceInfo, cancellationToken);
     }
 
@@ -77,7 +75,11 @@ public sealed class AuthenticationService(
         AuthenticationUser user, string? deviceInfo, CancellationToken cancellationToken)
     {
         IssuedToken issued = tokenIssuer.Issue(new AuthIdentity(user.Id, user.Username, user.Role), deviceInfo);
-        await store.SaveRefreshTokenAsync(ToPersistence(user.Id, issued, deviceInfo), cancellationToken);
+        await store.CompleteSuccessfulLoginAsync(
+            user.Id,
+            DateTime.UtcNow,
+            ToPersistence(user.Id, issued, deviceInfo),
+            cancellationToken);
         return Map(issued);
     }
 

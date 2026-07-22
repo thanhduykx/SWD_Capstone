@@ -19,16 +19,15 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         "council_groups", "council_members", "councils", "email_delivery_logs",
         "review_schedule_publications", "review_checklist_item_responses", "review_checklist_submissions",
         "group_review_slots", "review_sessions", "review_availability_submissions", "review_availabilities",
-          "inline_comments", "evaluation_details", "evaluation_reports", "document_payloads", "documents", "rule_keywords",
-        "clos", "syllabuses", "students", "capstone_groups", "topics", "semesters",
-        "system_administrators", "training_departments", "lecturers", "evaluation_panels",
+        "inline_comments", "document_payloads", "documents", "syllabuses", "students",
+        "capstone_groups", "topics", "semesters", "system_administrators", "training_departments", "lecturers",
         "refresh_tokens", "users"
     ];
 
-    public async Task InitializeAsync(bool seedDevelopmentData, CancellationToken cancellationToken)
+    public async Task InitializeAsync(bool seedBaselineDataset, CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
-        if (seedDevelopmentData) await SeedDevelopmentDataAsync(cancellationToken);
+        if (seedBaselineDataset) await SeedDevelopmentDataAsync(cancellationToken);
     }
 
     public Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken)
