@@ -24,6 +24,7 @@ using CPMS.BLL.Defense.Sessions;
 using CPMS.BLL.Academic.Import;
 using CPMS.BLL.AI.ProjectSuggestions;
 using CPMS.BLL.Documents;
+using CPMS.BLL.Notifications;
 using CPMS.DAL.UnitOfWork;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IProjectDocumentStore, ProjectDocumentStore>();
+        services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<IReviewRegistrationStore, ReviewRegistrationStore>();
         services.AddScoped<IReviewRoundStore, ReviewRoundStore>();
         services.AddScoped<IReviewSchedulingBoardStore, ReviewSchedulingBoardStore>();

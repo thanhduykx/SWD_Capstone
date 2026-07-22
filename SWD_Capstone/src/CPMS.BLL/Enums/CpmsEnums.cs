@@ -26,5 +26,5 @@ public enum ScoreType { BaoVe, Nguoi }
 public enum FinalResult { Pending, Pass, Fail, Drop }
 public enum CommentStatus { Open, Resolved }
 public enum EmailDeliveryStatus { Pending, Sent, Failed }
-public enum NotificationType { DocStatusChange, NewComment, ReportDone, ScoreLocked }
+public enum NotificationType { DocStatusChange, NewComment, ReportDone, ScoreLocked, ReviewSchedulePublished }
 public enum ReviewRoundStatus { Draft, Open, Closed, Published }

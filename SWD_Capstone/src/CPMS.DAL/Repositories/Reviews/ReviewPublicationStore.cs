@@ -175,6 +175,18 @@ public sealed class ReviewPublicationStore(CpmsDbContext dbContext, IEmailSender
                 Status = EmailDeliveryStatus.Pending
             });
         }
+        foreach (PublicationEmail email in input.Emails.DistinctBy(x => x.RecipientUserId))
+        {
+            dbContext.Notifications.Add(new Notification
+            {
+                RecipientId = email.RecipientUserId,
+                SenderId = input.UserId,
+                Type = NotificationType.ReviewSchedulePublished,
+                Title = email.Subject,
+                Message = email.Body,
+                CreatedAt = input.PublishedAt
+            });
+        }
         List<ReviewSession> sessions = await dbContext.ReviewSessions.Where(x => input.SessionIds.Contains(x.Id))
             .ToListAsync(cancellationToken);
         foreach (ReviewSession? session in sessions)
