@@ -135,7 +135,7 @@ public sealed class AssignmentRules
     {
         if (!councilMemberIds.Contains(lecturerId))
         {
-            throw new BusinessRuleException("Only assigned council members can join and score this defense session.");
+            throw new BusinessRuleException("Only assigned council members can join and comment in this defense session.");
         }
     }
 

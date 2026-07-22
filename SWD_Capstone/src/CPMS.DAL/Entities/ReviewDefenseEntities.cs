@@ -202,6 +202,19 @@ public sealed class DefenseEvidence
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
 }
 
+public sealed class DefenseComment
+{
+    public int Id { get; set; }
+    public int DefenseSessionId { get; set; }
+    public int ReviewerId { get; set; }
+    public int SubmittedByUserId { get; set; }
+    public required string Content { get; set; }
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public sealed class Score
 {
     public int Id { get; set; }

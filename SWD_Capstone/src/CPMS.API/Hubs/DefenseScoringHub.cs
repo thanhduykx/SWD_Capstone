@@ -11,7 +11,7 @@ public sealed class DefenseScoringHub(IDefenseSessionService defenseService) : H
 {
     public const string SessionStarted = "defenseSessionStarted";
     public const string SessionClosed = "defenseSessionClosed";
-    public const string ScoreSubmitted = "scoreSubmitted";
+    public const string CommentSubmitted = "defenseCommentSubmitted";
     public const string MemberJoined = "memberJoined";
 
     public async Task JoinDefenseSession(int sessionId)

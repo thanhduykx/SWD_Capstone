@@ -1,5 +1,3 @@
-using CPMS.BLL.Enums;
-
 namespace CPMS.BLL.Defense.Sessions;
 
 public sealed record DefenseSessionActor(int UserId, string? IpAddress, string? UserAgent);
@@ -15,7 +13,6 @@ public sealed record DefenseSessionListResult(
     IReadOnlyList<string> Reviewers,
     string Status,
     string? Result,
-    decimal AverageScore,
     string Notes);
 public sealed record DefenseSessionStateResult(
     int SessionId,
@@ -33,10 +30,17 @@ public sealed record DefenseSessionStateResult(
     bool IsChairman,
     IReadOnlyList<DefenseSessionStudentResult> Students);
 public sealed record DefenseSessionStudentResult(int Id, string Code, string FullName);
-public sealed record SubmitDefenseScoreData(int StudentId, ScoreType ScoreType, decimal ScoreValue);
-public sealed record SubmittedDefenseScoreResult(
-    int SessionId, int ScoreId, int ScorerId, int StudentId,
-    ScoreType ScoreType, decimal ScoreValue, DateTime SubmittedAt);
+public sealed record SubmitDefenseCommentData(string Content);
+public sealed record DefenseCommentResult(
+    int Id,
+    int SessionId,
+    int ReviewerId,
+    string ReviewerCode,
+    string ReviewerName,
+    string Content,
+    DateTime SubmittedAt,
+    DateTime UpdatedAt,
+    bool IsMine);
 public sealed record DefenseEvidenceResult(
     int Id,
     int DefenseSessionId,
@@ -63,8 +67,10 @@ public interface IDefenseSessionService
         string code, int userId, CancellationToken cancellationToken);
     Task<DefenseSessionStateResult> StartAsync(
         int sessionId, DefenseSessionActor actor, CancellationToken cancellationToken);
-    Task<SubmittedDefenseScoreResult> SubmitScoreAsync(
-        int sessionId, SubmitDefenseScoreData score, DefenseSessionActor actor, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DefenseCommentResult>> GetCommentsAsync(
+        int sessionId, int userId, CancellationToken cancellationToken);
+    Task<DefenseCommentResult> SubmitCommentAsync(
+        int sessionId, SubmitDefenseCommentData comment, DefenseSessionActor actor, CancellationToken cancellationToken);
     Task<IReadOnlyList<DefenseEvidenceResult>> GetEvidencesAsync(
         int sessionId, int userId, CancellationToken cancellationToken);
     Task<DefenseEvidenceResult> UploadEvidenceAsync(

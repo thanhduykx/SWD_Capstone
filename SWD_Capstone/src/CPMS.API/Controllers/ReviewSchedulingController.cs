@@ -200,5 +200,8 @@ public sealed class ReviewSchedulingController(
 
     private static ReviewSchedulingSessionResponse MapSession(ReviewSchedulingSession result) =>
         new(result.Id, result.Code, result.GroupId, result.GroupCode, result.Type, result.Status,
-            result.ReviewerIds, result.SessionDate, result.DayOfWeek, result.Slot, result.Room);
+            result.ReviewerIds, result.SessionDate, result.DayOfWeek, result.Slot, result.Room,
+            result.GroupStatus, (result.ReviewerFeedback ?? []).Select(x =>
+                new ReviewSchedulingReviewerFeedbackResponse(
+                    x.ReviewerId, x.ReviewerCode, x.ReviewerName, x.Comment, x.SubmittedAt)).ToArray());
 }

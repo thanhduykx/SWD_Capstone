@@ -78,14 +78,46 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                     session.DayOfWeek,
                     session.Slot,
                     session.Room,
+                    GroupStatus = groupSlot.Status,
                     groupSlot.GroupPosition
                 })
             .OrderBy(x => x.SessionDate).ThenBy(x => x.Slot).ThenBy(x => x.GroupPosition)
             .ToListAsync(cancellationToken);
+
+        int[] sessionIds = sessionRows.Select(x => x.Id).Distinct().ToArray();
+        int[] groupIds = sessionRows.Select(x => x.GroupId).Distinct().ToArray();
+        var feedbackRows = await dbContext.ReviewChecklistSubmissions
+            .Where(x => sessionIds.Contains(x.SessionId) && groupIds.Contains(x.GroupId) &&
+                        x.Status == ReviewSubmissionStatus.Submitted)
+            .Select(x => new
+            {
+                x.SessionId,
+                x.GroupId,
+                x.ReviewerId,
+                ReviewerCode = dbContext.Lecturers.Where(lecturer => lecturer.Id == x.ReviewerId)
+                    .Select(lecturer => lecturer.Code).Single(),
+                ReviewerName = dbContext.Lecturers.Where(lecturer => lecturer.Id == x.ReviewerId)
+                    .Select(lecturer => lecturer.FullName).Single(),
+                Comment = x.ReviewerComment ?? x.Suggestion ?? string.Empty,
+                SubmittedAt = x.SubmittedAt ?? x.LastSavedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        Dictionary<(int SessionId, int GroupId), ReviewSchedulingReviewerFeedback[]> feedbackBySessionGroup =
+            feedbackRows
+                .GroupBy(x => (x.SessionId, x.GroupId))
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.OrderBy(x => x.ReviewerId)
+                        .Select(x => new ReviewSchedulingReviewerFeedback(
+                            x.ReviewerId, x.ReviewerCode, x.ReviewerName, x.Comment, x.SubmittedAt))
+                        .ToArray());
+
         ReviewSchedulingSession[] sessions = sessionRows.Select(x => new ReviewSchedulingSession(
             x.Id, x.Code, x.GroupId, x.GroupCode, x.Type, x.Status,
             new[] { x.Reviewer1Id, x.Reviewer2Id }.Where(id => id.HasValue).Select(id => id!.Value).ToArray(),
-            x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty)).ToArray();
+            x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty, x.GroupStatus,
+            feedbackBySessionGroup.GetValueOrDefault((x.Id, x.GroupId), []))).ToArray();
 
         return new ReviewSchedulingBoardResult(
             semesterId, reviewType, weekStart, lecturers, availability, submissions, groups, sessions);

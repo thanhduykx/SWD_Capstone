@@ -118,16 +118,19 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Schedules a group into a board and defense round. Round, board, and group must belong to the same semester."),
         ["GET /api/defense-management/my-board-sessions"] = new(
             "My defense board sessions",
-            "Lecturer view. Use this to get defense session ids for scoring."),
+            "Lecturer view. Use this to get defense session ids for comments and evidence."),
         ["GET /api/defense-sessions/resolve/{code}"] = new(
             "Resolve defense session by code",
             "Lecturer view. code can be session code, council code, or session id."),
         ["POST /api/defense-sessions/{sessionId}/start"] = new(
-            "Start defense scoring",
-            "Chairman-only. Judges cannot submit scores until this succeeds."),
-        ["POST /api/defense-sessions/{sessionId}/scores"] = new(
-            "Submit defense score",
-            "Assigned council member only. scoreType is BaoVe or Nguoi. scoreValue must be between 0 and 10."),
+            "Start defense comment session",
+            "Chairman-only. Council members cannot submit comments until this succeeds."),
+        ["GET /api/defense-sessions/{sessionId}/comments"] = new(
+            "List defense comments",
+            "Assigned council member only. Returns the group-level comments from all council members."),
+        ["POST /api/defense-sessions/{sessionId}/comments"] = new(
+            "Submit defense comment",
+            "Assigned council member only. Creates or updates the member's text comment for the whole group."),
         ["GET /api/defense-sessions/{sessionId}/evidences"] = new(
             "List defense evidences",
             "Assigned council member only. Returns captured image evidence for a defense session."),
@@ -135,8 +138,8 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             "Upload defense evidence image",
             "Assigned council member only. Multipart form-data. File must be an image and max request size is 5 MB."),
         ["POST /api/defense-sessions/{sessionId}/close"] = new(
-            "Close defense scoring",
-            "Chairman-only. Locks the session and prevents further score edits.")
+            "Close defense comment session",
+            "Chairman-only. Locks the session and prevents further comment edits.")
     };
 
     private static readonly Dictionary<string, IOpenApiAny> RequestExamples = new(StringComparer.OrdinalIgnoreCase)
@@ -268,10 +271,8 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("sessionDate", Str("2026-07-05T00:00:00Z")),
             ("slot", Int(1)),
             ("room", Str("NVH 701"))),
-        ["POST /api/defense-sessions/{sessionId}/scores"] = Obj(
-            ("studentId", Int(1)),
-            ("scoreType", Str("BaoVe")),
-            ("scoreValue", Double(8.5))),
+        ["POST /api/defense-sessions/{sessionId}/comments"] = Obj(
+            ("content", Str("Nhóm trình bày rõ ràng; cần bổ sung kiểm thử cho các trường hợp biên."))),
     };
 
     public void Apply(OpenApiOperation operation, OperationFilterContext context)

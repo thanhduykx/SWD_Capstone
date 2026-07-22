@@ -55,7 +55,7 @@ public sealed class TestSupportController(
                 "Lecturer availability flow: get an Open roundId -> PUT /api/review-availability/week?roundId=... -> POST /api/review-availability/week/submit?roundId=... -> GET /api/review-availability/week?roundId=....",
                 "Review scheduling flow: Open round -> student/lecturer availability -> Close round -> random/bulk assign -> publish.",
                 "Review checklist flow: login as lecturer -> GET /api/review-sessions/my -> GET /api/review-submissions/{submissionId} -> PUT draft -> POST submit.",
-                "Defense flow: login as moderator to create round/board/session -> login as board lecturer -> resolve session -> chairman starts -> members submit scores -> chairman closes."
+                "Defense flow: login as moderator to create round/board/session -> login as board lecturer -> resolve session -> chairman starts -> members submit group comments -> chairman closes."
             ]));
     }
 

@@ -44,15 +44,20 @@ public sealed class DefenseSessionsController(
         return Ok(response);
     }
 
-    [HttpPost("{sessionId:int}/scores")]
-    public async Task<ActionResult<SubmittedDefenseScoreResult>> SubmitScore(
-        int sessionId, SubmitScoreRequest request, CancellationToken cancellationToken)
+    [HttpGet("{sessionId:int}/comments")]
+    public async Task<ActionResult<IReadOnlyList<DefenseCommentResult>>> GetComments(
+        int sessionId, CancellationToken cancellationToken) =>
+        Ok(await defenseService.GetCommentsAsync(sessionId, CurrentUserId(), cancellationToken));
+
+    [HttpPost("{sessionId:int}/comments")]
+    public async Task<ActionResult<DefenseCommentResult>> SubmitComment(
+        int sessionId, SubmitDefenseCommentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        SubmittedDefenseScoreResult response = await defenseService.SubmitScoreAsync(
-            sessionId, new SubmitDefenseScoreData(request.StudentId, request.ScoreType, request.ScoreValue),
+        DefenseCommentResult response = await defenseService.SubmitCommentAsync(
+            sessionId, new SubmitDefenseCommentData(request.Content),
             CurrentActor(), cancellationToken);
-        await BroadcastAsync(sessionId, DefenseScoringHub.ScoreSubmitted, response, cancellationToken);
+        await BroadcastAsync(sessionId, DefenseScoringHub.CommentSubmitted, response, cancellationToken);
         return Ok(response);
     }
 
