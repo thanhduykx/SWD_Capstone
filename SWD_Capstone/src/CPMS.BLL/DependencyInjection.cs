@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IGroupImportService, GroupImportService>();
         services.AddScoped<IProjectSuggestionService, ProjectSuggestionService>();
         services.AddScoped<IProjectDocumentService, ProjectDocumentService>();
+        services.AddScoped<IInlineCommentService, InlineCommentService>();
         services.AddScoped<INotificationService, NotificationService>();
         return services;
     }

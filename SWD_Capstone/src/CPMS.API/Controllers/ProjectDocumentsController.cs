@@ -44,6 +44,30 @@ public sealed class ProjectDocumentsController(IProjectDocumentService documentS
         return File(document.Content, document.ContentType, document.FileName, enableRangeProcessing: true);
     }
 
+    [HttpGet("{id:int}/comments")]
+    public async Task<ActionResult<IReadOnlyList<InlineCommentResponse>>> ListComments(
+        int id, [FromServices] IInlineCommentService commentService, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(commentService);
+        var comments = await commentService.ListAsync(CurrentActor(), id, cancellationToken);
+        return Ok(comments.Select(MapComment).ToArray());
+    }
+
+    [HttpPost("{id:int}/comments")]
+    [Authorize(Roles = "Lecturer")]
+    public async Task<ActionResult<InlineCommentResponse>> CreateComment(
+        int id,
+        CreateInlineCommentRequest request,
+        [FromServices] IInlineCommentService commentService,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(commentService);
+        var comment = await commentService.CreateAsync(CurrentActor(), id,
+            new CreateInlineCommentData(request.Content, request.Reference, request.ParagraphIndex), cancellationToken);
+        return Created($"/api/documents/{id}/comments/{comment.Id}", MapComment(comment));
+    }
+
     [HttpPost("{id:int}/suggestions")]
     [Authorize(Roles = "Lecturer")]
     [EnableRateLimiting("ai-suggestions")]
@@ -62,4 +86,7 @@ public sealed class ProjectDocumentsController(IProjectDocumentService documentS
     private static ProjectDocumentResponse Map(ProjectDocumentData x) => new(
         x.Id, x.GroupId, x.DocType.ToString(), x.FileName, x.FileSize,
         x.VersionNo, x.Status.ToString(), x.UploadedAt, x.UploadedById, x.UploadedByName);
+    private static InlineCommentResponse MapComment(InlineCommentData x) => new(
+        x.Id, x.DocumentId, x.AuthorId, x.AuthorName, x.Content, x.Reference,
+        x.ParagraphIndex, x.Status.ToString(), x.CreatedAt);
 }

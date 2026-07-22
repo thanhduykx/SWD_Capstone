@@ -42,21 +42,3 @@ public sealed class Syllabus : AuditableEntity
     public required string AcademicYear { get; set; }
     public bool IsActive { get; set; }
 }
-
-public sealed class Clo
-{
-    public int Id { get; set; }
-    public int SyllabusId { get; set; }
-    public required string Code { get; set; }
-    public required string Description { get; set; }
-    public decimal Weight { get; set; }
-}
-
-public sealed class RuleKeyword : AuditableEntity
-{
-    public int Id { get; set; }
-    public int CloId { get; set; }
-    public int CreatedByAdminId { get; set; }
-    public required string KeywordText { get; set; }
-    public decimal Weight { get; set; }
-}

@@ -66,11 +66,3 @@ public sealed class SystemAdministrator
     public required string AdminLevel { get; set; }
     public required string PermissionScope { get; set; }
 }
-
-public sealed class EvaluationPanel
-{
-    public int Id { get; set; }
-    public int UserId { get; set; }
-    public required string FullName { get; set; }
-    public required string Department { get; set; }
-}

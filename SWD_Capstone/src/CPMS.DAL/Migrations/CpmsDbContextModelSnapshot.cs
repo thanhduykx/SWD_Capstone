@@ -212,44 +212,6 @@ namespace CPMS.DAL.Data.Migrations
                     b.ToTable("capstone_groups", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.DAL.Entities.Clo", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("code");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<int>("SyllabusId")
-                        .HasColumnType("integer")
-                        .HasColumnName("syllabus_id");
-
-                    b.Property<decimal>("Weight")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("weight");
-
-                    b.HasKey("Id")
-                        .HasName("pk_clos");
-
-                    b.HasIndex("SyllabusId", "Code")
-                        .IsUnique()
-                        .HasDatabaseName("ix_clos_syllabus_id_code");
-
-                    b.ToTable("clos", (string)null);
-                });
-
             modelBuilder.Entity("CPMS.DAL.Entities.Council", b =>
                 {
                     b.Property<int>("Id")
@@ -699,145 +661,6 @@ namespace CPMS.DAL.Data.Migrations
                     b.ToTable("email_delivery_logs", (string)null);
                 });
 
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationDetail", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CloId")
-                        .HasColumnType("integer")
-                        .HasColumnName("clo_id");
-
-                    b.Property<string>("Feedback")
-                        .HasColumnType("text")
-                        .HasColumnName("feedback");
-
-                    b.Property<decimal>("MatchPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("match_percentage");
-
-                    b.Property<decimal>("MaxScore")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("max_score");
-
-                    b.Property<string>("MissingEvidence")
-                        .HasColumnType("text")
-                        .HasColumnName("missing_evidence");
-
-                    b.Property<int>("ReportId")
-                        .HasColumnType("integer")
-                        .HasColumnName("report_id");
-
-                    b.Property<decimal>("Score")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("score");
-
-                    b.HasKey("Id")
-                        .HasName("pk_evaluation_details");
-
-                    b.HasIndex("CloId")
-                        .HasDatabaseName("ix_evaluation_details_clo_id");
-
-                    b.HasIndex("ReportId", "CloId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_evaluation_details_report_id_clo_id");
-
-                    b.ToTable("evaluation_details", (string)null);
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationPanel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Department")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("department");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("full_name");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_evaluation_panels");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_evaluation_panels_user_id");
-
-                    b.ToTable("evaluation_panels", (string)null);
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationReport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DocumentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("document_id");
-
-                    b.Property<DateTime>("EvaluatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("evaluated_at");
-
-                    b.Property<string>("GapAnalysisSummary")
-                        .HasColumnType("text")
-                        .HasColumnName("gap_analysis_summary");
-
-                    b.Property<decimal>("MatchPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("match_percentage");
-
-                    b.Property<decimal>("OverallScore")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("overall_score");
-
-                    b.Property<int>("ReviewedById")
-                        .HasColumnType("integer")
-                        .HasColumnName("reviewed_by_id");
-
-                    b.Property<string>("TriggerType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("trigger_type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_evaluation_reports");
-
-                    b.HasIndex("DocumentId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_evaluation_reports_document_id");
-
-                    b.HasIndex("ReviewedById")
-                        .HasDatabaseName("ix_evaluation_reports_reviewed_by_id");
-
-                    b.ToTable("evaluation_reports", (string)null);
-                });
-
             modelBuilder.Entity("CPMS.DAL.Entities.GroupResult", b =>
                 {
                     b.Property<int>("Id")
@@ -1005,6 +828,11 @@ namespace CPMS.DAL.Data.Migrations
                     b.Property<int?>("ParentCommentId")
                         .HasColumnType("integer")
                         .HasColumnName("parent_comment_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reference");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1721,57 +1549,6 @@ namespace CPMS.DAL.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CPMS.DAL.Entities.RuleKeyword", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CloId")
-                        .HasColumnType("integer")
-                        .HasColumnName("clo_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("CreatedByAdminId")
-                        .HasColumnType("integer")
-                        .HasColumnName("created_by_admin_id");
-
-                    b.Property<int?>("CreatedById")
-                        .HasColumnType("integer")
-                        .HasColumnName("created_by_id");
-
-                    b.Property<string>("KeywordText")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("keyword_text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<decimal>("Weight")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("weight");
-
-                    b.HasKey("Id")
-                        .HasName("pk_rule_keywords");
-
-                    b.HasIndex("CloId")
-                        .HasDatabaseName("ix_rule_keywords_clo_id");
-
-                    b.HasIndex("CreatedByAdminId")
-                        .HasDatabaseName("ix_rule_keywords_created_by_admin_id");
-
-                    b.ToTable("rule_keywords", (string)null);
-                });
-
             modelBuilder.Entity("CPMS.DAL.Entities.Score", b =>
                 {
                     b.Property<int>("Id")
@@ -2384,16 +2161,6 @@ namespace CPMS.DAL.Data.Migrations
                         .HasConstraintName("fk_capstone_groups_topics_topic_id");
                 });
 
-            modelBuilder.Entity("CPMS.DAL.Entities.Clo", b =>
-                {
-                    b.HasOne("CPMS.DAL.Entities.Syllabus", null)
-                        .WithMany()
-                        .HasForeignKey("SyllabusId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_clos_syllabuses_syllabus_id");
-                });
-
             modelBuilder.Entity("CPMS.DAL.Entities.Council", b =>
                 {
                     b.HasOne("CPMS.DAL.Entities.Lecturer", null)
@@ -2548,50 +2315,6 @@ namespace CPMS.DAL.Data.Migrations
                         .HasForeignKey("RecipientUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_email_delivery_logs_users_recipient_user_id");
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationDetail", b =>
-                {
-                    b.HasOne("CPMS.DAL.Entities.Clo", null)
-                        .WithMany()
-                        .HasForeignKey("CloId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evaluation_details_clos_clo_id");
-
-                    b.HasOne("CPMS.DAL.Entities.EvaluationReport", null)
-                        .WithMany()
-                        .HasForeignKey("ReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_evaluation_details_evaluation_reports_report_id");
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationPanel", b =>
-                {
-                    b.HasOne("CPMS.DAL.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evaluation_panels_users_user_id");
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.EvaluationReport", b =>
-                {
-                    b.HasOne("CPMS.DAL.Entities.CapstoneDocument", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evaluation_reports_documents_document_id");
-
-                    b.HasOne("CPMS.DAL.Entities.EvaluationPanel", null)
-                        .WithMany()
-                        .HasForeignKey("ReviewedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_evaluation_reports_evaluation_panels_reviewed_by_id");
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.GroupResult", b =>
@@ -2882,23 +2605,6 @@ namespace CPMS.DAL.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_sessions_semesters_semester_id");
-                });
-
-            modelBuilder.Entity("CPMS.DAL.Entities.RuleKeyword", b =>
-                {
-                    b.HasOne("CPMS.DAL.Entities.Clo", null)
-                        .WithMany()
-                        .HasForeignKey("CloId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_rule_keywords_clos_clo_id");
-
-                    b.HasOne("CPMS.DAL.Entities.SystemAdministrator", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByAdminId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_rule_keywords_system_administrators_created_by_admin_id");
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.Score", b =>

@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IProjectDocumentStore, ProjectDocumentStore>();
+        services.AddScoped<IInlineCommentStore, InlineCommentStore>();
         services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<IReviewRegistrationStore, ReviewRegistrationStore>();
         services.AddScoped<IReviewRoundStore, ReviewRoundStore>();

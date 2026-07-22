@@ -13,17 +13,12 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<Student> Students => Set<Student>();
     public DbSet<TrainingDepartment> TrainingDepartments => Set<TrainingDepartment>();
     public DbSet<SystemAdministrator> SystemAdministrators => Set<SystemAdministrator>();
-    public DbSet<EvaluationPanel> EvaluationPanels => Set<EvaluationPanel>();
     public DbSet<Semester> Semesters => Set<Semester>();
     public DbSet<Topic> Topics => Set<Topic>();
     public DbSet<CapstoneGroup> CapstoneGroups => Set<CapstoneGroup>();
     public DbSet<Syllabus> Syllabuses => Set<Syllabus>();
-    public DbSet<Clo> Clos => Set<Clo>();
-    public DbSet<RuleKeyword> RuleKeywords => Set<RuleKeyword>();
     public DbSet<CapstoneDocument> Documents => Set<CapstoneDocument>();
     public DbSet<DocumentPayload> DocumentPayloads => Set<DocumentPayload>();
-    public DbSet<EvaluationReport> EvaluationReports => Set<EvaluationReport>();
-    public DbSet<EvaluationDetail> EvaluationDetails => Set<EvaluationDetail>();
     public DbSet<InlineComment> InlineComments => Set<InlineComment>();
     public DbSet<ReviewAvailability> ReviewAvailabilities => Set<ReviewAvailability>();
     public DbSet<ReviewAvailabilitySubmission> ReviewAvailabilitySubmissions => Set<ReviewAvailabilitySubmission>();
@@ -98,13 +93,6 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasIndex(x => x.UserId).IsUnique();
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         });
-        modelBuilder.Entity<EvaluationPanel>(entity =>
-        {
-            entity.ToTable("evaluation_panels");
-            entity.HasIndex(x => x.UserId).IsUnique();
-            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<Semester>(entity =>
         {
             entity.ToTable("semesters", table => table.HasCheckConstraint(
@@ -134,22 +122,6 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.TrainingDepartmentId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-        modelBuilder.Entity<Clo>(entity =>
-        {
-            entity.ToTable("clos");
-            entity.HasIndex(x => new { x.SyllabusId, x.Code }).IsUnique();
-            entity.Property(x => x.Weight).HasPrecision(5, 4);
-            entity.HasOne<Syllabus>().WithMany().HasForeignKey(x => x.SyllabusId).OnDelete(DeleteBehavior.Cascade);
-        });
-        modelBuilder.Entity<RuleKeyword>(entity =>
-        {
-            entity.ToTable("rule_keywords");
-            entity.Property(x => x.Weight).HasPrecision(5, 4);
-            entity.HasOne<Clo>().WithMany().HasForeignKey(x => x.CloId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne<SystemAdministrator>().WithMany().HasForeignKey(x => x.CreatedByAdminId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<CapstoneDocument>(entity =>
         {
             entity.ToTable("documents");
@@ -168,30 +140,11 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.Property(x => x.ContentType).HasMaxLength(200);
             entity.Property(x => x.Content).HasColumnType("bytea");
         });
-        modelBuilder.Entity<EvaluationReport>(entity =>
-        {
-            entity.ToTable("evaluation_reports");
-            entity.HasIndex(x => x.DocumentId).IsUnique();
-            entity.Property(x => x.OverallScore).HasPrecision(5, 2);
-            entity.Property(x => x.MatchPercentage).HasPrecision(5, 2);
-            entity.Property(x => x.TriggerType).HasConversion<string>();
-            entity.HasOne<CapstoneDocument>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<EvaluationPanel>().WithMany().HasForeignKey(x => x.ReviewedById).OnDelete(DeleteBehavior.Restrict);
-        });
-        modelBuilder.Entity<EvaluationDetail>(entity =>
-        {
-            entity.ToTable("evaluation_details");
-            entity.HasIndex(x => new { x.ReportId, x.CloId }).IsUnique();
-            entity.Property(x => x.Score).HasPrecision(5, 2);
-            entity.Property(x => x.MaxScore).HasPrecision(5, 2);
-            entity.Property(x => x.MatchPercentage).HasPrecision(5, 2);
-            entity.HasOne<EvaluationReport>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne<Clo>().WithMany().HasForeignKey(x => x.CloId).OnDelete(DeleteBehavior.Restrict);
-        });
         modelBuilder.Entity<InlineComment>(entity =>
         {
             entity.ToTable("inline_comments");
             entity.Property(x => x.Status).HasConversion<string>();
+            entity.Property(x => x.Reference).HasMaxLength(200);
             entity.HasOne<CapstoneDocument>().WithMany().HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.AuthorId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<InlineComment>().WithMany().HasForeignKey(x => x.ParentCommentId).OnDelete(DeleteBehavior.Restrict);
