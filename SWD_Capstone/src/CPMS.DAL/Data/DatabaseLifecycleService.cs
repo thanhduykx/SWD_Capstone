@@ -180,7 +180,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         {
             new StudentSeed("Huỳnh Nhật Thịnh", "SE194673", "duongduy12317@gmail.com", false),
             new StudentSeed("Phạm Thị Ánh", "SE182446", "thanhduykx@gmail.com", false),
-            new StudentSeed("Dương Thành Thanh Duy", "SS180745", "victornhatthinh@gmail.com", true),
+            new StudentSeed("Dương Thành Thanh Duy", "SS180745", "duongduy12314@gmail.com", true),
             new StudentSeed("Trương Đinh Hồng Nhung", "SS194356", "a@gmail.com", false),
             new StudentSeed("Vũ Minh Quang", "SE192755", "acc@gmail.com", false),
             new StudentSeed("Nguyễn Minh Thành", "SE191034", "ab@gmail.com", false)
