@@ -102,7 +102,8 @@ internal static class ApiSecurityConfiguration
         PathString path = context.HttpContext.Request.Path;
         if (!string.IsNullOrWhiteSpace(accessToken) &&
             (path.StartsWithSegments("/hubs/defense") ||
-             path.StartsWithSegments("/hubs/presence")))
+             path.StartsWithSegments("/hubs/presence") ||
+             path.StartsWithSegments("/hubs/review-progress")))
             context.Token = accessToken;
         return Task.CompletedTask;
     }

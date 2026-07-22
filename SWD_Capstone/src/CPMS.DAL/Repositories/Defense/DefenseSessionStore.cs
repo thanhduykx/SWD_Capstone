@@ -44,9 +44,7 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
                 Defense1Result = dbContext.GroupResults.Where(result => result.GroupId == x.GroupId)
                     .Select(result => result.Defense1Result).FirstOrDefault(),
                 Defense2Result = dbContext.GroupResults.Where(result => result.GroupId == x.GroupId)
-                    .Select(result => result.Defense2Result).FirstOrDefault(),
-                AverageScore = dbContext.Scores.Where(score => score.DefenseSessionId == x.Id)
-                    .Select(score => (decimal?)score.ScoreValue).Average()
+                    .Select(result => result.Defense2Result).FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 
@@ -70,7 +68,6 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
                 x.Reviewers,
                 x.EndedAt is not null ? "Completed" : "Scheduled",
                 resultText,
-                x.AverageScore ?? 0m,
                 string.Empty);
         }).ToArray();
     }
@@ -134,76 +131,73 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         return (await FindSessionAsync(sessionId, cancellationToken))!;
     }
 
-    public Task<bool> StudentBelongsToGroupAsync(
-        int studentId, int groupId, CancellationToken cancellationToken) =>
-        dbContext.Students.AnyAsync(x => x.Id == studentId && x.GroupId == groupId, cancellationToken);
+    public async Task<IReadOnlyList<DefenseCommentResult>> GetCommentsAsync(
+        int sessionId, int currentLecturerId, CancellationToken cancellationToken) =>
+        await dbContext.DefenseComments.AsNoTracking()
+            .Where(x => x.DefenseSessionId == sessionId)
+            .OrderBy(x => x.ReviewerId)
+            .Select(x => new DefenseCommentResult(
+                x.Id,
+                x.DefenseSessionId,
+                x.ReviewerId,
+                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.ReviewerId)
+                    .Select(lecturer => lecturer.Code).Single(),
+                dbContext.Lecturers.Where(lecturer => lecturer.Id == x.ReviewerId)
+                    .Select(lecturer => lecturer.FullName).Single(),
+                x.Content,
+                x.SubmittedAt,
+                x.UpdatedAt,
+                x.ReviewerId == currentLecturerId))
+            .ToListAsync(cancellationToken);
 
-    public async Task<ExistingDefenseScore> FindScoreAsync(
+    public async Task<DefenseCommentResult> SaveCommentAsync(
         int sessionId,
         int lecturerId,
-        int studentId,
-        ScoreType scoreType,
-        CancellationToken cancellationToken)
-    {
-        var score = await dbContext.Scores.Where(x =>
-                x.DefenseSessionId == sessionId && x.ScorerId == lecturerId &&
-                x.StudentId == studentId && x.ScoreType == scoreType)
-            .Select(x => new { x.Id, x.ScoreValue, x.IsLocked })
-            .SingleOrDefaultAsync(cancellationToken);
-        return score is null ? new ExistingDefenseScore(null, null, false) :
-            new ExistingDefenseScore(score.Id, score.ScoreValue, score.IsLocked);
-    }
-
-    public async Task<SubmittedDefenseScoreResult> SaveScoreAsync(
-        int sessionId,
-        int lecturerId,
-        SubmitDefenseScoreData input,
-        ExistingDefenseScore existing,
+        SubmitDefenseCommentData input,
         DefenseSessionActor actor,
         DateTime submittedAt,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
-        ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(actor);
-        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        Score score;
-        if (existing.Id.HasValue)
+        DefenseComment? comment = await dbContext.DefenseComments.SingleOrDefaultAsync(x =>
+            x.DefenseSessionId == sessionId && x.ReviewerId == lecturerId, cancellationToken);
+        string? oldContent = comment?.Content;
+        if (comment is null)
         {
-            score = await dbContext.Scores.SingleAsync(x => x.Id == existing.Id.Value, cancellationToken);
-            score.ScoreValue = input.ScoreValue;
-            score.SubmittedAt = submittedAt;
+            comment = new DefenseComment
+            {
+                DefenseSessionId = sessionId,
+                ReviewerId = lecturerId,
+                SubmittedByUserId = actor.UserId,
+                Content = input.Content,
+                IpAddress = actor.IpAddress,
+                UserAgent = actor.UserAgent,
+                SubmittedAt = submittedAt,
+                UpdatedAt = submittedAt
+            };
+            dbContext.DefenseComments.Add(comment);
         }
         else
         {
-            score = new Score
-            {
-                DefenseSessionId = sessionId, ScorerId = lecturerId, StudentId = input.StudentId,
-                ScoreType = input.ScoreType, ScoreValue = input.ScoreValue, SubmittedAt = submittedAt
-            };
-            dbContext.Scores.Add(score);
+            comment.Content = input.Content;
+            comment.SubmittedByUserId = actor.UserId;
+            comment.IpAddress = actor.IpAddress;
+            comment.UserAgent = actor.UserAgent;
+            comment.UpdatedAt = submittedAt;
         }
         await dbContext.SaveChangesAsync(cancellationToken);
-        dbContext.ScoreSubmissionHistories.Add(new ScoreSubmissionHistory
-        {
-            ScoreId = score.Id,
-            DefenseSessionId = sessionId,
-            ScorerId = lecturerId,
-            SubmittedByUserId = actor.UserId,
-            StudentId = input.StudentId,
-            ScoreType = input.ScoreType,
-            OldScoreValue = existing.ScoreValue,
-            NewScoreValue = input.ScoreValue,
-            IpAddress = actor.IpAddress,
-            UserAgent = actor.UserAgent,
-            TrustReason = "JWT user matched an assigned council member, target student belonged to the council group list, and the chairman had started the session."
-        });
         dbContext.AuditLogs.Add(NewAudit(
-            actor, "SUBMIT_SCORE", nameof(Score), score.Id, existing.ScoreValue, input.ScoreValue));
+            actor, "SUBMIT_DEFENSE_COMMENT", nameof(DefenseComment), comment.Id,
+            oldContent, input.Content));
         await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return new SubmittedDefenseScoreResult(
-            sessionId, score.Id, lecturerId, input.StudentId, input.ScoreType, input.ScoreValue, score.SubmittedAt);
+
+        DefenseLecturerState lecturer = await dbContext.Lecturers.Where(x => x.Id == lecturerId)
+            .Select(x => new DefenseLecturerState(x.Id, x.Code, x.FullName))
+            .SingleAsync(cancellationToken);
+        return new DefenseCommentResult(
+            comment.Id, sessionId, lecturer.Id, lecturer.Code, lecturer.FullName,
+            comment.Content, comment.SubmittedAt, comment.UpdatedAt, true);
     }
 
     public async Task<DefenseSessionAccessState> CloseAsync(

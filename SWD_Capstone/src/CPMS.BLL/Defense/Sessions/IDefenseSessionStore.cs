@@ -1,5 +1,3 @@
-using CPMS.BLL.Enums;
-
 namespace CPMS.BLL.Defense.Sessions;
 
 public sealed record DefenseSessionAccessState(
@@ -19,7 +17,6 @@ public sealed record DefenseSessionAccessState(
     bool IsLocked,
     IReadOnlyList<DefenseSessionStudentResult> Students);
 public sealed record DefenseLecturerState(int Id, string Code, string FullName);
-public sealed record ExistingDefenseScore(int? Id, decimal? ScoreValue, bool IsLocked);
 
 public interface IDefenseSessionStore
 {
@@ -30,17 +27,11 @@ public interface IDefenseSessionStore
     Task<DefenseLecturerState?> FindLecturerAsync(int userId, CancellationToken cancellationToken);
     Task<DefenseSessionAccessState> StartAsync(
         int sessionId, DefenseSessionActor actor, DateTime startedAt, CancellationToken cancellationToken);
-    Task<bool> StudentBelongsToGroupAsync(int studentId, int groupId, CancellationToken cancellationToken);
-    Task<ExistingDefenseScore> FindScoreAsync(
-        int sessionId, int lecturerId, int studentId, ScoreType scoreType, CancellationToken cancellationToken);
-    Task<SubmittedDefenseScoreResult> SaveScoreAsync(
-        int sessionId,
-        int lecturerId,
-        SubmitDefenseScoreData input,
-        ExistingDefenseScore existing,
-        DefenseSessionActor actor,
-        DateTime submittedAt,
-        CancellationToken cancellationToken);
+    Task<IReadOnlyList<DefenseCommentResult>> GetCommentsAsync(
+        int sessionId, int currentLecturerId, CancellationToken cancellationToken);
+    Task<DefenseCommentResult> SaveCommentAsync(
+        int sessionId, int lecturerId, SubmitDefenseCommentData input,
+        DefenseSessionActor actor, DateTime submittedAt, CancellationToken cancellationToken);
     Task<DefenseSessionAccessState> CloseAsync(
         int sessionId, DefenseSessionActor actor, DateTime endedAt, CancellationToken cancellationToken);
     Task<IReadOnlyList<DefenseEvidenceResult>> GetEvidencesAsync(

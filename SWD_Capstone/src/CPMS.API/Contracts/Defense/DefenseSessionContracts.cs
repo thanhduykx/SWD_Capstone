@@ -1,12 +1,9 @@
-using CPMS.BLL.Enums;
 using Microsoft.AspNetCore.Http;
 
 namespace CPMS.API.Contracts.Defense;
 
-public sealed record SubmitScoreRequest(
-    [property: JsonRequired] int StudentId,
-    [property: JsonRequired] ScoreType ScoreType,
-    [property: JsonRequired] decimal ScoreValue);
+public sealed record SubmitDefenseCommentRequest(
+    [property: JsonRequired] string Content);
 public sealed class UploadDefenseEvidenceRequest
 {
     public IFormFile? File { get; set; }

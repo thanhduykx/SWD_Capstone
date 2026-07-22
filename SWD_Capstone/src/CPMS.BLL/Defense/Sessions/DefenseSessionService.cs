@@ -39,27 +39,32 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
         return Map(session, true);
     }
 
-    public async Task<SubmittedDefenseScoreResult> SubmitScoreAsync(
+    public async Task<IReadOnlyList<DefenseCommentResult>> GetCommentsAsync(
+        int sessionId, int userId, CancellationToken cancellationToken)
+    {
+        DefenseLecturerState lecturer = await RequireLecturerAsync(userId, cancellationToken);
+        DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
+        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        return await store.GetCommentsAsync(sessionId, lecturer.Id, cancellationToken);
+    }
+
+    public async Task<DefenseCommentResult> SubmitCommentAsync(
         int sessionId,
-        SubmitDefenseScoreData score,
+        SubmitDefenseCommentData comment,
         DefenseSessionActor actor,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(score);
+        ArgumentNullException.ThrowIfNull(comment);
         ArgumentNullException.ThrowIfNull(actor);
+        string content = comment.Content?.Trim() ?? string.Empty;
+        if (content.Length is < 1 or > 2000)
+            throw new BusinessRuleException("A defense comment is required and cannot exceed 2000 characters.");
         DefenseLecturerState lecturer = await RequireLecturerAsync(actor.UserId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
         rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
         rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
-        rules.ValidateScore(score.ScoreValue);
-        if (!await store.StudentBelongsToGroupAsync(score.StudentId, session.GroupId, cancellationToken))
-            throw new BusinessRuleException(
-                "The selected student does not belong to the project assigned to this defense session.");
-        ExistingDefenseScore existing = await store.FindScoreAsync(
-            sessionId, lecturer.Id, score.StudentId, score.ScoreType, cancellationToken);
-        if (existing.Id.HasValue) rules.EnsureSessionEditable(existing.IsLocked);
-        return await store.SaveScoreAsync(
-            sessionId, lecturer.Id, score, existing, actor, DateTime.UtcNow, cancellationToken);
+        return await store.SaveCommentAsync(
+            sessionId, lecturer.Id, comment with { Content = content }, actor, DateTime.UtcNow, cancellationToken);
     }
 
     public async Task<IReadOnlyList<DefenseEvidenceResult>> GetEvidencesAsync(
@@ -119,7 +124,7 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
     private async Task<DefenseLecturerState> RequireLecturerAsync(
         int userId, CancellationToken cancellationToken) =>
         await store.FindLecturerAsync(userId, cancellationToken)
-        ?? throw new UnauthorizedAccessException("Only lecturers assigned to a council can access defense scoring.");
+        ?? throw new UnauthorizedAccessException("Only lecturers assigned to a council can access the defense room.");
     private async Task<DefenseSessionAccessState> RequireSessionAsync(
         int sessionId, CancellationToken cancellationToken) =>
         await store.FindSessionAsync(sessionId, cancellationToken)

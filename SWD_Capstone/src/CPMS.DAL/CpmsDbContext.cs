@@ -36,6 +36,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<ScoreSubmissionHistory> ScoreSubmissionHistories => Set<ScoreSubmissionHistory>();
     public DbSet<DefenseEvidence> DefenseEvidences => Set<DefenseEvidence>();
+    public DbSet<DefenseComment> DefenseComments => Set<DefenseComment>();
     public DbSet<GroupResult> GroupResults => Set<GroupResult>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -338,6 +339,15 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             entity.HasOne<DefenseSession>().WithMany().HasForeignKey(x => x.DefenseSessionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.CapturedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.CapturedByLecturerId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<DefenseComment>(entity =>
+        {
+            entity.ToTable("defense_comments");
+            entity.HasIndex(x => new { x.DefenseSessionId, x.ReviewerId }).IsUnique();
+            entity.Property(x => x.Content).HasMaxLength(2000);
+            entity.HasOne<DefenseSession>().WithMany().HasForeignKey(x => x.DefenseSessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.SubmittedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<GroupResult>(entity =>
         {

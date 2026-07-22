@@ -27,7 +27,16 @@ public sealed record ReviewSchedulingSession(
     DateTime SessionDate,
     int DayOfWeek,
     int Slot,
-    string Room);
+    string Room,
+    ReviewGroupStatus GroupStatus = ReviewGroupStatus.Scheduled,
+    IReadOnlyList<ReviewSchedulingReviewerFeedback>? ReviewerFeedback = null);
+
+public sealed record ReviewSchedulingReviewerFeedback(
+    int ReviewerId,
+    string ReviewerCode,
+    string ReviewerName,
+    string Comment,
+    DateTime SubmittedAt);
 
 public sealed record StudentSlotRegistrationResult(int Id, int GroupId, string GroupCode, int DayOfWeek, int Slot);
 

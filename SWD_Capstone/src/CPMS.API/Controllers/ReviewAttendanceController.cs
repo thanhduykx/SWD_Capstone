@@ -5,15 +5,19 @@ using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Reviews.Assessment;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Exceptions;
+using CPMS.API.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/review-attendance")]
 [Authorize]
-public sealed class ReviewAttendanceController(IReviewAttendanceService attendanceService) : ControllerBase
+public sealed class ReviewAttendanceController(
+    IReviewAttendanceService attendanceService,
+    IHubContext<ReviewProgressHub> progressHub) : ControllerBase
 {
     [HttpGet("{sessionId:int}")]
     public async Task<ActionResult<ReviewAttendanceListResponse>> GetAttendance(
@@ -68,8 +72,12 @@ public sealed class ReviewAttendanceController(IReviewAttendanceService attendan
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            return Ok(MapComment(await attendanceService.AddCommentAsync(
-                sessionId, request.GroupId, request.Content, CurrentActor(), cancellationToken)));
+            ReviewCommentResponse response = MapComment(await attendanceService.AddCommentAsync(
+                sessionId, request.GroupId, request.Content, CurrentActor(), cancellationToken));
+            await progressHub.Clients
+                .Group(ReviewProgressHub.GroupName(sessionId, request.GroupId))
+                .SendAsync(ReviewProgressHub.CommentAdded, response, cancellationToken);
+            return Ok(response);
         }
         catch (KeyNotFoundException exception) { return NotFound(new { error = exception.Message }); }
         catch (UnauthorizedAccessException) { return Forbid(); }

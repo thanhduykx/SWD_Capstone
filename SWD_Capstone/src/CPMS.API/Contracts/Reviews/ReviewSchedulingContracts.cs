@@ -26,7 +26,15 @@ public sealed record ReviewSchedulingSessionResponse(
     DateTime SessionDate,
     int DayOfWeek,
     int Slot,
-    string Room);
+    string Room,
+    ReviewGroupStatus GroupStatus,
+    IReadOnlyCollection<ReviewSchedulingReviewerFeedbackResponse> ReviewerFeedback);
+public sealed record ReviewSchedulingReviewerFeedbackResponse(
+    int ReviewerId,
+    string ReviewerCode,
+    string ReviewerName,
+    string Comment,
+    DateTime SubmittedAt);
 public sealed record RandomAssignReviewSessionsRequest(
     [property: JsonRequired] int SemesterId,
     [property: JsonRequired] ReviewType ReviewType,

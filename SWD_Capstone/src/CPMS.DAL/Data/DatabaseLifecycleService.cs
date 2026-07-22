@@ -14,7 +14,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     private static readonly string[] ResetTables =
     [
         "audit_logs", "notifications", "review_comments", "review_attendances",
-        "student_slot_registrations", "review_rounds", "group_results", "defense_evidences",
+        "student_slot_registrations", "review_rounds", "group_results", "defense_comments", "defense_evidences",
         "score_submission_histories", "scores", "defense_sessions", "defense_rounds",
         "council_groups", "council_members", "councils", "email_delivery_logs",
         "review_schedule_publications", "review_checklist_item_responses", "review_checklist_submissions",

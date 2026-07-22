@@ -336,6 +336,65 @@ namespace CPMS.DAL.Data.Migrations
                     b.ToTable("council_members", (string)null);
                 });
 
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("content");
+
+                    b.Property<int>("DefenseSessionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("defense_session_id");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("ip_address");
+
+                    b.Property<int>("ReviewerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<int>("SubmittedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("submitted_by_user_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text")
+                        .HasColumnName("user_agent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_defense_comments");
+
+                    b.HasIndex("ReviewerId")
+                        .HasDatabaseName("ix_defense_comments_reviewer_id");
+
+                    b.HasIndex("SubmittedByUserId")
+                        .HasDatabaseName("ix_defense_comments_submitted_by_user_id");
+
+                    b.HasIndex("DefenseSessionId", "ReviewerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_defense_comments_defense_session_id_reviewer_id");
+
+                    b.ToTable("defense_comments", (string)null);
+                });
+
             modelBuilder.Entity("CPMS.DAL.Entities.DefenseEvidence", b =>
                 {
                     b.Property<int>("Id")
@@ -2223,6 +2282,30 @@ namespace CPMS.DAL.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_council_members_lecturers_lecturer_id");
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.DefenseComment", b =>
+                {
+                    b.HasOne("CPMS.DAL.Entities.DefenseSession", null)
+                        .WithMany()
+                        .HasForeignKey("DefenseSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_defense_comments_defense_sessions_defense_session_id");
+
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_defense_comments_lecturers_reviewer_id");
+
+                    b.HasOne("CPMS.DAL.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_defense_comments_users_submitted_by_user_id");
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.DefenseEvidence", b =>
