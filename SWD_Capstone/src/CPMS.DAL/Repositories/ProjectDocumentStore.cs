@@ -25,13 +25,55 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
     public async Task<int> GetNextVersionAsync(int groupId, CancellationToken cancellationToken) =>
         await db.Documents.CountAsync(x => x.GroupId == groupId, cancellationToken) + 1;
 
-    public async Task<IReadOnlyList<ProjectDocumentData>> ListAsync(int groupId, CancellationToken cancellationToken) =>
-        await DocumentHistoryQuery().Where(x => x.GroupId == groupId)
+    public async Task<IReadOnlyList<ProjectDocumentData>> ListAsync(
+        int groupId, CancellationToken cancellationToken)
+    {
+        List<CapstoneDocument> documents = await db.Documents.AsNoTracking()
+            .Where(x => x.GroupId == groupId)
             .OrderByDescending(x => x.UploadedAt).ThenByDescending(x => x.Id)
             .ToListAsync(cancellationToken);
+        int[] uploaderIds = documents.Select(x => x.UploadedById).Distinct().ToArray();
+        Dictionary<int, string> uploaderNames = await db.Users.AsNoTracking()
+            .Where(x => uploaderIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Username, cancellationToken);
+        foreach (var uploader in await db.Students.AsNoTracking()
+                     .Where(x => uploaderIds.Contains(x.UserId))
+                     .Select(x => new { x.UserId, x.FullName }).ToListAsync(cancellationToken))
+        {
+            uploaderNames[uploader.UserId] = uploader.FullName;
+        }
+        foreach (var uploader in await db.Lecturers.AsNoTracking()
+                     .Where(x => uploaderIds.Contains(x.UserId))
+                     .Select(x => new { x.UserId, x.FullName }).ToListAsync(cancellationToken))
+        {
+            uploaderNames[uploader.UserId] = uploader.FullName;
+        }
+        return documents.Select(x => Map(x, uploaderNames.GetValueOrDefault(x.UploadedById, "Tài khoản không xác định")))
+            .ToArray();
+    }
 
-    public async Task<ProjectDocumentData?> FindAsync(int documentId, CancellationToken cancellationToken) =>
-        await DocumentHistoryQuery().SingleOrDefaultAsync(x => x.Id == documentId, cancellationToken);
+    public async Task<ProjectDocumentData?> FindAsync(int documentId, CancellationToken cancellationToken)
+    {
+        CapstoneDocument? document = await db.Documents.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == documentId, cancellationToken);
+        if (document is null)
+        {
+            return null;
+        }
+        string uploaderName = await db.Students.AsNoTracking()
+            .Where(x => x.UserId == document.UploadedById)
+            .Select(x => x.FullName)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? await db.Lecturers.AsNoTracking()
+                .Where(x => x.UserId == document.UploadedById)
+                .Select(x => x.FullName)
+                .SingleOrDefaultAsync(cancellationToken)
+            ?? await db.Users.AsNoTracking()
+                .Where(x => x.Id == document.UploadedById)
+                .Select(x => x.Username)
+                .SingleAsync(cancellationToken);
+        return Map(document, uploaderName);
+    }
 
     public async Task<ProjectDocumentData> CreateAsync(CreateProjectDocumentData input, CancellationToken cancellationToken)
     {
@@ -51,14 +93,7 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
             .Select(x => db.Topics.Where(topic => topic.Id == x.TopicId).Select(topic => topic.NameVn).FirstOrDefault() ?? x.Code)
             .SingleAsync(cancellationToken);
 
-    private IQueryable<ProjectDocumentData> DocumentHistoryQuery() =>
-        db.Documents.AsNoTracking().Select(x => new ProjectDocumentData(
-            x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath, x.FileSize,
-            x.VersionNo, x.Status, x.UploadedAt, x.UploadedById,
-            db.Students.Where(student => student.UserId == x.UploadedById)
-                .Select(student => student.FullName).FirstOrDefault()
-            ?? db.Lecturers.Where(lecturer => lecturer.UserId == x.UploadedById)
-                .Select(lecturer => lecturer.FullName).FirstOrDefault()
-            ?? db.Users.Where(user => user.Id == x.UploadedById)
-                .Select(user => user.Username).First()));
+    private static ProjectDocumentData Map(CapstoneDocument x, string uploaderName) => new(
+        x.Id, x.GroupId, x.DocType, x.FileName, x.FilePath, x.FileSize,
+        x.VersionNo, x.Status, x.UploadedAt, x.UploadedById, uploaderName);
 }
