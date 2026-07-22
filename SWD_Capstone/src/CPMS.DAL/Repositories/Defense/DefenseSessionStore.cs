@@ -72,10 +72,15 @@ public sealed class DefenseSessionStore(CpmsDbContext dbContext, IHostEnvironmen
         if (row is null) return null;
         var members = await dbContext.CouncilMembers.Where(x => x.CouncilId == row.CouncilId)
             .Select(x => x.LecturerId).ToArrayAsync(cancellationToken);
+        var students = await dbContext.Students.AsNoTracking()
+            .Where(x => x.GroupId == row.GroupId)
+            .OrderBy(x => x.Code)
+            .Select(x => new DefenseSessionStudentResult(x.Id, x.Code, x.FullName))
+            .ToArrayAsync(cancellationToken);
         return new DefenseSessionAccessState(
             row.Id, row.Code, row.DefenseRoundId, row.CouncilId, row.CouncilCode, row.ChairmanId,
             members, row.GroupId, row.SessionDate, row.Slot, row.Room,
-            row.StartedAt, row.EndedAt, row.IsLocked);
+            row.StartedAt, row.EndedAt, row.IsLocked, students);
     }
 
     public Task<DefenseLecturerState?> FindLecturerAsync(int userId, CancellationToken cancellationToken) =>

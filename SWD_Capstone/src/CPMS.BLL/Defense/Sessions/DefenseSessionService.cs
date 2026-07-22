@@ -126,5 +126,5 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
         ?? throw new KeyNotFoundException("Defense session does not exist.");
     private static DefenseSessionStateResult Map(DefenseSessionAccessState x, bool isChairman) =>
         new(x.Id, x.Code, x.DefenseRoundId, x.CouncilId, x.CouncilCode, x.GroupId,
-            x.SessionDate, x.Slot, x.Room, x.StartedAt, x.EndedAt, x.IsLocked, isChairman);
+            x.SessionDate, x.Slot, x.Room, x.StartedAt, x.EndedAt, x.IsLocked, isChairman, x.Students);
 }

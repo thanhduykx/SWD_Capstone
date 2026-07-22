@@ -16,7 +16,8 @@ public sealed record DefenseSessionAccessState(
     string Room,
     DateTime? StartedAt,
     DateTime? EndedAt,
-    bool IsLocked);
+    bool IsLocked,
+    IReadOnlyList<DefenseSessionStudentResult> Students);
 public sealed record DefenseLecturerState(int Id, string Code, string FullName);
 public sealed record ExistingDefenseScore(int? Id, decimal? ScoreValue, bool IsLocked);
 

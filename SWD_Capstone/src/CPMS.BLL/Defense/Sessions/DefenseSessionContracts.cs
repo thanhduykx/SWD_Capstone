@@ -30,7 +30,9 @@ public sealed record DefenseSessionStateResult(
     DateTime? StartedAt,
     DateTime? EndedAt,
     bool IsLocked,
-    bool IsChairman);
+    bool IsChairman,
+    IReadOnlyList<DefenseSessionStudentResult> Students);
+public sealed record DefenseSessionStudentResult(int Id, string Code, string FullName);
 public sealed record SubmitDefenseScoreData(int StudentId, ScoreType ScoreType, decimal ScoreValue);
 public sealed record SubmittedDefenseScoreResult(
     int SessionId, int ScoreId, int ScorerId, int StudentId,
