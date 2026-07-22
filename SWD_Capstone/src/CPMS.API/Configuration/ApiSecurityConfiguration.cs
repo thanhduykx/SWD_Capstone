@@ -99,8 +99,10 @@ internal static class ApiSecurityConfiguration
     private static Task SetHubAccessToken(MessageReceivedContext context)
     {
         StringValues accessToken = context.Request.Query["access_token"];
+        PathString path = context.HttpContext.Request.Path;
         if (!string.IsNullOrWhiteSpace(accessToken) &&
-            context.HttpContext.Request.Path.StartsWithSegments("/hubs/defense"))
+            (path.StartsWithSegments("/hubs/defense") ||
+             path.StartsWithSegments("/hubs/presence")))
             context.Token = accessToken;
         return Task.CompletedTask;
     }

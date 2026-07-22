@@ -19,13 +19,22 @@ public sealed class GroupImportService(
     private const int InitialPasswordByteCount = 18;
 
     public async Task<GroupImportResult> ImportAsync(
-        Stream stream, int? lecturerId = null, CancellationToken cancellationToken = default)
+        Stream stream, int semesterId, int? lecturerId = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        if (semesterId <= 0)
+            throw new BusinessRuleException("A target semester is required for Excel import.");
+        if (!lecturerId.HasValue)
+        {
+            var defaultLecturerId = await store.FindDefaultLecturerIdAsync(cancellationToken);
+            lecturerId = defaultLecturerId > 0
+                ? defaultLecturerId
+                : throw new BusinessRuleException("At least one lecturer must exist before importing groups.");
+        }
         if (lecturerId.HasValue && (lecturerId.Value <= 0 || !await store.LecturerExistsAsync(lecturerId.Value, cancellationToken)))
             throw new BusinessRuleException($"Lecturer {lecturerId.Value} does not exist.");
-        SemesterResult semester = await semesterService.ResolveAsync(
-            DateOnly.FromDateTime(DateTime.Today), cancellationToken);
+        SemesterResult semester = await semesterService.FindByIdAsync(semesterId, cancellationToken)
+            ?? throw new BusinessRuleException($"Semester {semesterId} does not exist.");
         IReadOnlyList<ImportedGroupData> groups = parser.Parse(stream);
         PersistResult persisted = await store.ExecuteInTransactionAsync(
             token => PersistAsync(groups, semester.Id, lecturerId, token), cancellationToken);

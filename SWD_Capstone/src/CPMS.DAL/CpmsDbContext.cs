@@ -109,7 +109,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         {
             entity.ToTable("semesters", table => table.HasCheckConstraint(
                 "ck_semesters_supported_codes",
-                "upper(\"code\") IN ('SP26', 'SU26', 'FA26')"));
+                "upper(\"code\") ~ '^(SP|SU|FA)[0-9]{2}$'"));
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasIndex(x => x.IsActive).IsUnique().HasFilter("\"is_active\" = TRUE");
         });

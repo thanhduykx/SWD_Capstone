@@ -18,7 +18,7 @@ public sealed class ImportControllerTests
         var file = new FormFile(content, 0, content.Length, "file", "groups.xlsx");
 
         ActionResult<GroupImportResult> result = await controller.ImportGroups(
-            new ImportGroupsRequest(file, 1), CancellationToken.None);
+            new ImportGroupsRequest(file, 1, 1), CancellationToken.None);
 
         ObjectResult response = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status413PayloadTooLarge, response.StatusCode);
@@ -31,6 +31,7 @@ public sealed class ImportControllerTests
 
         public Task<GroupImportResult> ImportAsync(
             Stream stream,
+            int semesterId,
             int? lecturerId = null,
             CancellationToken cancellationToken = default)
         {

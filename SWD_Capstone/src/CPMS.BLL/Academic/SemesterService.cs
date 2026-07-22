@@ -21,6 +21,9 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
     public Task<SemesterResult> ResolveAsync(DateOnly date, CancellationToken cancellationToken) =>
         store.UpsertResolvedAsync(ResolveTerm(date), cancellationToken);
 
+    public Task<SemesterResult?> FindByIdAsync(int semesterId, CancellationToken cancellationToken) =>
+        store.FindByIdAsync(semesterId, cancellationToken);
+
     public Task<SemesterResult> CreateAsync(
         CreateSemesterCommand command, CancellationToken cancellationToken)
     {
