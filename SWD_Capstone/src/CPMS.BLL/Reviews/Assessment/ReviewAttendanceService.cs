@@ -109,14 +109,20 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             return new CompleteReviewResult(
                 sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
-        await store.FinalizeUnsignedCheckInsAsync(
-            sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
-        (int StudentCount, int AttendanceCount, int SubmittedCount) counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
-        if (counts.StudentCount == 0 || counts.AttendanceCount != counts.StudentCount ||
-            counts.SubmittedCount != context.ReviewerIds.Count)
+        (int StudentCount, int AttendanceCount, int SubmittedCount) counts =
+            await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
+        if (counts.StudentCount == 0 || counts.SubmittedCount != context.ReviewerIds.Count)
         {
             throw new ConflictException(
-                "Attendance for every student and all reviewer submissions are required before completion.");
+                "All reviewer submissions are required before completion.");
+        }
+
+        await store.FinalizeUnsignedCheckInsAsync(
+            sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
+        counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
+        if (counts.AttendanceCount != counts.StudentCount)
+        {
+            throw new ConflictException("Attendance could not be finalized for every student.");
         }
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
