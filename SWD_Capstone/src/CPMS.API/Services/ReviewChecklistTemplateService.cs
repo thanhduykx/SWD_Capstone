@@ -184,7 +184,7 @@ public sealed class ReviewChecklistTemplateService(IWebHostEnvironment environme
     {
         ReviewType.Review1 => "Review 1",
         ReviewType.Review2 => "Review 2",
-        ReviewType.Review3 => "Review 3- Final",
+        ReviewType.Review3 => "Review 3",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported review type.")
     };
 

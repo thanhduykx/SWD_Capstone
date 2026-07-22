@@ -16,10 +16,10 @@ public sealed class ProjectDocumentServiceTests
 
         ProjectDocumentData result = await service.UploadAsync(
             new ProjectDocumentActor(11, UserRole.Student),
-            new UploadProjectDocumentInput(8, DocumentType.Final, "report.pdf", content.Length, content),
+            new UploadProjectDocumentInput(8, DocumentType.Review3, "report.pdf", content.Length, content),
             CancellationToken.None);
 
-        Assert.Contains("groups/8/final/v3/", storage.LastObjectPath, StringComparison.Ordinal);
+        Assert.Contains("groups/8/review3/v3/", storage.LastObjectPath, StringComparison.Ordinal);
         Assert.Equal("private:test-key", store.Created?.StorageKey);
         Assert.Equal(3, result.VersionNo);
     }
@@ -28,7 +28,7 @@ public sealed class ProjectDocumentServiceTests
     public async Task GenerateSuggestionsAsync_AssignedLecturer_UsesPdfDocumentContract()
     {
         var store = new StubStore { LecturerCanAccess = true };
-        store.Document = new ProjectDocumentData(6, 8, DocumentType.Final, "report.pdf", "private:test-key", 9, 1, DocumentStatus.Submitted, DateTime.UtcNow, 11);
+        store.Document = new ProjectDocumentData(6, 8, DocumentType.Review3, "report.pdf", "private:test-key", 9, 1, DocumentStatus.Submitted, DateTime.UtcNow, 11);
         var suggestions = new StubSuggestionService();
         var service = new ProjectDocumentService(store, new StubStorage(), suggestions);
 

@@ -218,7 +218,7 @@ static async Task SeedAsync(CpmsDbContext db)
     db.RuleKeywords.AddRange(clos.Select((x, i) => new RuleKeyword { CloId = x.Id, CreatedByAdminId = admin.Id, KeywordText = marker + (i == 0 ? " architecture testing" : " implementation presentation"), Weight = .5m, CreatedById = adminUser.Id }));
     await db.SaveChangesAsync();
 
-    var document = new CapstoneDocument { GroupId = groups[0].Id, SyllabusId = syllabus.Id, UploadedById = studentUsers[0].Id, DocType = DocumentType.Final, FileName = marker + "_final-report.docx", FilePath = "/demo/DEMO_2026/final-report.docx", FileSize = 1_048_576, VersionNo = 1, Status = DocumentStatus.Approved, UploadedAt = now.AddDays(-14), CreatedById = studentUsers[0].Id };
+    var document = new CapstoneDocument { GroupId = groups[0].Id, SyllabusId = syllabus.Id, UploadedById = studentUsers[0].Id, DocType = DocumentType.Review3, FileName = marker + "_review-3-report.docx", FilePath = "/demo/DEMO_2026/review-3-report.docx", FileSize = 1_048_576, VersionNo = 1, Status = DocumentStatus.Approved, UploadedAt = now.AddDays(-14), CreatedById = studentUsers[0].Id };
     db.Documents.Add(document);
     await db.SaveChangesAsync();
     var evaluation = new EvaluationReport { DocumentId = document.Id, ReviewedById = panel.Id, OverallScore = 8.5m, MatchPercentage = 85m, GapAnalysisSummary = marker + ": adequate evidence; improve deployment metrics.", TriggerType = EvaluationTriggerType.Manual, EvaluatedAt = now.AddDays(-12) };

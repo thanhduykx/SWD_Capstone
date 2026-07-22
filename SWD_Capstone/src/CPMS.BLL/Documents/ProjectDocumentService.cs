@@ -37,7 +37,7 @@ public sealed class ProjectDocumentService(
         if (input.Content.CanSeek) input.Content.Position = 0;
 
         var syllabusId = await store.FindActiveSyllabusIdAsync(cancellationToken)
-            ?? throw new ConflictException("Chưa có đề cương đang hoạt động để lưu tài liệu.");
+            ?? throw new ConflictException("Chưa có cấu hình học kỳ đang hoạt động để lưu tài liệu review.");
         var version = await store.GetNextVersionAsync(input.GroupId, input.DocType, cancellationToken);
         var objectPath = $"groups/{input.GroupId.ToString(CultureInfo.InvariantCulture)}/{input.DocType.ToString().ToLowerInvariant()}/v{version.ToString(CultureInfo.InvariantCulture)}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
         var stored = await storage.SaveAsync(objectPath, GetContentType(fileName), input.Content, cancellationToken);
