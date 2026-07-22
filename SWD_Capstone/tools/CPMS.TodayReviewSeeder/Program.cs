@@ -5,6 +5,7 @@ using CPMS.DAL.Entities;
 using Microsoft.EntityFrameworkCore;
 
 const string sessionCode = "SU26_R2_TODAY_20260723";
+const int sessionSlot = 3;
 var sessionDate = new DateTime(2026, 7, 23, 0, 0, 0, DateTimeKind.Utc);
 
 try
@@ -35,6 +36,26 @@ try
     if (reviewers.Any(x => x.Id == group.LecturerId))
         throw new InvalidOperationException("A selected reviewer supervises the target group.");
 
+    foreach (var reviewer in reviewers)
+    {
+        var hasTargetAvailability = await db.ReviewAvailabilities.AnyAsync(x =>
+            x.ReviewRoundId == round.Id && x.LecturerId == reviewer.Id &&
+            x.DayOfWeek == 4 && x.Slot == sessionSlot);
+        if (!hasTargetAvailability)
+        {
+            db.ReviewAvailabilities.Add(new ReviewAvailability
+            {
+                ReviewRoundId = round.Id,
+                SemesterId = semester.Id,
+                LecturerId = reviewer.Id,
+                WeekStartDate = round.WeekStartDate,
+                DayOfWeek = 4,
+                Slot = sessionSlot,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+    }
+
     var student = await db.Students
         .Where(x => x.GroupId == group.Id)
         .OrderByDescending(x => x.IsLeader)
@@ -51,7 +72,7 @@ try
             (Day: 1, Slot: 1),
             (Day: 2, Slot: 2),
             (Day: 3, Slot: 3),
-            (Day: 4, Slot: 1),
+            (Day: 4, Slot: sessionSlot),
             (Day: 5, Slot: 2)
         };
         db.StudentSlotRegistrations.AddRange(selectedSlots.Select(x => new StudentSlotRegistration
@@ -64,7 +85,13 @@ try
             CreatedAt = now
         }));
     }
-    else if (registrations.Count != 5 || registrations.All(x => x.DayOfWeek != 4 || x.Slot != 1))
+    else if (registrations.Count == 5 && registrations.All(x => x.DayOfWeek != 4 || x.Slot != sessionSlot))
+    {
+        var previousTarget = registrations.SingleOrDefault(x => x.DayOfWeek == 4 && x.Slot == 1)
+            ?? throw new InvalidOperationException("The target group has incompatible Review 2 availability data.");
+        previousTarget.Slot = sessionSlot;
+    }
+    else if (registrations.Count != 5)
     {
         throw new InvalidOperationException("The target group has incompatible Review 2 availability data.");
     }
@@ -79,7 +106,7 @@ try
             Code = sessionCode,
             SemesterId = semester.Id,
             DayOfWeek = 4,
-            Slot = 1,
+            Slot = sessionSlot,
             Room = "B206",
             Type = ReviewType.Review2,
             Reviewer1Id = reviewers[0].Id,
@@ -113,12 +140,29 @@ try
         }));
         operation = "created";
     }
+    else if (session.SessionDate != sessionDate || session.DayOfWeek != 4 || session.Slot != sessionSlot)
+    {
+        session.SessionDate = sessionDate;
+        session.DayOfWeek = 4;
+        session.Slot = sessionSlot;
+        operation = "updated";
+    }
 
     await db.SaveChangesAsync();
 
     var reviewerIds = reviewers.Select(x => x.Id).ToArray();
     var isValid = session.SessionDate == sessionDate &&
+                  session.DayOfWeek == 4 &&
+                  session.Slot == sessionSlot &&
                   session.Status == ReviewSessionStatus.Published &&
+                  await db.StudentSlotRegistrations.CountAsync(x =>
+                      x.ReviewRoundId == round.Id && x.GroupId == group.Id) == 5 &&
+                  await db.StudentSlotRegistrations.AnyAsync(x =>
+                      x.ReviewRoundId == round.Id && x.GroupId == group.Id &&
+                      x.DayOfWeek == 4 && x.Slot == sessionSlot) &&
+                  await db.ReviewAvailabilities.CountAsync(x =>
+                      x.ReviewRoundId == round.Id && x.DayOfWeek == 4 && x.Slot == sessionSlot &&
+                      reviewerIds.Contains(x.LecturerId)) == 2 &&
                   await db.GroupReviewSlots.AnyAsync(x => x.SessionId == session.Id && x.GroupId == group.Id) &&
                   await db.ReviewChecklistSubmissions.CountAsync(x =>
                       x.SessionId == session.Id && x.GroupId == group.Id && reviewerIds.Contains(x.ReviewerId)) == 2;
@@ -127,7 +171,7 @@ try
 
     await transaction.CommitAsync();
     Console.WriteLine(
-        $"TODAY_REVIEW operation={operation} sessionId={session.Id} date={session.SessionDate:yyyy-MM-dd} " +
+        $"TODAY_REVIEW operation={operation} sessionId={session.Id} date={session.SessionDate:yyyy-MM-dd} slot={session.Slot} " +
         $"group={group.Code} reviewers={string.Join(',', reviewers.Select(x => x.Code))}");
     return 0;
 }
