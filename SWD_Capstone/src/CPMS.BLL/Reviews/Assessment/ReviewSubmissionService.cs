@@ -38,6 +38,16 @@ public sealed class ReviewSubmissionService(
         return Map(await store.GetDataAsync(submissionId, cancellationToken));
     }
 
+    public async Task<IReadOnlyList<PreviousReviewFeedback>> GetPreviousHistoryAsync(
+        int submissionId, ReviewActor actor, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
+        await EnsureCanViewAsync(state, actor, cancellationToken);
+        return await store.GetPreviousHistoryAsync(
+            state.GroupId, state.Type, cancellationToken);
+    }
+
     public async Task<ReviewSubmissionResult> SaveDraftAsync(
         int submissionId, SaveReviewDraft draft, ReviewActor actor, CancellationToken cancellationToken)
     {

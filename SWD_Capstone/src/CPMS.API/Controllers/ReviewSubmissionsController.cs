@@ -30,6 +30,25 @@ public sealed class ReviewSubmissionsController(
         catch (KeyNotFoundException) { return NotFound(); }
     }
 
+    [HttpGet("{submissionId:int}/previous")]
+    public async Task<ActionResult<IReadOnlyCollection<PreviousReviewFeedbackResponse>>> GetPrevious(
+        int submissionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlyList<PreviousReviewFeedback> history =
+                await submissionService.GetPreviousHistoryAsync(
+                    submissionId, CurrentActor(), cancellationToken);
+            return Ok(history.Select(item => new PreviousReviewFeedbackResponse(
+                item.SubmissionId,
+                item.Type,
+                item.ReviewerName,
+                item.ReviewerComments,
+                item.SubmittedAt)));
+        }
+        catch (KeyNotFoundException) { return NotFound(); }
+    }
+
     [HttpPut("{submissionId:int}/draft")]
     [Authorize(Roles = "Lecturer")]
     public async Task<ActionResult<ReviewSubmissionResponse>> SaveDraft(

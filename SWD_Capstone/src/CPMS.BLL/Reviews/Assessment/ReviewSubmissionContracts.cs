@@ -55,6 +55,12 @@ public sealed record ReviewSubmissionSummary(
     string ReviewerName,
     string Notes,
     DateTime SubmittedAt);
+public sealed record PreviousReviewFeedback(
+    int SubmissionId,
+    ReviewType Type,
+    string ReviewerName,
+    IReadOnlyList<string> ReviewerComments,
+    DateTime SubmittedAt);
 public sealed record ScheduledReviewExport(int SessionId, int GroupId);
 
 public interface IReviewSubmissionService
@@ -62,6 +68,8 @@ public interface IReviewSubmissionService
     Task<IReadOnlyList<ReviewSubmissionSummary>> GetMySubmissionsAsync(
         ReviewActor actor, CancellationToken cancellationToken);
     Task<ReviewSubmissionResult> GetAsync(
+        int submissionId, ReviewActor actor, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PreviousReviewFeedback>> GetPreviousHistoryAsync(
         int submissionId, ReviewActor actor, CancellationToken cancellationToken);
     Task<ReviewSubmissionResult> SaveDraftAsync(
         int submissionId, SaveReviewDraft draft, ReviewActor actor, CancellationToken cancellationToken);

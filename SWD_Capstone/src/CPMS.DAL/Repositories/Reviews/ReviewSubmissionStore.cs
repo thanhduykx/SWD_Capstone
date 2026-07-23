@@ -50,6 +50,73 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
                    submission.SubmittedAt ?? submission.LastSavedAt))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PreviousReviewFeedback>> GetPreviousHistoryAsync(
+        int groupId, ReviewType beforeType, CancellationToken cancellationToken)
+    {
+        ReviewType[] previousTypes = Enum.GetValues<ReviewType>()
+            .Where(type => type < beforeType)
+            .ToArray();
+        if (previousTypes.Length == 0) return [];
+
+        var submissions = await dbContext.ReviewChecklistSubmissions
+            .Where(submission =>
+                submission.GroupId == groupId &&
+                previousTypes.Contains(submission.Type) &&
+                submission.Status == ReviewSubmissionStatus.Submitted &&
+                dbContext.ReviewSessions.Any(session =>
+                    session.Id == submission.SessionId &&
+                    session.Status == ReviewSessionStatus.Published) &&
+                dbContext.GroupReviewSlots.Any(slot =>
+                    slot.SessionId == submission.SessionId &&
+                    slot.GroupId == submission.GroupId &&
+                    slot.Status == ReviewGroupStatus.Completed))
+            .OrderByDescending(submission => submission.Type)
+            .ThenBy(submission => submission.ReviewerId)
+            .Select(submission => new
+            {
+                submission.Id,
+                submission.Type,
+                submission.ReviewerComment,
+                submission.Suggestion,
+                SubmittedAt = submission.SubmittedAt ?? submission.LastSavedAt,
+                ReviewerName = dbContext.Lecturers
+                    .Where(lecturer => lecturer.Id == submission.ReviewerId)
+                    .Select(lecturer => lecturer.FullName)
+                    .Single()
+            })
+            .ToListAsync(cancellationToken);
+
+        int[] submissionIds = submissions.Select(submission => submission.Id).ToArray();
+        var commentRows = await dbContext.ReviewSubmissionComments
+            .Where(comment => submissionIds.Contains(comment.SubmissionId))
+            .OrderBy(comment => comment.Position)
+            .Select(comment => new { comment.SubmissionId, comment.Content })
+            .ToListAsync(cancellationToken);
+        var commentsBySubmission = commentRows
+            .GroupBy(comment => comment.SubmissionId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group.Select(comment => comment.Content).ToArray());
+
+        return submissions.Select(submission =>
+        {
+            commentsBySubmission.TryGetValue(submission.Id, out IReadOnlyList<string>? comments);
+            if (comments is null)
+            {
+                string? fallbackComment = !string.IsNullOrWhiteSpace(submission.ReviewerComment)
+                    ? submission.ReviewerComment
+                    : submission.Suggestion;
+                comments = string.IsNullOrWhiteSpace(fallbackComment) ? [] : [fallbackComment];
+            }
+            return new PreviousReviewFeedback(
+                submission.Id,
+                submission.Type,
+                submission.ReviewerName,
+                comments,
+                submission.SubmittedAt);
+        }).ToArray();
+    }
+
     public Task<ReviewSubmissionState?> FindStateAsync(int submissionId, CancellationToken cancellationToken) =>
         dbContext.ReviewChecklistSubmissions.Where(x => x.Id == submissionId)
             .Select(x => new ReviewSubmissionState(

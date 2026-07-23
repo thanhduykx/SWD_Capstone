@@ -56,6 +56,8 @@ public interface IReviewSubmissionStore
         int lecturerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReviewSubmissionSummary>> GetStudentSummariesAsync(
         int groupId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PreviousReviewFeedback>> GetPreviousHistoryAsync(
+        int groupId, ReviewType beforeType, CancellationToken cancellationToken);
     Task<ReviewSubmissionState?> FindStateAsync(int submissionId, CancellationToken cancellationToken);
     Task<ReviewSubmissionData> GetDataAsync(int submissionId, CancellationToken cancellationToken);
     Task SaveDraftAsync(int submissionId, PersistReviewDraft draft, CancellationToken cancellationToken);

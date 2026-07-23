@@ -47,3 +47,9 @@ public sealed record ReviewSubmissionItemResponse(
     string? CriteriaCode,
     ReviewChecklistAnswer? Answer,
     string? Comment);
+public sealed record PreviousReviewFeedbackResponse(
+    int SubmissionId,
+    ReviewType ReviewType,
+    string ReviewerName,
+    IReadOnlyCollection<string> ReviewerComments,
+    DateTime SubmittedAt);

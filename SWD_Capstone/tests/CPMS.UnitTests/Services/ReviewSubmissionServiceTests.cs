@@ -38,6 +38,30 @@ public sealed class ReviewSubmissionServiceTests
         Assert.Equal(["Nhận xét kiến trúc", "Bổ sung kiểm thử"], store.LastDraft.ReviewerComments);
     }
 
+    [Fact]
+    public async Task PreviousHistory_UsesCurrentSubmissionGroupAndReviewType()
+    {
+        var store = new FakeStore
+        {
+            StateType = ReviewType.Review3,
+            PreviousHistory =
+            [
+                new(8, ReviewType.Review2, "Nguyen Van An",
+                    ["Bo sung kiem thu tu dong."], DateTime.UtcNow)
+            ]
+        };
+        var service = new ReviewSubmissionService(
+            store, new TemplateProvider(), new TestReviewSessionAccessService());
+
+        IReadOnlyList<PreviousReviewFeedback> history =
+            await service.GetPreviousHistoryAsync(
+                10, new ReviewActor(7, UserRole.Lecturer), CancellationToken.None);
+
+        Assert.Single(history);
+        Assert.Equal(30, store.RequestedHistoryGroupId);
+        Assert.Equal(ReviewType.Review3, store.RequestedBeforeType);
+    }
+
     private sealed class TemplateProvider : IReviewChecklistTemplateProvider
     {
         public IReadOnlyList<ReviewChecklistTemplateItem> GetItems(ReviewType type) =>
@@ -48,6 +72,10 @@ public sealed class ReviewSubmissionServiceTests
     {
         public bool Submitted { get; private set; }
         public PersistReviewDraft? LastDraft { get; private set; }
+        public ReviewType StateType { get; init; } = ReviewType.Review1;
+        public IReadOnlyList<PreviousReviewFeedback> PreviousHistory { get; init; } = [];
+        public int? RequestedHistoryGroupId { get; private set; }
+        public ReviewType? RequestedBeforeType { get; private set; }
 
         public Task<int?> FindLecturerIdAsync(int userId, CancellationToken cancellationToken) =>
             Task.FromResult<int?>(3);
@@ -59,9 +87,16 @@ public sealed class ReviewSubmissionServiceTests
         public Task<IReadOnlyList<ReviewSubmissionSummary>> GetStudentSummariesAsync(
             int groupId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ReviewSubmissionSummary>>([]);
+        public Task<IReadOnlyList<PreviousReviewFeedback>> GetPreviousHistoryAsync(
+            int groupId, ReviewType beforeType, CancellationToken cancellationToken)
+        {
+            RequestedHistoryGroupId = groupId;
+            RequestedBeforeType = beforeType;
+            return Task.FromResult(PreviousHistory);
+        }
         public Task<ReviewSubmissionState?> FindStateAsync(int submissionId, CancellationToken cancellationToken) =>
             Task.FromResult<ReviewSubmissionState?>(new(
-                submissionId, 20, 30, 3, ReviewType.Review1, ReviewSubmissionStatus.Draft,
+                submissionId, 20, 30, 3, StateType, ReviewSubmissionStatus.Draft,
                 ReviewSessionStatus.Published, false, "Kiến trúc cần tách lớp rõ hơn."));
         public Task<ReviewSubmissionData> GetDataAsync(int submissionId, CancellationToken cancellationToken) =>
             Task.FromResult(new ReviewSubmissionData(
