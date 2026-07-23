@@ -19,6 +19,7 @@ WORKDIR /app
 EXPOSE 8080
 
 COPY --from=backend-build /app/publish ./
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "CPMS.API.dll"]

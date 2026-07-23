@@ -19,6 +19,9 @@ WORKDIR /app
 EXPOSE 8080
 
 COPY --from=backend-build /app/publish ./
+# Bind on all interfaces so Render's port scanner can reach the process.
+# Program.cs overrides this with Render's PORT when that env var is present.
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "CPMS.API.dll"]

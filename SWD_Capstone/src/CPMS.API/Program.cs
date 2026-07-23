@@ -29,19 +29,11 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using Serilog;
 
+// Render injects PORT and requires binding on 0.0.0.0 (not localhost).
+// Set ASPNETCORE_URLS before CreateBuilder — clearing Configuration later can drop UseUrls().
+ConfigurePublicHttpBinding();
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-if (builder.Environment.IsProduction())
-{
-    string configuredPort = Environment.GetEnvironmentVariable("PORT")
-        ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS")
-        ?? "8080";
-    if (!int.TryParse(configuredPort, out int httpPort) || httpPort is < 1 or > 65535)
-        throw new InvalidOperationException("The configured HTTP port is invalid.");
-    // TLS terminates at Render's reverse proxy; the container must expose HTTP internally.
-#pragma warning disable S5332
-    builder.WebHost.UseUrls($"http://0.0.0.0:{httpPort}");
-#pragma warning restore S5332
-}
 IConfigurationRoot appSettingsConfiguration = new ConfigurationBuilder()
     .SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
@@ -49,6 +41,14 @@ IConfigurationRoot appSettingsConfiguration = new ConfigurationBuilder()
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddConfiguration(appSettingsConfiguration);
 ApplicationConfiguration.AddDeploymentOverrides(builder.Configuration);
+// Re-apply after Sources.Clear() so Kestrel keeps the public bind address.
+string? publicUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+if (!string.IsNullOrWhiteSpace(publicUrls))
+{
+#pragma warning disable S5332
+    builder.WebHost.UseUrls(publicUrls);
+#pragma warning restore S5332
+}
 
 var cpmsConnectionString = GetCpmsConnectionString(builder.Configuration);
 var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
@@ -203,6 +203,30 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 static string GetCpmsConnectionString(IConfiguration configuration) =>
     configuration.GetConnectionString("CpmsDatabase")
     ?? throw new InvalidOperationException("Connection string 'CpmsDatabase' is missing.");
+
+static void ConfigurePublicHttpBinding()
+{
+    // Prefer Render PORT; fall back to container HTTP ports / 8080.
+    string configuredPort = Environment.GetEnvironmentVariable("PORT")
+        ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS")
+        ?? "8080";
+    configuredPort = configuredPort.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .FirstOrDefault()
+        ?? "8080";
+    if (!int.TryParse(configuredPort, NumberStyles.Integer, CultureInfo.InvariantCulture, out int httpPort)
+        || httpPort is < 1 or > 65535)
+    {
+        throw new InvalidOperationException($"The configured HTTP port '{configuredPort}' is invalid.");
+    }
+
+    // Force all-interfaces bind. localhost:* makes Render port-scan time out.
+    // HTTP is intentional behind Render's TLS-terminating proxy.
+#pragma warning disable S5332
+    Environment.SetEnvironmentVariable(
+        "ASPNETCORE_URLS",
+        string.Create(CultureInfo.InvariantCulture, $"http://0.0.0.0:{httpPort}"));
+#pragma warning restore S5332
+}
 
 #pragma warning disable S1118 // ASP.NET WebApplicationFactory requires an instantiable Program marker.
 public partial class Program;
