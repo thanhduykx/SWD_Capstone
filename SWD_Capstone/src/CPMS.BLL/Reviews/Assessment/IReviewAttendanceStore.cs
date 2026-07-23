@@ -45,6 +45,4 @@ public interface IReviewAttendanceStore
         int sessionId, int groupId, CancellationToken cancellationToken);
     Task<CompleteReviewResult> CompleteAsync(
         int sessionId, int groupId, int lecturerId, DateTime completedAt, CancellationToken cancellationToken);
-    Task<bool> CanLecturerAccessGroupAsync(
-        int lecturerId, int groupId, CancellationToken cancellationToken);
 }
