@@ -30,6 +30,18 @@ using Npgsql;
 using Serilog;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsProduction())
+{
+    string configuredPort = Environment.GetEnvironmentVariable("PORT")
+        ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS")
+        ?? "8080";
+    if (!int.TryParse(configuredPort, out int httpPort) || httpPort is < 1 or > 65535)
+        throw new InvalidOperationException("The configured HTTP port is invalid.");
+    // TLS terminates at Render's reverse proxy; the container must expose HTTP internally.
+#pragma warning disable S5332
+    builder.WebHost.UseUrls($"http://0.0.0.0:{httpPort}");
+#pragma warning restore S5332
+}
 IConfigurationRoot appSettingsConfiguration = new ConfigurationBuilder()
     .SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
