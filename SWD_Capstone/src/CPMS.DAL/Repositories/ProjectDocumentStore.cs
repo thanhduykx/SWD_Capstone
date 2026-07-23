@@ -16,8 +16,8 @@ internal sealed class ProjectDocumentStore(CpmsDbContext db) : IProjectDocumentS
         var lecturerId = await db.Lecturers.Where(x => x.UserId == userId).Select(x => (int?)x.Id).SingleOrDefaultAsync(cancellationToken);
         return lecturerId is not null && (await db.CapstoneGroups.AnyAsync(x => x.Id == groupId && x.LecturerId == lecturerId, cancellationToken)
             || await db.GroupReviewSlots.AnyAsync(slot => slot.GroupId == groupId &&
-                db.ReviewSessionReviewers.Any(reviewer =>
-                    reviewer.SessionId == slot.SessionId && reviewer.LecturerId == lecturerId), cancellationToken));
+                db.ReviewChecklistSubmissions.Any(submission =>
+                    submission.SessionId == slot.SessionId && submission.GroupId == groupId && submission.ReviewerId == lecturerId), cancellationToken));
     }
 
     public Task<int?> FindActiveSyllabusIdAsync(CancellationToken cancellationToken) =>

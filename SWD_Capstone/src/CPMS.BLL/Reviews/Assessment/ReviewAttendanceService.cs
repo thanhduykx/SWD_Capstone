@@ -66,7 +66,7 @@ public sealed class ReviewAttendanceService(
     {
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
-        EnsureCanViewComments(context, actor);
+        await EnsureCanViewCommentsAsync(context, actor, cancellationToken);
         await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         return await store.GetCommentsAsync(sessionId, context.GroupId, cancellationToken);
     }
@@ -182,14 +182,17 @@ public sealed class ReviewAttendanceService(
         }
     }
 
-    private static void EnsureCanViewComments(ReviewAttendanceContext context, ReviewActor actor)
+    private async Task EnsureCanViewCommentsAsync(ReviewAttendanceContext context, ReviewActor actor, CancellationToken cancellationToken)
     {
         if (actor.Role is UserRole.SystemAdministrator or UserRole.TrainingDepartment) return;
+        if (actor.Role == UserRole.Lecturer && context.LecturerId.HasValue)
+        {
+            if (context.ReviewerIds.Contains(context.LecturerId.Value)) return;
+            if (await store.CanLecturerAccessGroupAsync(context.LecturerId.Value, context.GroupId, cancellationToken)) return;
+        }
         if (context.SessionStatus == ReviewSessionStatus.Published &&
-            ((actor.Role == UserRole.Lecturer && context.LecturerId.HasValue &&
-              context.ReviewerIds.Contains(context.LecturerId.Value)) ||
              (actor.Role == UserRole.Student && context.StudentGroupId == context.GroupId &&
-              context.GroupStatus == ReviewGroupStatus.Completed))) return;
+              context.GroupStatus == ReviewGroupStatus.Completed)) return;
         throw new UnauthorizedAccessException("You cannot view these comments.");
     }
 

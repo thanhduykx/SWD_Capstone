@@ -30,9 +30,95 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         if (seedBaselineDataset) await SeedDevelopmentDataAsync(cancellationToken);
     }
 
-    public Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken)
+    public async Task EnsureMobileLecturerDatasetAsync(CancellationToken cancellationToken)
     {
-        return Task.CompletedTask;
+        // Get the first 3 groups to seed comments for
+        List<int> groupIds = await dbContext.CapstoneGroups
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .Take(3)
+            .ToListAsync(cancellationToken);
+
+        if (groupIds.Count == 0) return;
+
+        // Get a lecturer or training department user to act as author
+        int authorUserId = await dbContext.Users
+            .Where(x => x.Role == UserRole.Lecturer || x.Role == UserRole.TrainingDepartment)
+            .Select(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (authorUserId == 0) return;
+
+        // Ensure a past session exists to attach comments to
+        int? previousSessionId = await dbContext.ReviewSessions
+            .Where(x => x.Status == ReviewSessionStatus.Published || x.Status == ReviewSessionStatus.Closed)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (previousSessionId is null)
+        {
+            var session = new ReviewSession
+            {
+                Code = "REV1_PREVIOUS",
+                SemesterId = await dbContext.Semesters.Where(x => x.IsActive).Select(x => x.Id).FirstOrDefaultAsync(cancellationToken),
+                DayOfWeek = 2,
+                Slot = 1,
+                Room = "A101",
+                Type = ReviewType.Review1,
+                SessionDate = DateTime.UtcNow.AddDays(-14), // 2 weeks ago
+                Status = ReviewSessionStatus.Closed
+            };
+            dbContext.ReviewSessions.Add(session);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            previousSessionId = session.Id;
+        }
+
+        bool hasChanges = false;
+        foreach (int groupId in groupIds)
+        {
+            // Seed GroupReviewSlot if it doesn't exist
+            if (!await dbContext.GroupReviewSlots.AnyAsync(x => x.SessionId == previousSessionId.Value && x.GroupId == groupId, cancellationToken))
+            {
+                dbContext.GroupReviewSlots.Add(new GroupReviewSlot
+                {
+                    SessionId = previousSessionId.Value,
+                    GroupId = groupId,
+                    GroupPosition = 1,
+                    Status = ReviewGroupStatus.Completed,
+                    CompletedAt = DateTime.UtcNow.AddDays(-14)
+                });
+                hasChanges = true;
+            }
+
+            // Check if comments already exist
+            if (!await dbContext.ReviewComments.AnyAsync(x => x.SessionId == previousSessionId.Value && x.GroupId == groupId, cancellationToken))
+            {
+                dbContext.ReviewComments.AddRange(
+                    new ReviewComment
+                    {
+                        SessionId = previousSessionId.Value,
+                        GroupId = groupId,
+                        AuthorUserId = authorUserId,
+                        Content = "Nhóm đã hoàn thành tốt tài liệu đặc tả yêu cầu.",
+                        CreatedAt = DateTime.UtcNow.AddDays(-14)
+                    },
+                    new ReviewComment
+                    {
+                        SessionId = previousSessionId.Value,
+                        GroupId = groupId,
+                        AuthorUserId = authorUserId,
+                        Content = "Cần cải thiện phần thiết kế cơ sở dữ liệu, một số bảng thiếu chuẩn hóa.",
+                        CreatedAt = DateTime.UtcNow.AddDays(-13)
+                    }
+                );
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken) =>

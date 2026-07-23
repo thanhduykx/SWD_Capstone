@@ -193,4 +193,12 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
         await dbContext.SaveChangesAsync(cancellationToken);
         return new CompleteReviewResult(sessionId, groupId, slot.Status, slot.CompletedAt);
     }
+
+    public async Task<bool> CanLecturerAccessGroupAsync(int lecturerId, int groupId, CancellationToken cancellationToken)
+    {
+        return await dbContext.CapstoneGroups.AnyAsync(x => x.Id == groupId && x.LecturerId == lecturerId, cancellationToken)
+            || await dbContext.GroupReviewSlots.AnyAsync(slot => slot.GroupId == groupId &&
+                dbContext.ReviewChecklistSubmissions.Any(submission =>
+                    submission.SessionId == slot.SessionId && submission.GroupId == groupId && submission.ReviewerId == lecturerId), cancellationToken);
+    }
 }
