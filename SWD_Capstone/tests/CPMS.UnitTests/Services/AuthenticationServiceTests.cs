@@ -159,10 +159,5 @@ public sealed class AuthenticationServiceTests
             RotatedToken = replacement;
             return Task.CompletedTask;
         }
-        public Task<bool> AnyUsersAsync(CancellationToken cancellationToken) => Task.FromResult(false);
-        public Task<BootstrapAdminResult> CreateBootstrapAdminAsync(
-            string username, string email, string passwordHash, string? ipAddress,
-            string? userAgent, CancellationToken cancellationToken) =>
-            Task.FromResult(new BootstrapAdminResult(1, username, UserRole.SystemAdministrator));
     }
 }

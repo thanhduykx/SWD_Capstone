@@ -14,10 +14,12 @@ public sealed record ReviewRoundState(
     DateTime? ClosedAt,
     int RegisteredGroupCount);
 
+public sealed record SemesterReviewPeriod(DateOnly StartDate, DateOnly EndDate);
+
 public interface IReviewRoundStore
 {
     Task<IReadOnlyList<ReviewRoundState>> GetRoundsAsync(int semesterId, CancellationToken cancellationToken);
-    Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken);
+    Task<SemesterReviewPeriod?> FindSemesterPeriodAsync(int semesterId, CancellationToken cancellationToken);
     Task<int?> FindModeratorIdAsync(int userId, bool allowFallback, CancellationToken cancellationToken);
     Task<bool> RoundExistsAsync(int semesterId, ReviewType reviewType, CancellationToken cancellationToken);
     Task<ReviewRoundState> CreateRoundAsync(int semesterId, ReviewType reviewType, DateOnly weekStartDate, DateOnly weekEndDate, int moderatorId, CancellationToken cancellationToken);

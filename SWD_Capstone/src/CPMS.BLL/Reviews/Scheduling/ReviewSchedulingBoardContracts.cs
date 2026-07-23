@@ -29,7 +29,9 @@ public sealed record ReviewSchedulingSession(
     int Slot,
     string Room,
     ReviewGroupStatus GroupStatus = ReviewGroupStatus.Scheduled,
-    IReadOnlyList<ReviewSchedulingReviewerFeedback>? ReviewerFeedback = null);
+    IReadOnlyList<ReviewSchedulingReviewerFeedback>? ReviewerFeedback = null,
+    bool HasAccessCode = false,
+    DateTime? AccessCodeGeneratedAt = null);
 
 public sealed record ReviewSchedulingReviewerFeedback(
     int ReviewerId,

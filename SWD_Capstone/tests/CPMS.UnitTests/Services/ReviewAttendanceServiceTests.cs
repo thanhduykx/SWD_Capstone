@@ -10,7 +10,7 @@ public sealed class ReviewAttendanceServiceTests
     public async Task GetAttendance_RejectsAssignedReviewerBeforeSlotStarts()
     {
         var store = new FakeStore(FutureContext());
-        var service = new ReviewAttendanceService(store);
+        var service = new ReviewAttendanceService(store, new TestReviewSessionAccessService());
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.GetAttendanceAsync(
@@ -24,7 +24,7 @@ public sealed class ReviewAttendanceServiceTests
     public async Task SubmitAttendance_RejectsWriteBeforeSlotStarts()
     {
         var store = new FakeStore(FutureContext());
-        var service = new ReviewAttendanceService(store);
+        var service = new ReviewAttendanceService(store, new TestReviewSessionAccessService());
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SubmitAttendanceAsync(

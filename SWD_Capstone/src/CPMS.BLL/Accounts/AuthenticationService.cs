@@ -1,5 +1,4 @@
 using CPMS.BLL.Abstractions.Security;
-using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Exceptions;
 
 namespace CPMS.BLL.Accounts;
@@ -53,22 +52,6 @@ public sealed class AuthenticationService(
         IssuedToken issued = tokenIssuer.Issue(new AuthIdentity(user.Id, user.Username, user.Role), deviceInfo);
         await store.RotateRefreshTokenAsync(state.Id, ToPersistence(user.Id, issued, deviceInfo), cancellationToken);
         return Map(issued);
-    }
-
-    public async Task<BootstrapAdminResult> BootstrapAdminAsync(
-        string username,
-        string email,
-        string password,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken)
-    {
-        if (await store.AnyUsersAsync(cancellationToken))
-            throw new ConflictException("Bootstrap is only allowed before the first account exists.");
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-            throw new BusinessRuleException("Username, email and password are required.");
-        return await store.CreateBootstrapAdminAsync(
-            username.Trim(), email.Trim(), passwordHasher.Hash(password), ipAddress, userAgent, cancellationToken);
     }
 
     private async Task<AuthenticationResult> IssueAsync(

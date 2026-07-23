@@ -14,6 +14,7 @@ using CPMS.BLL.Reviews.Scheduling;
 using CPMS.BLL.Reviews.Sessions;
 using CPMS.BLL.Reviews.Publication;
 using CPMS.BLL.Reviews.Assessment;
+using CPMS.BLL.Reviews.Access;
 using CPMS.BLL.Academic;
 using CPMS.DAL.Repositories.Academic;
 using CPMS.BLL.Accounts;
@@ -58,6 +59,7 @@ public static class DependencyInjection
         services.AddHostedService<ReviewPublicationEmailWorker>();
         services.AddScoped<IReviewAttendanceStore, ReviewAttendanceStore>();
         services.AddScoped<IReviewSubmissionStore, ReviewSubmissionStore>();
+        services.AddScoped<IReviewSessionAccessStore, ReviewSessionAccessStore>();
         services.AddScoped<ISemesterStore, SemesterStore>();
         services.AddScoped<IAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IAccountAdministrationStore, AccountAdministrationStore>();

@@ -14,6 +14,14 @@ namespace CPMS.API.Controllers;
 [Route("api/defense-management")]
 public sealed class DefenseManagementController(IDefenseManagementService defenseService) : ControllerBase
 {
+    [HttpGet("boards")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<IReadOnlyList<DefenseBoardResponse>> GetBoards(
+        [FromQuery] int semesterId, CancellationToken cancellationToken) =>
+        (await defenseService.GetBoardsAsync(semesterId, cancellationToken))
+        .Select(MapBoard)
+        .ToArray();
+
     [HttpGet("rounds")]
     [AllowAnonymous]
     public async Task<PagedResult<DefenseRoundResponse>> GetRounds(

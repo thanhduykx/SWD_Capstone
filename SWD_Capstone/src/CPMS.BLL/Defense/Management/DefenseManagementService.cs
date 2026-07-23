@@ -14,6 +14,14 @@ public sealed class DefenseManagementService(IDefenseManagementStore store) : ID
         return store.GetRoundsAsync(request, cancellationToken);
     }
 
+    public Task<IReadOnlyList<DefenseBoardResult>> GetBoardsAsync(
+        int semesterId, CancellationToken cancellationToken)
+    {
+        if (semesterId <= 0)
+            throw new BusinessRuleException("A valid semester is required.");
+        return store.GetBoardsAsync(semesterId, cancellationToken);
+    }
+
     public async Task<DefenseRoundResult> CreateRoundAsync(
         CreateDefenseRoundCommand command, DefenseActor actor, CancellationToken cancellationToken)
     {

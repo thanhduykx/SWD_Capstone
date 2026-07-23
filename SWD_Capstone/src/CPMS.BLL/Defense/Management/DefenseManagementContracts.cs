@@ -25,6 +25,8 @@ public sealed record DefenseSessionAssignmentResult(
 public interface IDefenseManagementService
 {
     Task<PagedResult<DefenseRoundResult>> GetRoundsAsync(PagedRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DefenseBoardResult>> GetBoardsAsync(
+        int semesterId, CancellationToken cancellationToken);
     Task<DefenseRoundResult> CreateRoundAsync(
         CreateDefenseRoundCommand command, DefenseActor actor, CancellationToken cancellationToken);
     Task<DefenseBoardResult> CreateBoardAsync(

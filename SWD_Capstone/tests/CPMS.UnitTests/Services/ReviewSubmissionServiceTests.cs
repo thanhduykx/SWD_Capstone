@@ -9,7 +9,8 @@ public sealed class ReviewSubmissionServiceTests
     public async Task Submit_RequiresReviewerCommentButNotNumericScoreOrVerdict()
     {
         var store = new FakeStore();
-        var service = new ReviewSubmissionService(store, new TemplateProvider());
+        var service = new ReviewSubmissionService(
+            store, new TemplateProvider(), new TestReviewSessionAccessService());
 
         ReviewSubmissionResult result = await service.SubmitAsync(
             10, new ReviewActor(7, UserRole.Lecturer), CancellationToken.None);
@@ -22,7 +23,8 @@ public sealed class ReviewSubmissionServiceTests
     public async Task SaveDraft_NormalizesAndPersistsMultipleReviewerComments()
     {
         var store = new FakeStore();
-        var service = new ReviewSubmissionService(store, new TemplateProvider());
+        var service = new ReviewSubmissionService(
+            store, new TemplateProvider(), new TestReviewSessionAccessService());
 
         await service.SaveDraftAsync(
             10,

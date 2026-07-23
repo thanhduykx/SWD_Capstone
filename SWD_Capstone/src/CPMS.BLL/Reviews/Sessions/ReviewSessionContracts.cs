@@ -48,7 +48,9 @@ public sealed record MyReviewSessionResult(
     string Room,
     int ReviewerCount,
     ReviewSubmissionStatus SubmissionStatus,
-    DateTime LastSavedAt);
+    DateTime LastSavedAt,
+    bool HasAccessCode,
+    bool IsAccessVerified);
 
 public interface IReviewSessionService
 {

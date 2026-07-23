@@ -50,6 +50,16 @@ internal static class ApiSecurityConfiguration
                         QueueLimit = 0,
                         AutoReplenishment = true
                     }));
+            options.AddPolicy("review-access-code", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    $"{context.User.FindFirstValue("sub") ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
         });
         var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
         services.AddCors(options => options.AddPolicy("Frontend", policy => policy

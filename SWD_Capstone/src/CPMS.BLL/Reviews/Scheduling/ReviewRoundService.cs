@@ -7,6 +7,10 @@ namespace CPMS.BLL.Reviews.Scheduling;
 
 public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules rules) : IReviewRoundService
 {
+    private const int RegistrationWindowDays = 7;
+    private const int DaysBetweenRegistrationAndReview = 5;
+    private const int MinimumDaysBetweenReviewWeeks = 28;
+
     public async Task<IReadOnlyList<ReviewRoundManagementResult>> GetRoundsAsync(
         int semesterId, CancellationToken cancellationToken) =>
         (await store.GetRoundsAsync(semesterId, cancellationToken)).Select(Map).ToArray();
@@ -20,43 +24,94 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
         DateOnly? legacyWeekStartDate,
         CancellationToken cancellationToken)
     {
-        if (!await store.SemesterExistsAsync(semesterId, cancellationToken))
-        {
-            throw new BusinessRuleException("Semester does not exist.");
-        }
+        SemesterReviewPeriod semester = await store.FindSemesterPeriodAsync(semesterId, cancellationToken)
+            ?? throw new BusinessRuleException("Semester does not exist.");
 
         var moderatorId = await store.FindModeratorIdAsync(userId, allowModeratorFallback, cancellationToken)
             ?? throw new UnauthorizedAccessException("A Training Department moderator profile is required.");
-        DateOnly normalizedStart;
-        if (registrationEndDate.HasValue)
-        {
-            normalizedStart = registrationEndDate.Value.AddDays(5);
-            if (normalizedStart.DayOfWeek != DayOfWeek.Monday)
-            {
-                throw new BusinessRuleException(
-                    "Registration must end on Wednesday so the Monday-Saturday review schedule starts exactly five days later.");
-            }
-            if (legacyWeekStartDate.HasValue && legacyWeekStartDate.Value != normalizedStart)
-            {
-                throw new BusinessRuleException("Review week must start exactly five days after registration ends.");
-            }
-        }
-        else if (legacyWeekStartDate.HasValue)
-        {
-            normalizedStart = ReviewWeek.NormalizeStart(legacyWeekStartDate.Value);
-        }
-        else
-        {
-            throw new BusinessRuleException("Registration end date is required.");
-        }
+        DateOnly normalizedStart = ResolveWeekStart(registrationEndDate, legacyWeekStartDate);
+
+        DateOnly reviewEnd = normalizedStart.AddDays(5);
+        EnsureWithinSemester(semester, normalizedStart, reviewEnd);
+
         if (await store.RoundExistsAsync(semesterId, reviewType, cancellationToken))
         {
             throw new BusinessRuleException("This semester already has a review round of the selected type.");
         }
 
+        IReadOnlyList<ReviewRoundState> existingRounds =
+            await store.GetRoundsAsync(semesterId, cancellationToken);
+        EnsureSpacingAndOrder(existingRounds, reviewType, normalizedStart);
+
         ReviewRoundState state = await store.CreateRoundAsync(
-            semesterId, reviewType, normalizedStart, normalizedStart.AddDays(5), moderatorId, cancellationToken);
+            semesterId, reviewType, normalizedStart, reviewEnd, moderatorId, cancellationToken);
         return Map(state);
+    }
+
+    private static DateOnly ResolveWeekStart(
+        DateOnly? registrationEndDate,
+        DateOnly? legacyWeekStartDate)
+    {
+        if (!registrationEndDate.HasValue)
+        {
+            if (legacyWeekStartDate.HasValue)
+            {
+                return ReviewWeek.NormalizeStart(legacyWeekStartDate.Value);
+            }
+            throw new BusinessRuleException("Registration end date is required.");
+        }
+
+        DateOnly normalizedStart = registrationEndDate.Value.AddDays(DaysBetweenRegistrationAndReview);
+        if (normalizedStart.DayOfWeek != DayOfWeek.Monday)
+        {
+            throw new BusinessRuleException(
+                "Registration must end on Wednesday so the Monday-Saturday review schedule starts exactly five days later.");
+        }
+        if (legacyWeekStartDate.HasValue && legacyWeekStartDate.Value != normalizedStart)
+        {
+            throw new BusinessRuleException("Review week must start exactly five days after registration ends.");
+        }
+        return normalizedStart;
+    }
+
+    private static void EnsureWithinSemester(
+        SemesterReviewPeriod semester,
+        DateOnly reviewStart,
+        DateOnly reviewEnd)
+    {
+        DateOnly registrationStart = reviewStart.AddDays(
+            -(DaysBetweenRegistrationAndReview + RegistrationWindowDays));
+        if (registrationStart < semester.StartDate || reviewEnd > semester.EndDate)
+        {
+            throw new BusinessRuleException(
+                "The registration window and Monday-Saturday review week must be fully within the semester.");
+        }
+    }
+
+    private static void EnsureSpacingAndOrder(
+        IReadOnlyList<ReviewRoundState> existingRounds,
+        ReviewType reviewType,
+        DateOnly weekStart)
+    {
+        ReviewRoundState? conflictingRound = existingRounds.FirstOrDefault(existing =>
+            Math.Abs(existing.WeekStartDate.DayNumber - weekStart.DayNumber)
+                < MinimumDaysBetweenReviewWeeks);
+        if (conflictingRound is not null)
+        {
+            throw new BusinessRuleException(
+                $"Review weeks must be at least four weeks apart. " +
+                $"{conflictingRound.Type} starts on {conflictingRound.WeekStartDate:yyyy-MM-dd}.");
+        }
+
+        int requestedOrder = (int)reviewType;
+        bool violatesReviewOrder = existingRounds.Any(existing =>
+            ((int)existing.Type < requestedOrder && existing.WeekStartDate >= weekStart)
+            || ((int)existing.Type > requestedOrder && existing.WeekStartDate <= weekStart));
+        if (violatesReviewOrder)
+        {
+            throw new BusinessRuleException(
+                "Review 1, Review 2 and Review 3 must be scheduled in chronological order.");
+        }
     }
 
     public async Task<ReviewRoundManagementResult> UpdateStatusAsync(

@@ -19,8 +19,13 @@ public sealed class ReviewRoundStore(CpmsDbContext dbContext) : IReviewRoundStor
                     .Select(registration => registration.GroupId).Distinct().Count()))
             .ToListAsync(cancellationToken);
 
-    public Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken) =>
-        dbContext.Semesters.AnyAsync(x => x.Id == semesterId, cancellationToken);
+    public Task<SemesterReviewPeriod?> FindSemesterPeriodAsync(
+        int semesterId,
+        CancellationToken cancellationToken) =>
+        dbContext.Semesters
+            .Where(x => x.Id == semesterId)
+            .Select(x => new SemesterReviewPeriod(x.StartDate, x.EndDate))
+            .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<int?> FindModeratorIdAsync(
         int userId, bool allowFallback, CancellationToken cancellationToken)

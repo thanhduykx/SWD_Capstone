@@ -10,6 +10,34 @@ namespace CPMS.DAL.Repositories.Defense;
 
 public sealed class DefenseManagementStore(CpmsDbContext dbContext) : IDefenseManagementStore
 {
+    public async Task<IReadOnlyList<DefenseBoardResult>> GetBoardsAsync(
+        int semesterId, CancellationToken cancellationToken)
+    {
+        var boards = await dbContext.Councils.AsNoTracking()
+            .Where(x => x.SemesterId == semesterId)
+            .OrderBy(x => x.Code)
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.SemesterId,
+                x.Type,
+                x.Status,
+                x.ChairmanId,
+                x.SecretaryId,
+                MemberLecturerIds = dbContext.CouncilMembers
+                    .Where(member => member.CouncilId == x.Id)
+                    .OrderBy(member => member.Role)
+                    .ThenBy(member => member.LecturerId)
+                    .Select(member => member.LecturerId)
+                    .ToArray()
+            })
+            .ToListAsync(cancellationToken);
+        return boards.Select(x => new DefenseBoardResult(
+            x.Id, x.Code, x.SemesterId, x.Type, x.Status,
+            x.ChairmanId, x.SecretaryId, x.MemberLecturerIds)).ToArray();
+    }
+
     public async Task<PagedResult<DefenseRoundResult>> GetRoundsAsync(
         PagedRequest request, CancellationToken cancellationToken)
     {

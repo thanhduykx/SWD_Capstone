@@ -29,6 +29,10 @@ public sealed class ReviewSession
 {
     public int Id { get; set; }
     public required string Code { get; set; }
+    public string? AccessCodeHash { get; set; }
+    public int AccessCodeVersion { get; set; }
+    public DateTime? AccessCodeGeneratedAt { get; set; }
+    public int? AccessCodeGeneratedByUserId { get; set; }
     public int SemesterId { get; set; }
     public int DayOfWeek { get; set; }
     public int Slot { get; set; }
@@ -38,6 +42,14 @@ public sealed class ReviewSession
     public ReviewSessionStatus Status { get; set; } = ReviewSessionStatus.Draft;
     public DateTime? PublishedAt { get; set; }
     public int? PublishedByTrainingDepartmentId { get; set; }
+}
+
+public sealed class ReviewSessionAccessGrant
+{
+    public int SessionId { get; set; }
+    public int LecturerId { get; set; }
+    public int CodeVersion { get; set; }
+    public DateTime VerifiedAt { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class ReviewSessionReviewer

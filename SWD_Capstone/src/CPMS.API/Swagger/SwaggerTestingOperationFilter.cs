@@ -27,10 +27,6 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
         ["POST /api/auth/google"] = new(
             "Google login",
             "For client Google Sign-In. The Google email must already exist in users.email."),
-        ["POST /api/auth/bootstrap-admin"] = new(
-            "Create first admin in Development",
-            "Only works in Development and only when the users table is empty. Normal Swagger testing should use a moderator account."),
-
         ["GET /api/accounts"] = new(
             "List accounts",
             "Use this after login to verify account ids, roles, active status, and existing test users."),
@@ -151,11 +147,6 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("refreshToken", Str("paste-refresh-token-from-login"))),
         ["POST /api/auth/google"] = Obj(
             ("idToken", Str("paste-google-id-token-from-client"))),
-        ["POST /api/auth/bootstrap-admin"] = Obj(
-            ("username", Str("admin")),
-            ("email", Str("admin@cpms.local")),
-            ("password", Str("123456"))),
-
         ["POST /api/accounts"] = Obj(
             ("username", Null()),
             ("identityCode", Str("SE194673")),

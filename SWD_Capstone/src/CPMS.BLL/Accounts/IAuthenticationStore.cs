@@ -27,12 +27,4 @@ public interface IAuthenticationStore
     Task<RefreshTokenState?> FindRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken);
     Task<AuthenticationUser?> FindUserAsync(int userId, CancellationToken cancellationToken);
     Task RotateRefreshTokenAsync(int existingTokenId, PersistRefreshToken replacement, CancellationToken cancellationToken);
-    Task<bool> AnyUsersAsync(CancellationToken cancellationToken);
-    Task<BootstrapAdminResult> CreateBootstrapAdminAsync(
-        string username,
-        string email,
-        string passwordHash,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken);
 }

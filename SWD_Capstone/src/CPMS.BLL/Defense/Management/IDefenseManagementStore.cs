@@ -10,6 +10,8 @@ public sealed record DefenseGroupState(int Id, string Code, int SemesterId);
 public interface IDefenseManagementStore
 {
     Task<PagedResult<DefenseRoundResult>> GetRoundsAsync(PagedRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DefenseBoardResult>> GetBoardsAsync(
+        int semesterId, CancellationToken cancellationToken);
     Task<int?> FindModeratorIdAsync(int userId, bool allowFallback, CancellationToken cancellationToken);
     Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken);
     Task<bool> RoundCodeExistsAsync(int semesterId, string code, CancellationToken cancellationToken);

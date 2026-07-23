@@ -2,10 +2,13 @@ using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Exceptions;
 using CPMS.BLL.Services;
+using CPMS.BLL.Reviews.Access;
 
 namespace CPMS.BLL.Reviews.Assessment;
 
-public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IReviewAttendanceService
+public sealed class ReviewAttendanceService(
+    IReviewAttendanceStore store,
+    IReviewSessionAccessService sessionAccessService) : IReviewAttendanceService
 {
     public async Task<ReviewAttendanceResult> GetAttendanceAsync(
         int sessionId, int? groupId, ReviewActor actor, CancellationToken cancellationToken)
@@ -13,6 +16,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewAttendance(context, actor);
+        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
         EnsureAttendanceHasOpened(context);
         return await BuildAttendanceAsync(context, cancellationToken);
     }
@@ -33,6 +37,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can submit attendance.");
         }
+        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
             throw new ConflictException("Attendance is locked after the group's review is completed.");
@@ -62,6 +67,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewComments(context, actor);
+        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
         return await store.GetCommentsAsync(sessionId, context.GroupId, cancellationToken);
     }
 
@@ -80,6 +86,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can add comments.");
         }
+        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
             throw new ConflictException("Comments are locked after the group's review is completed.");
@@ -103,6 +110,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can complete the review.");
         }
+        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
         if (context.SessionStatus != ReviewSessionStatus.Published)
         {
             throw new ConflictException("Only a published review session can be completed.");
@@ -130,6 +138,17 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);
     }
+
+    private Task EnsureSessionCodeAsync(
+        int sessionId,
+        ReviewActor actor,
+        CancellationToken cancellationToken) =>
+        actor.Role == UserRole.Lecturer
+            ? sessionAccessService.EnsureLecturerAccessAsync(
+                sessionId,
+                actor.UserId,
+                cancellationToken)
+            : Task.CompletedTask;
 
     private async Task<ReviewAttendanceContext> RequireContextAsync(
         int sessionId, int? groupId, int userId, CancellationToken cancellationToken)

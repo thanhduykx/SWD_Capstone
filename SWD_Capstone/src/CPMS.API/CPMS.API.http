@@ -29,31 +29,6 @@ Accept: application/json
   "password": ""
 }
 
-### Login: legacy local admin
-POST {{CPMS_API_HostAddress}}/api/auth/login
-Content-Type: application/json
-Accept: application/json
-
-{
-  "username": "",
-  "password": ""
-}
-
-###
-
-### Bootstrap first admin: Development only and only when users table is empty
-POST {{CPMS_API_HostAddress}}/api/auth/bootstrap-admin
-Content-Type: application/json
-Accept: application/json
-
-{
-  "username": "",
-  "email": "admin@cpms.local",
-  "password": ""
-}
-
-###
-
 ### List accounts
 GET {{CPMS_API_HostAddress}}/api/accounts
 Authorization: Bearer {{AccessToken}}

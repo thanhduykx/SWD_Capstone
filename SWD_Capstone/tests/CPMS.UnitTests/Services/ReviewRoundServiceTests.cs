@@ -79,6 +79,51 @@ public sealed class ReviewRoundServiceTests
     }
 
     [Fact]
+    public async Task CreateRound_RejectsReviewWeeksLessThanFourWeeksApart()
+    {
+        var store = new FakeStore
+        {
+            SemesterExists = true,
+            ModeratorId = 12,
+            CurrentRound = Round(
+                status: ReviewRoundStatus.Published,
+                type: ReviewType.Review1,
+                weekStartDate: new DateOnly(2026, 7, 6))
+        };
+        var service = new ReviewRoundService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.CreateRoundAsync(
+                7, false, 3, ReviewType.Review2,
+                new DateOnly(2026, 7, 15), new DateOnly(2026, 7, 20), CancellationToken.None));
+
+        Assert.Contains("at least four weeks apart", exception.Message);
+        Assert.Null(store.CreatedByModeratorId);
+    }
+
+    [Fact]
+    public async Task CreateRound_RejectsRegistrationOrReviewOutsideSemester()
+    {
+        var store = new FakeStore
+        {
+            SemesterExists = true,
+            ModeratorId = 12,
+            SemesterPeriod = new SemesterReviewPeriod(
+                new DateOnly(2026, 5, 1),
+                new DateOnly(2026, 8, 31))
+        };
+        var service = new ReviewRoundService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.CreateRoundAsync(
+                7, false, 3, ReviewType.Review1,
+                new DateOnly(2026, 4, 29), new DateOnly(2026, 5, 4), CancellationToken.None));
+
+        Assert.Contains("fully within the semester", exception.Message);
+        Assert.Null(store.CreatedByModeratorId);
+    }
+
+    [Fact]
     public async Task UpdateStatus_RejectsInvalidTransitionWithoutWriting()
     {
         var store = new FakeStore { CurrentRound = Round(status: ReviewRoundStatus.Draft) };
@@ -125,13 +170,21 @@ public sealed class ReviewRoundServiceTests
         Assert.NotNull(result.ClosedAt);
     }
 
-    private static ReviewRoundState Round(int id = 1, ReviewRoundStatus status = ReviewRoundStatus.Draft) =>
-        new(id, 3, ReviewType.Review1, status, new DateOnly(2026, 7, 13), new DateOnly(2026, 7, 18),
+    private static ReviewRoundState Round(
+        int id = 1,
+        ReviewRoundStatus status = ReviewRoundStatus.Draft,
+        ReviewType type = ReviewType.Review1,
+        DateOnly? weekStartDate = null)
+    {
+        DateOnly start = weekStartDate ?? new DateOnly(2026, 7, 13);
+        return new(id, 3, type, status, start, start.AddDays(5),
             DateTime.UtcNow.AddDays(-1), null, null, 0);
+    }
 
     private sealed class FakeStore : IReviewRoundStore
     {
         public bool SemesterExists { get; init; }
+        public SemesterReviewPeriod? SemesterPeriod { get; init; }
         public bool RoundExists { get; init; }
         public int? ModeratorId { get; init; }
         public ReviewRoundState? CurrentRound { get; init; }
@@ -142,8 +195,14 @@ public sealed class ReviewRoundServiceTests
         public Task<IReadOnlyList<ReviewRoundState>> GetRoundsAsync(int semesterId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ReviewRoundState>>(CurrentRound is null ? [] : [CurrentRound]);
 
-        public Task<bool> SemesterExistsAsync(int semesterId, CancellationToken cancellationToken) =>
-            Task.FromResult(SemesterExists);
+        public Task<SemesterReviewPeriod?> FindSemesterPeriodAsync(
+            int semesterId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(SemesterExists
+                ? SemesterPeriod ?? new SemesterReviewPeriod(
+                    new DateOnly(2026, 1, 1),
+                    new DateOnly(2026, 12, 31))
+                : null);
 
         public Task<int?> FindModeratorIdAsync(int userId, bool allowFallback, CancellationToken cancellationToken) =>
             Task.FromResult(ModeratorId);

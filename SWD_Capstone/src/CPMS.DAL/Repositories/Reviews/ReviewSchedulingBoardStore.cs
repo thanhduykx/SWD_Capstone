@@ -76,6 +76,8 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                     session.DayOfWeek,
                     session.Slot,
                     session.Room,
+                    HasAccessCode = session.AccessCodeHash != null,
+                    session.AccessCodeGeneratedAt,
                     GroupStatus = groupSlot.Status,
                     groupSlot.GroupPosition
                 })
@@ -121,7 +123,8 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
             reviewerRowsBySession.Where(reviewer => reviewer.SessionId == x.Id)
                 .Select(reviewer => reviewer.LecturerId).ToArray(),
             x.SessionDate, x.DayOfWeek, x.Slot, x.Room ?? string.Empty, x.GroupStatus,
-            feedbackBySessionGroup.GetValueOrDefault((x.Id, x.GroupId), []))).ToArray();
+            feedbackBySessionGroup.GetValueOrDefault((x.Id, x.GroupId), []),
+            x.HasAccessCode, x.AccessCodeGeneratedAt)).ToArray();
 
         return new ReviewSchedulingBoardResult(
             semesterId, reviewType, weekStart, lecturers, availability, submissions, groups, sessions);

@@ -60,4 +60,17 @@ public sealed record MyReviewSessionResponse(
     string Room,
     int ReviewerCount,
     ReviewSubmissionStatus SubmissionStatus,
-    DateTime LastSavedAt);
+    DateTime LastSavedAt,
+    bool HasAccessCode,
+    bool IsAccessVerified);
+
+public sealed record VerifyReviewSessionAccessCodeRequest(string AccessCode);
+public sealed record GeneratedReviewSessionAccessCodeResponse(
+    int SessionId,
+    string AccessCode,
+    int CodeVersion,
+    DateTime GeneratedAt);
+public sealed record VerifiedReviewSessionAccessResponse(
+    int SessionId,
+    bool IsVerified,
+    DateTime VerifiedAt);

@@ -7,6 +7,7 @@ using CPMS.BLL.Reviews.Scheduling;
 using CPMS.BLL.Reviews.Sessions;
 using CPMS.BLL.Reviews.Publication;
 using CPMS.BLL.Reviews.Assessment;
+using CPMS.BLL.Reviews.Access;
 using CPMS.BLL.Academic;
 using CPMS.BLL.Accounts;
 using CPMS.BLL.Defense.Management;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IReviewPublicationService, ReviewPublicationService>();
         services.AddScoped<IReviewAttendanceService, ReviewAttendanceService>();
         services.AddScoped<IReviewSubmissionService, ReviewSubmissionService>();
+        services.AddScoped<IReviewSessionAccessService, ReviewSessionAccessService>();
         services.AddScoped<ISemesterService, SemesterService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IAccountAdministrationService, AccountAdministrationService>();

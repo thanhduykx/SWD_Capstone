@@ -20,6 +20,10 @@ _Avoid_: Lecturer assignment
 A published or draft panel assignment for one reviewer pair, room, date, and slot, containing at most three capstone groups in an explicit order.
 _Avoid_: Student availability, registration
 
+**Review Session Access Code**:
+A session-scoped secret generated or rotated by the Training Department; an assigned lecturer must verify it before entering that review session's working area.
+_Avoid_: Room code, invitation code, lecturer password
+
 **Publication**:
 The moderator action that makes draft review sessions visible and sends schedule notifications.
 _Avoid_: Assignment

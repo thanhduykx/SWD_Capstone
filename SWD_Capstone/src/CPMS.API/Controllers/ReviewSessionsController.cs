@@ -2,17 +2,22 @@ using System.Globalization;
 using System.Security.Claims;
 using CPMS.API.Contracts.Reviews;
 using CPMS.BLL.Common.Exceptions;
+using CPMS.BLL.Exceptions;
 using CPMS.BLL.Reviews.Sessions;
+using CPMS.BLL.Reviews.Access;
 using CPMS.BLL.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CPMS.API.Controllers;
 
 [ApiController]
 [Route("api/review-sessions")]
 [Authorize]
-public sealed class ReviewSessionsController(IReviewSessionService sessionService) : ControllerBase
+public sealed class ReviewSessionsController(
+    IReviewSessionService sessionService,
+    IReviewSessionAccessService accessService) : ControllerBase
 {
     [HttpPost]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment,Moderator")]
@@ -90,7 +95,67 @@ public sealed class ReviewSessionsController(IReviewSessionService sessionServic
         IReadOnlyList<MyReviewSessionResult> results = await sessionService.GetLecturerSessionsAsync(CurrentUserId(), cancellationToken);
         return results.Select(x => new MyReviewSessionResponse(
             x.SessionId, x.SubmissionId, x.Code, x.Type, x.SessionStatus, x.GroupId, x.GroupCode,
-            x.TopicName, x.SessionDate, x.Slot, x.Room, x.ReviewerCount, x.SubmissionStatus, x.LastSavedAt)).ToArray();
+            x.TopicName, x.SessionDate, x.Slot, x.Room, x.ReviewerCount, x.SubmissionStatus, x.LastSavedAt,
+            x.HasAccessCode, x.IsAccessVerified)).ToArray();
+    }
+
+    [HttpPost("{sessionId:int}/access-code")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<GeneratedReviewSessionAccessCodeResponse>> GenerateAccessCode(
+        int sessionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            GeneratedReviewSessionAccessCode result = await accessService.GenerateAsync(
+                sessionId,
+                CurrentUserId(),
+                cancellationToken);
+            return Ok(new GeneratedReviewSessionAccessCodeResponse(
+                result.SessionId,
+                result.AccessCode,
+                result.CodeVersion,
+                result.GeneratedAt));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
+        }
+    }
+
+    [HttpPost("{sessionId:int}/access-code/verify")]
+    [Authorize(Roles = "Lecturer")]
+    [EnableRateLimiting("review-access-code")]
+    public async Task<ActionResult<VerifiedReviewSessionAccessResponse>> VerifyAccessCode(
+        int sessionId,
+        VerifyReviewSessionAccessCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        try
+        {
+            VerifiedReviewSessionAccess result = await accessService.VerifyAsync(
+                sessionId,
+                CurrentUserId(),
+                request.AccessCode,
+                cancellationToken);
+            return Ok(new VerifiedReviewSessionAccessResponse(
+                result.SessionId,
+                result.IsVerified,
+                result.VerifiedAt));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
+        }
+        catch (BusinessRuleException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     private int CurrentUserId()

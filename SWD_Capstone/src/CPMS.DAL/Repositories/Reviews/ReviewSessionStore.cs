@@ -215,7 +215,16 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
                     .Select(session => session.Room).Single(),
                 dbContext.ReviewSessionReviewers.Count(reviewer => reviewer.SessionId == submission.SessionId),
                 submission.Status,
-                submission.LastSavedAt))
+                submission.LastSavedAt,
+                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId)
+                    .Select(session => session.AccessCodeHash != null).Single(),
+                dbContext.ReviewSessionAccessGrants.Any(grant =>
+                    grant.SessionId == submission.SessionId
+                    && grant.LecturerId == lecturerId
+                    && grant.CodeVersion == dbContext.ReviewSessions
+                        .Where(session => session.Id == submission.SessionId)
+                        .Select(session => session.AccessCodeVersion)
+                        .Single())))
             .ToListAsync(cancellationToken);
 
     private async Task<ReviewSessionResult> MapSessionAsync(int sessionId, CancellationToken cancellationToken)

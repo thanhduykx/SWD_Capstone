@@ -14,9 +14,7 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
         ArgumentNullException.ThrowIfNull(login);
         var normalized = login.Trim().ToLowerInvariant();
         return dbContext.Users.Where(x => EF.Functions.ILike(x.Username, normalized) ||
-                EF.Functions.ILike(x.Email, normalized) ||
-                (normalized == "admin" && (EF.Functions.ILike(x.Username, "admin@gmail.com") ||
-                                             EF.Functions.ILike(x.Email, "admin@gmail.com"))))
+                EF.Functions.ILike(x.Email, normalized))
             .Select(MapProjection()).FirstOrDefaultAsync(cancellationToken);
     }
     public Task<AuthenticationUser?> FindByEmailAsync(string email, CancellationToken cancellationToken) =>
@@ -71,31 +69,6 @@ public sealed class AuthenticationStore(CpmsDbContext dbContext) : IAuthenticati
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
-    public Task<bool> AnyUsersAsync(CancellationToken cancellationToken) => dbContext.Users.AnyAsync(cancellationToken);
-    public async Task<BootstrapAdminResult> CreateBootstrapAdminAsync(
-        string username, string email, string passwordHash, string? ipAddress, string? userAgent,
-        CancellationToken cancellationToken)
-    {
-        var user = new User
-        {
-            Username = username, Email = email, PasswordHash = passwordHash,
-            Role = UserRole.SystemAdministrator, IsActive = true
-        };
-        dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        dbContext.SystemAdministrators.Add(new SystemAdministrator
-        {
-            UserId = user.Id, AdminLevel = "Root", PermissionScope = "DevelopmentBootstrap"
-        });
-        dbContext.AuditLogs.Add(new AuditLog
-        {
-            UserId = user.Id, Action = "BOOTSTRAP_ADMIN", EntityType = nameof(User), EntityId = user.Id,
-            NewValue = user.Username, IpAddress = ipAddress, UserAgent = userAgent
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return new BootstrapAdminResult(user.Id, user.Username, user.Role);
-    }
-
     private static RefreshToken NewToken(PersistRefreshToken x) => new()
     {
         UserId = x.UserId, TokenHash = x.TokenHash, ExpiresAt = x.ExpiresAt, DeviceInfo = x.DeviceInfo

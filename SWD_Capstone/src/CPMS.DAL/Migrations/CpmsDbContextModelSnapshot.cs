@@ -1527,6 +1527,23 @@ namespace CPMS.DAL.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AccessCodeGeneratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("access_code_generated_at");
+
+                    b.Property<int?>("AccessCodeGeneratedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_code_generated_by_user_id");
+
+                    b.Property<string>("AccessCodeHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("access_code_hash");
+
+                    b.Property<int>("AccessCodeVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_code_version");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1576,6 +1593,9 @@ namespace CPMS.DAL.Data.Migrations
                     b.HasKey("Id")
                         .HasName("pk_review_sessions");
 
+                    b.HasIndex("AccessCodeGeneratedByUserId")
+                        .HasDatabaseName("ix_review_sessions_access_code_generated_by_user_id");
+
                     b.HasIndex("PublishedByTrainingDepartmentId")
                         .HasDatabaseName("ix_review_sessions_published_by_training_department_id");
 
@@ -1592,6 +1612,33 @@ namespace CPMS.DAL.Data.Migrations
 
                             t.HasCheckConstraint("ck_review_sessions_slot", "status = 'Cancelled' OR slot BETWEEN 1 AND 5");
                         });
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionAccessGrant", b =>
+                {
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer")
+                        .HasColumnName("session_id");
+
+                    b.Property<int>("LecturerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lecturer_id");
+
+                    b.Property<int>("CodeVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("code_version");
+
+                    b.Property<DateTime>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.HasKey("SessionId", "LecturerId")
+                        .HasName("pk_review_session_access_grants");
+
+                    b.HasIndex("LecturerId")
+                        .HasDatabaseName("ix_review_session_access_grants_lecturer_id");
+
+                    b.ToTable("review_session_access_grants", (string)null);
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionReviewer", b =>
@@ -2723,6 +2770,12 @@ namespace CPMS.DAL.Data.Migrations
 
             modelBuilder.Entity("CPMS.DAL.Entities.ReviewSession", b =>
                 {
+                    b.HasOne("CPMS.DAL.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AccessCodeGeneratedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_review_sessions_users_access_code_generated_by_user_id");
+
                     b.HasOne("CPMS.DAL.Entities.TrainingDepartment", null)
                         .WithMany()
                         .HasForeignKey("PublishedByTrainingDepartmentId")
@@ -2735,6 +2788,23 @@ namespace CPMS.DAL.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_review_sessions_semesters_semester_id");
+                });
+
+            modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionAccessGrant", b =>
+                {
+                    b.HasOne("CPMS.DAL.Entities.Lecturer", null)
+                        .WithMany()
+                        .HasForeignKey("LecturerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_session_access_grants_lecturers_lecturer_id");
+
+                    b.HasOne("CPMS.DAL.Entities.ReviewSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_session_access_grants_review_sessions_session_id");
                 });
 
             modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionReviewer", b =>

@@ -23,6 +23,7 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
     public DbSet<ReviewAvailability> ReviewAvailabilities => Set<ReviewAvailability>();
     public DbSet<ReviewAvailabilitySubmission> ReviewAvailabilitySubmissions => Set<ReviewAvailabilitySubmission>();
     public DbSet<ReviewSession> ReviewSessions => Set<ReviewSession>();
+    public DbSet<ReviewSessionAccessGrant> ReviewSessionAccessGrants => Set<ReviewSessionAccessGrant>();
     public DbSet<ReviewSessionReviewer> ReviewSessionReviewers => Set<ReviewSessionReviewer>();
     public DbSet<GroupReviewSlot> GroupReviewSlots => Set<GroupReviewSlot>();
     public DbSet<ReviewChecklistSubmission> ReviewChecklistSubmissions => Set<ReviewChecklistSubmission>();
@@ -189,10 +190,20 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             });
             entity.HasIndex(x => new { x.Code, x.SemesterId }).IsUnique();
             entity.HasIndex(x => new { x.SemesterId, x.Type, x.SessionDate, x.Slot });
+            entity.Property(x => x.AccessCodeHash).HasMaxLength(100);
             entity.Property(x => x.Type).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewSessionStatus.Draft);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<TrainingDepartment>().WithMany().HasForeignKey(x => x.PublishedByTrainingDepartmentId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AccessCodeGeneratedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ReviewSessionAccessGrant>(entity =>
+        {
+            entity.ToTable("review_session_access_grants");
+            entity.HasKey(x => new { x.SessionId, x.LecturerId });
+            entity.HasIndex(x => x.LecturerId);
+            entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<ReviewSessionReviewer>(entity =>
         {

@@ -1,7 +1,6 @@
 using CPMS.API.Contracts.Accounts;
 using CPMS.BLL.Accounts;
 using CPMS.BLL.Common.Exceptions;
-using CPMS.BLL.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -11,9 +10,7 @@ namespace CPMS.API.Controllers;
 [ApiController]
 [Route("api/auth")]
 [EnableRateLimiting("auth")]
-public sealed class AuthController(
-    IAuthenticationService authenticationService,
-    IWebHostEnvironment environment) : ControllerBase
+public sealed class AuthController(IAuthenticationService authenticationService) : ControllerBase
 {
     [AllowAnonymous]
     [HttpPost("login")]
@@ -56,24 +53,6 @@ public sealed class AuthController(
         AuthenticationResult? result = await authenticationService.RefreshAsync(
             request.RefreshToken, Request.Headers.UserAgent, cancellationToken);
         return result is null ? Unauthorized() : Ok(Map(result));
-    }
-
-    [AllowAnonymous]
-    [HttpPost("bootstrap-admin")]
-    public async Task<ActionResult> BootstrapAdmin(
-        BootstrapAdminRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        if (!environment.IsDevelopment()) return NotFound();
-        try
-        {
-            BootstrapAdminResult result = await authenticationService.BootstrapAdminAsync(
-                request.Username, request.Email, request.Password,
-                HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent, cancellationToken);
-            return CreatedAtAction(nameof(BootstrapAdmin), new { result.Id }, result);
-        }
-        catch (ConflictException exception) { return Conflict(new { error = exception.Message }); }
-        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
     private static TokenResponse Map(AuthenticationResult result) =>

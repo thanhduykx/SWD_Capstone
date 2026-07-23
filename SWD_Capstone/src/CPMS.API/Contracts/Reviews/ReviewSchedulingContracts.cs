@@ -28,7 +28,9 @@ public sealed record ReviewSchedulingSessionResponse(
     int Slot,
     string Room,
     ReviewGroupStatus GroupStatus,
-    IReadOnlyCollection<ReviewSchedulingReviewerFeedbackResponse> ReviewerFeedback);
+    IReadOnlyCollection<ReviewSchedulingReviewerFeedbackResponse> ReviewerFeedback,
+    bool HasAccessCode,
+    DateTime? AccessCodeGeneratedAt);
 public sealed record ReviewSchedulingReviewerFeedbackResponse(
     int ReviewerId,
     string ReviewerCode,

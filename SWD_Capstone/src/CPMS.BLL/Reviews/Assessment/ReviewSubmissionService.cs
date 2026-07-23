@@ -1,12 +1,14 @@
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Exceptions;
+using CPMS.BLL.Reviews.Access;
 
 namespace CPMS.BLL.Reviews.Assessment;
 
 public sealed class ReviewSubmissionService(
     IReviewSubmissionStore store,
-    IReviewChecklistTemplateProvider templateProvider) : IReviewSubmissionService
+    IReviewChecklistTemplateProvider templateProvider,
+    IReviewSessionAccessService sessionAccessService) : IReviewSubmissionService
 {
     public async Task<IReadOnlyList<ReviewSubmissionSummary>> GetMySubmissionsAsync(
         ReviewActor actor, CancellationToken cancellationToken)
@@ -115,7 +117,14 @@ public sealed class ReviewSubmissionService(
     {
         if (actor.Role is UserRole.SystemAdministrator or UserRole.TrainingDepartment) return;
         if (actor.Role == UserRole.Lecturer &&
-            await store.FindLecturerIdAsync(actor.UserId, cancellationToken) == state.ReviewerId) return;
+            await store.FindLecturerIdAsync(actor.UserId, cancellationToken) == state.ReviewerId)
+        {
+            await sessionAccessService.EnsureLecturerAccessAsync(
+                state.SessionId,
+                actor.UserId,
+                cancellationToken);
+            return;
+        }
         if (actor.Role == UserRole.Student && state.Status != ReviewSubmissionStatus.Draft &&
             await store.FindStudentGroupIdAsync(actor.UserId, cancellationToken) == state.GroupId) return;
         throw new UnauthorizedAccessException("You are not allowed to view this review submission.");
@@ -127,6 +136,10 @@ public sealed class ReviewSubmissionService(
         if (actor.Role != UserRole.Lecturer ||
             await store.FindLecturerIdAsync(actor.UserId, cancellationToken) != state.ReviewerId)
             throw new UnauthorizedAccessException("Only the assigned reviewer can edit this review submission.");
+        await sessionAccessService.EnsureLecturerAccessAsync(
+            state.SessionId,
+            actor.UserId,
+            cancellationToken);
         if (state.GroupCompleted)
             throw new BusinessRuleException("Review feedback is locked after the group's review is completed.");
     }
