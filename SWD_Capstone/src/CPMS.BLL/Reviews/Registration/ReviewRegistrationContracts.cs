@@ -4,6 +4,8 @@ namespace CPMS.BLL.Reviews.Registration;
 
 public sealed record ReviewAvailabilitySlot(int DayOfWeek, int Slot);
 
+public sealed record SlotRegistrationCount(int DayOfWeek, int Slot, int RegisteredCount);
+
 public sealed record ReviewAvailabilityWeekResult(
     int RoundId,
     int SemesterId,
@@ -11,7 +13,9 @@ public sealed record ReviewAvailabilityWeekResult(
     DateOnly WeekStart,
     bool IsSubmitted,
     DateTime? SubmittedAt,
-    IReadOnlyCollection<ReviewAvailabilitySlot> Slots);
+    IReadOnlyCollection<ReviewAvailabilitySlot> Slots,
+    int MaxRegistrationsPerSlot,
+    IReadOnlyCollection<SlotRegistrationCount> SlotRegistrationCounts);
 
 public sealed record StudentReviewRoundResult(
     int Id,
@@ -40,6 +44,8 @@ public sealed record StudentSlotGridResult(
     DateOnly WeekEndDate,
     int RequiredAvailabilityCount,
     IReadOnlyCollection<StudentSlotRegistrationResult> MyAvailability,
+    int MaxRegistrationsPerSlot,
+    IReadOnlyCollection<SlotRegistrationCount> SlotRegistrationCounts,
     bool IsLeader = false,
     int? GroupId = null,
     string? GroupCode = null);

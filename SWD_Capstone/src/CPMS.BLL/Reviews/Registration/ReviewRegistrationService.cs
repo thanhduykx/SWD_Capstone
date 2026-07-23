@@ -14,7 +14,8 @@ public sealed class ReviewRegistrationService(
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
         ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
         LecturerAvailabilityData state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
-        return MapLecturerAvailability(round, lecturerId, state);
+        IReadOnlyList<SlotRegistrationCount> counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, cancellationToken);
+        return MapLecturerAvailability(round, lecturerId, state, counts);
     }
 
     public async Task<ReviewAvailabilityWeekResult> SaveLecturerAvailabilityAsync(
@@ -28,9 +29,6 @@ public sealed class ReviewRegistrationService(
             throw new BusinessRuleException("Slots is required.");
         }
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
-        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
-        EnsureOpen(round, "Lecturer availability can only be changed while registration is Open.");
-
         ReviewAvailabilitySlot[] distinctSlots = slots.Distinct().OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot).ToArray();
         foreach (ReviewAvailabilitySlot? slot in distinctSlots)
         {
@@ -41,9 +39,20 @@ public sealed class ReviewRegistrationService(
             rules.ValidateReviewSlot(slot.Slot);
         }
 
-        await store.ReplaceLecturerAvailabilityAsync(round, lecturerId, distinctSlots, DateTime.UtcNow, cancellationToken);
-        return new ReviewAvailabilityWeekResult(
-            round.Id, round.SemesterId, lecturerId, round.WeekStartDate, false, null, distinctSlots);
+        return await store.ExecuteLockedAsync(roundId, async token =>
+        {
+            ReviewRoundData round = await RequireRoundAsync(roundId, token);
+            EnsureOpen(round, "Lecturer availability can only be changed while registration is Open.");
+            LecturerAvailabilityData current = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, token);
+            IReadOnlyList<SlotRegistrationCount> counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
+            rules.EnsureSlotRegistrationCapacity(
+                distinctSlots, current.Slots, counts, AssignmentRules.MaxLecturersPerAvailabilitySlot, "lecturer");
+            await store.ReplaceLecturerAvailabilityAsync(round, lecturerId, distinctSlots, DateTime.UtcNow, token);
+            counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
+            return new ReviewAvailabilityWeekResult(
+                round.Id, round.SemesterId, lecturerId, round.WeekStartDate, false, null, distinctSlots,
+                AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
+        }, cancellationToken);
     }
 
     public async Task<ReviewAvailabilityWeekResult> SubmitLecturerAvailabilityAsync(
@@ -60,8 +69,10 @@ public sealed class ReviewRegistrationService(
 
         DateTime submittedAt = DateTime.UtcNow;
         await store.SubmitLecturerAvailabilityAsync(round, lecturerId, submittedAt, cancellationToken);
+        IReadOnlyList<SlotRegistrationCount> counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, cancellationToken);
         return new ReviewAvailabilityWeekResult(
-            round.Id, round.SemesterId, lecturerId, round.WeekStartDate, true, submittedAt, state.Slots);
+            round.Id, round.SemesterId, lecturerId, round.WeekStartDate, true, submittedAt, state.Slots,
+            AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
     }
 
     public async Task<IReadOnlyList<StudentReviewRoundResult>> GetStudentRoundsAsync(
@@ -89,7 +100,8 @@ public sealed class ReviewRegistrationService(
         IReadOnlyList<StudentRegistrationData> registrations = student?.GroupId is int groupId
             ? await store.GetStudentRegistrationsAsync(roundId, groupId, cancellationToken)
             : [];
-        return MapGrid(round, registrations, student?.IsLeader ?? false, student?.GroupId, student?.GroupCode);
+        IReadOnlyList<SlotRegistrationCount> counts = await store.GetStudentSlotRegistrationCountsAsync(roundId, cancellationToken);
+        return MapGrid(round, registrations, counts, student?.IsLeader ?? false, student?.GroupId, student?.GroupCode);
     }
 
     public async Task<StudentSlotGridResult> SaveStudentAvailabilityAsync(
@@ -103,22 +115,36 @@ public sealed class ReviewRegistrationService(
             throw new BusinessRuleException("Slots are required.");
         }
         StudentProfileData student = await RequireGroupedStudentAsync(userId, cancellationToken);
-        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
-        EnsureOpen(round, "Registration is not open for this review round.");
         rules.ValidateStudentAvailability(slots.Select(x => (x.DayOfWeek, x.Slot)).ToArray());
         if (!student.IsLeader)
         {
             throw new BusinessRuleException("Only the group leader can register a review slot.");
         }
-        if (student.GroupSemesterId != round.SemesterId)
+        ReviewAvailabilitySlot[] distinctSlots = slots.Distinct().OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot).ToArray();
+        return await store.ExecuteLockedAsync(roundId, async token =>
         {
-            throw new BusinessRuleException("Your capstone group does not belong to this review round's semester.");
-        }
-
-        await store.ReplaceStudentAvailabilityAsync(
-            roundId, student.GroupId!.Value, student.Id, slots.Distinct().ToArray(), cancellationToken);
-        IReadOnlyList<StudentRegistrationData> registrations = await store.GetStudentRegistrationsAsync(roundId, student.GroupId.Value, cancellationToken);
-        return MapGrid(round, registrations, student.IsLeader, student.GroupId, student.GroupCode);
+            ReviewRoundData round = await RequireRoundAsync(roundId, token);
+            EnsureOpen(round, "Registration is not open for this review round.");
+            if (student.GroupSemesterId != round.SemesterId)
+            {
+                throw new BusinessRuleException("Your capstone group does not belong to this review round's semester.");
+            }
+            IReadOnlyList<StudentRegistrationData> current = await store.GetStudentRegistrationsAsync(
+                roundId, student.GroupId!.Value, token);
+            IReadOnlyList<SlotRegistrationCount> counts = await store.GetStudentSlotRegistrationCountsAsync(roundId, token);
+            rules.EnsureSlotRegistrationCapacity(
+                distinctSlots,
+                current.Select(x => new ReviewAvailabilitySlot(x.DayOfWeek, x.Slot)).ToArray(),
+                counts,
+                AssignmentRules.MaxGroupsPerAvailabilitySlot,
+                "group");
+            await store.ReplaceStudentAvailabilityAsync(
+                roundId, student.GroupId.Value, student.Id, distinctSlots, token);
+            IReadOnlyList<StudentRegistrationData> registrations = await store.GetStudentRegistrationsAsync(
+                roundId, student.GroupId.Value, token);
+            counts = await store.GetStudentSlotRegistrationCountsAsync(roundId, token);
+            return MapGrid(round, registrations, counts, student.IsLeader, student.GroupId, student.GroupCode);
+        }, cancellationToken);
     }
 
     public async Task ClearStudentAvailabilityAsync(int userId, int roundId, CancellationToken cancellationToken)
@@ -236,15 +262,21 @@ public sealed class ReviewRegistrationService(
     }
 
     private static ReviewAvailabilityWeekResult MapLecturerAvailability(
-        ReviewRoundData round, int lecturerId, LecturerAvailabilityData state) =>
+        ReviewRoundData round, int lecturerId, LecturerAvailabilityData state,
+        IReadOnlyCollection<SlotRegistrationCount> counts) =>
         new(round.Id, round.SemesterId, lecturerId, round.WeekStartDate,
-            state.SubmittedAt is not null, state.SubmittedAt, state.Slots);
+            state.SubmittedAt is not null, state.SubmittedAt, state.Slots,
+            AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
 
     private static StudentSlotGridResult MapGrid(
-        ReviewRoundData round, IReadOnlyCollection<StudentRegistrationData> registrations, bool isLeader = false, int? groupId = null, string? groupCode = null) =>
+        ReviewRoundData round, IReadOnlyCollection<StudentRegistrationData> registrations,
+        IReadOnlyCollection<SlotRegistrationCount> counts,
+        bool isLeader = false, int? groupId = null, string? groupCode = null) =>
         new(round.Id, round.Type, round.Status, round.WeekStartDate, round.WeekEndDate,
             AssignmentRules.RequiredStudentAvailabilityCount,
             registrations.Select(x => new StudentSlotRegistrationResult(
                 x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray(),
+            AssignmentRules.MaxGroupsPerAvailabilitySlot,
+            counts,
             isLeader, groupId, groupCode);
 }

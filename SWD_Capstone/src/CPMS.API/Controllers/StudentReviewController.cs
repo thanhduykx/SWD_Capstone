@@ -132,6 +132,9 @@ public sealed class StudentReviewController(IReviewRegistrationService registrat
             result.RequiredAvailabilityCount,
             result.MyAvailability.Select(x => new StudentSlotRegistrationResponse(
                 x.Id, x.GroupId, x.GroupCode, x.DayOfWeek, x.Slot)).ToArray(),
+            result.MaxRegistrationsPerSlot,
+            result.SlotRegistrationCounts.Select(x => new SlotRegistrationCountResponse(
+                x.DayOfWeek, x.Slot, x.RegisteredCount)).ToArray(),
             result.IsLeader,
             result.GroupId,
             result.GroupCode);

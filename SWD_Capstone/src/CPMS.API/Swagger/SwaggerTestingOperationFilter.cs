@@ -191,7 +191,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("semesterId", Int(1)),
             ("reviewType", Str("Review1")),
             ("weekStart", Str("2026-06-15")),
-            ("reviewersPerSession", Int(4)),
+            ("reviewersPerSession", Int(2)),
             ("roomPrefix", Str("AUTO")),
             ("seed", Null())),
 

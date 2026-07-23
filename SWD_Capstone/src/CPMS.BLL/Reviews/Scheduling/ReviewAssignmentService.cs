@@ -13,23 +13,24 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         GenerateReviewAssignmentsCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var reviewersPerSession = command.ReviewersPerSession == 0 ? 2 : command.ReviewersPerSession;
-        if (reviewersPerSession < 2)
+        var minimumReviewers = command.ReviewersPerSession == 0 ? 2 : command.ReviewersPerSession;
+        if (minimumReviewers is < 2 or > AssignmentRules.MaxLecturersPerAvailabilitySlot)
         {
-            throw new BusinessRuleException("Reviewers per session must be at least 2.");
+            throw new BusinessRuleException(
+                $"Minimum reviewers per session must be between 2 and {AssignmentRules.MaxLecturersPerAvailabilitySlot}.");
         }
 
         var scope = new ReviewAssignmentScope(
             command.SemesterId, command.ReviewType, ReviewWeek.NormalizeStart(command.WeekStart));
         return store.ExecuteLockedAsync(
             scope,
-            token => GenerateLockedAsync(scope, reviewersPerSession, command.RoomPrefix, command.Seed, token),
+            token => GenerateLockedAsync(scope, minimumReviewers, command.RoomPrefix, command.Seed, token),
             cancellationToken);
     }
 
     private async Task<GenerateReviewAssignmentsResult> GenerateLockedAsync(
         ReviewAssignmentScope scope,
-        int reviewersPerSession,
+        int minimumReviewers,
         string? requestedRoomPrefix,
         int? seed,
         CancellationToken cancellationToken)
@@ -66,10 +67,10 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
                 ? previous
                 : new HashSet<int>();
             MutablePanel? selectedPanel = FindReusablePanel(
-                panels, group, groupAvailability, previousReviewerIds, reviewersPerSession);
+                panels, group, groupAvailability, previousReviewerIds, minimumReviewers);
             selectedPanel ??= await CreatePanelAsync(
                 scope, snapshot, group, groupAvailability, previousReviewerIds,
-                reviewersPerSession, roomPrefix, panels, occupiedSlots, usedCodes, random,
+                minimumReviewers, roomPrefix, panels, occupiedSlots, usedCodes, random,
                 cancellationToken);
             if (selectedPanel is null)
             {
@@ -126,9 +127,10 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         AssignmentGroup group,
         IReadOnlySet<string> groupAvailability,
         IReadOnlySet<int> previousReviewerIds,
-        int reviewersPerSession) => panels
+        int minimumReviewers) => panels
         .Where(panel => panel.GroupCount < AssignmentRules.MaxGroupsPerReviewSession &&
-                        panel.ReviewerIds.Count == reviewersPerSession &&
+                        panel.ReviewerIds.Count >= minimumReviewers &&
+                        panel.ReviewerIds.Count <= AssignmentRules.MaxLecturersPerAvailabilitySlot &&
                         groupAvailability.Contains(SlotKey(panel.DayOfWeek, panel.Slot)) &&
                         !panel.ReviewerIds.Contains(group.SupervisorId) &&
                         !panel.ReviewerIds.Any(previousReviewerIds.Contains))
@@ -141,7 +143,7 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         AssignmentGroup group,
         IReadOnlySet<string> groupAvailability,
         IReadOnlySet<int> previousReviewerIds,
-        int reviewersPerSession,
+        int minimumReviewers,
         string roomPrefix,
         List<MutablePanel> panels,
         HashSet<string> occupiedSlots,
@@ -157,13 +159,15 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
                                slot.LecturerId, SessionDate(scope.WeekStart, slot.DayOfWeek), slot.Slot)))
             .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
             .Where(groupedSlots =>
-                groupedSlots.Select(slot => slot.LecturerId).Distinct().Count() >= reviewersPerSession)
+            {
+                var count = groupedSlots.Select(slot => slot.LecturerId).Distinct().Count();
+                return count >= minimumReviewers && count <= AssignmentRules.MaxLecturersPerAvailabilitySlot;
+            })
             .ToArray();
         if (eligibleSlots.Length == 0) return null;
 
         var selectedSlot = Shuffle(eligibleSlots, random)[0];
-        var reviewerIds = Shuffle(selectedSlot.Select(x => x.LecturerId).Distinct(), random)
-            .Take(reviewersPerSession).ToArray();
+        int[] reviewerIds = selectedSlot.Select(x => x.LecturerId).Distinct().Order().ToArray();
         rules.ValidateReviewAssignment(group.SupervisorId, reviewerIds, previousReviewerIds);
         DateTime sessionDate = SessionDate(scope.WeekStart, selectedSlot.Key.DayOfWeek);
         AssignmentPanel created = await store.CreatePanelAsync(

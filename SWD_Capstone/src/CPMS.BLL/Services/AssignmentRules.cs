@@ -1,5 +1,6 @@
 using CPMS.BLL.Exceptions;
 using CPMS.BLL.Enums;
+using CPMS.BLL.Reviews.Registration;
 
 namespace CPMS.BLL.Services;
 
@@ -7,6 +8,8 @@ public sealed class AssignmentRules
 {
     public const int RequiredStudentAvailabilityCount = 5;
     public const int MaxGroupsPerReviewSession = 3;
+    public const int MaxLecturersPerAvailabilitySlot = 4;
+    public const int MaxGroupsPerAvailabilitySlot = 3;
 
     public void ValidateReviewSlot(int slot)
     {
@@ -27,7 +30,11 @@ public sealed class AssignmentRules
         {
             throw new BusinessRuleException("A review session must have at least two reviewers.");
         }
-
+        if (reviewerIds.Count > MaxLecturersPerAvailabilitySlot)
+        {
+            throw new BusinessRuleException(
+                $"A review session can contain at most {MaxLecturersPerAvailabilitySlot} reviewers.");
+        }
         if (reviewerIds.Count != reviewerIds.Distinct().Count())
         {
             throw new BusinessRuleException("A review session cannot repeat the same reviewer.");
@@ -41,6 +48,27 @@ public sealed class AssignmentRules
         if (previousRoundReviewerIds is not null && reviewerIds.Any(previousRoundReviewerIds.Contains))
         {
             throw new BusinessRuleException("Review 2 reviewers cannot repeat reviewers from Review 1.");
+        }
+    }
+
+    public void EnsureSlotRegistrationCapacity(
+        IReadOnlyCollection<ReviewAvailabilitySlot> selectedSlots,
+        IReadOnlyCollection<ReviewAvailabilitySlot> currentSlots,
+        IReadOnlyCollection<SlotRegistrationCount> registrationCounts,
+        int maximum,
+        string participantLabel)
+    {
+        ArgumentNullException.ThrowIfNull(selectedSlots);
+        ArgumentNullException.ThrowIfNull(currentSlots);
+        ArgumentNullException.ThrowIfNull(registrationCounts);
+        var current = currentSlots.ToHashSet();
+        var counts = registrationCounts.ToDictionary(x => (x.DayOfWeek, x.Slot), x => x.RegisteredCount);
+        ReviewAvailabilitySlot? fullSlot = selectedSlots.FirstOrDefault(slot =>
+            counts.GetValueOrDefault((slot.DayOfWeek, slot.Slot)) - (current.Contains(slot) ? 1 : 0) >= maximum);
+        if (fullSlot is not null)
+        {
+            throw new BusinessRuleException(
+                $"Day {fullSlot.DayOfWeek}, slot {fullSlot.Slot} already has {maximum}/{maximum} {participantLabel} registrations.");
         }
     }
 

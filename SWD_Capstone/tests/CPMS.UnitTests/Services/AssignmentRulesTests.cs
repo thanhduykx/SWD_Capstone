@@ -81,6 +81,14 @@ public sealed class AssignmentRulesTests
     }
 
     [Fact]
+    public void ReviewAssignment_RejectsMoreThanFourReviewers()
+    {
+        Action action = () => _rules.ValidateReviewAssignment(10, [11, 12, 13, 14, 15]);
+
+        Assert.Throws<BusinessRuleException>(action);
+    }
+
+    [Fact]
     public void ReviewAssignment_RejectsSingleReviewer()
     {
         Action action = () => _rules.ValidateReviewAssignment(10, [11]);

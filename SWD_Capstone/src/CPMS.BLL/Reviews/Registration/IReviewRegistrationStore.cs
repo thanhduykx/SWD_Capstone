@@ -29,15 +29,21 @@ public sealed record StudentCommentData(
 
 public interface IReviewRegistrationStore
 {
+    Task<TResult> ExecuteLockedAsync<TResult>(
+        int roundId,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken);
     Task<int?> FindLecturerIdByUserIdAsync(int userId, CancellationToken cancellationToken);
     Task<ReviewRoundData?> FindRoundAsync(int roundId, CancellationToken cancellationToken);
     Task<LecturerAvailabilityData> GetLecturerAvailabilityAsync(int roundId, int lecturerId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<SlotRegistrationCount>> GetLecturerSlotRegistrationCountsAsync(int roundId, CancellationToken cancellationToken);
     Task ReplaceLecturerAvailabilityAsync(ReviewRoundData round, int lecturerId, IReadOnlyCollection<ReviewAvailabilitySlot> slots, DateTime changedAt, CancellationToken cancellationToken);
     Task SubmitLecturerAvailabilityAsync(ReviewRoundData round, int lecturerId, DateTime submittedAt, CancellationToken cancellationToken);
     Task<StudentProfileData?> FindStudentByUserIdAsync(int userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<int>> GetActiveSemesterIdsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentRoundData>> GetStudentRoundsAsync(IReadOnlyCollection<int> semesterIds, int? groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentRegistrationData>> GetStudentRegistrationsAsync(int roundId, int groupId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<SlotRegistrationCount>> GetStudentSlotRegistrationCountsAsync(int roundId, CancellationToken cancellationToken);
     Task ReplaceStudentAvailabilityAsync(int roundId, int groupId, int studentId, IReadOnlyCollection<ReviewAvailabilitySlot> slots, CancellationToken cancellationToken);
     Task<bool> ClearStudentAvailabilityAsync(int roundId, int groupId, CancellationToken cancellationToken);
     Task<IReadOnlyList<StudentScheduleData>> GetStudentScheduleAsync(int groupId, CancellationToken cancellationToken);

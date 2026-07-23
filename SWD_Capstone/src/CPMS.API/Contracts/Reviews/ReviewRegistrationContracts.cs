@@ -5,6 +5,7 @@ namespace CPMS.API.Contracts.Reviews;
 public sealed record SaveReviewAvailabilityWeekRequest(IReadOnlyCollection<ReviewAvailabilitySlotRequest> Slots);
 public sealed record ReviewAvailabilitySlotRequest(int DayOfWeek, int Slot);
 public sealed record ReviewAvailabilitySlotResponse(int DayOfWeek, int Slot);
+public sealed record SlotRegistrationCountResponse(int DayOfWeek, int Slot, int RegisteredCount);
 public sealed record ReviewAvailabilityWeekResponse(
     int RoundId,
     int SemesterId,
@@ -12,7 +13,9 @@ public sealed record ReviewAvailabilityWeekResponse(
     DateOnly WeekStart,
     bool IsSubmitted,
     DateTime? SubmittedAt,
-    IReadOnlyCollection<ReviewAvailabilitySlotResponse> Slots);
+    IReadOnlyCollection<ReviewAvailabilitySlotResponse> Slots,
+    int MaxRegistrationsPerSlot,
+    IReadOnlyCollection<SlotRegistrationCountResponse> SlotRegistrationCounts);
 
 public sealed record StudentReviewRoundResponse(
     int Id,
@@ -34,6 +37,8 @@ public sealed record StudentSlotGridResponse(
     DateOnly WeekEndDate,
     int RequiredAvailabilityCount,
     IReadOnlyCollection<StudentSlotRegistrationResponse> MyAvailability,
+    int MaxRegistrationsPerSlot,
+    IReadOnlyCollection<SlotRegistrationCountResponse> SlotRegistrationCounts,
     bool IsLeader = false,
     int? GroupId = null,
     string? GroupCode = null);

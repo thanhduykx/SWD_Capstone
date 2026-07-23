@@ -64,5 +64,8 @@ public sealed class ReviewAvailabilityController(IReviewRegistrationService regi
             result.WeekStart,
             result.IsSubmitted,
             result.SubmittedAt,
-            result.Slots.Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot)).ToArray());
+            result.Slots.Select(x => new ReviewAvailabilitySlotResponse(x.DayOfWeek, x.Slot)).ToArray(),
+            result.MaxRegistrationsPerSlot,
+            result.SlotRegistrationCounts.Select(x => new SlotRegistrationCountResponse(
+                x.DayOfWeek, x.Slot, x.RegisteredCount)).ToArray());
 }

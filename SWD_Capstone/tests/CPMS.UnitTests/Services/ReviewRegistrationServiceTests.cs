@@ -42,6 +42,41 @@ public sealed class ReviewRegistrationServiceTests
     }
 
     [Fact]
+    public async Task SaveLecturerAvailability_RejectsAFullSlot()
+    {
+        var store = new FakeStore
+        {
+            LecturerId = 7,
+            Round = OpenRound(),
+            LecturerCounts = [new SlotRegistrationCount(1, 1, 4)]
+        };
+        var service = new ReviewRegistrationService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.SaveLecturerAvailabilityAsync(1, 1, [new ReviewAvailabilitySlot(1, 1)], CancellationToken.None));
+
+        Assert.Contains("4/4 lecturer", exception.Message);
+    }
+
+    [Fact]
+    public async Task SaveStudentAvailability_RejectsAFullSlot()
+    {
+        var store = new FakeStore
+        {
+            Student = new StudentProfileData(10, 20, true, 30),
+            Round = OpenRound(),
+            StudentCounts = [new SlotRegistrationCount(1, 1, 3)]
+        };
+        var service = new ReviewRegistrationService(store, new AssignmentRules());
+
+        BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.SaveStudentAvailabilityAsync(1, 1, FiveSlots(), CancellationToken.None));
+
+        Assert.Contains("3/3 group", exception.Message);
+        Assert.False(store.StudentAvailabilityReplaced);
+    }
+
+    [Fact]
     public async Task GetStudentSchedule_ExposesOnlyPublishedSessions()
     {
         var store = new FakeStore
@@ -125,19 +160,24 @@ public sealed class ReviewRegistrationServiceTests
         public IReadOnlyList<StudentRoundData> StudentRounds { get; init; } = [];
         public IReadOnlyList<StudentScheduleData> Schedules { get; init; } = [];
         public IReadOnlyList<StudentCheckInData> CheckIns { get; init; } = [];
+        public IReadOnlyList<SlotRegistrationCount> LecturerCounts { get; init; } = [];
+        public IReadOnlyList<SlotRegistrationCount> StudentCounts { get; init; } = [];
         public bool StudentAvailabilityReplaced { get; private set; }
         public bool LecturerAvailabilitySubmitted { get; private set; }
         public bool StudentCheckInConfirmed { get; private set; }
 
+        public Task<TResult> ExecuteLockedAsync<TResult>(int roundId, Func<CancellationToken, Task<TResult>> action, CancellationToken cancellationToken) => action(cancellationToken);
         public Task<int?> FindLecturerIdByUserIdAsync(int userId, CancellationToken cancellationToken) => Task.FromResult(LecturerId);
         public Task<ReviewRoundData?> FindRoundAsync(int roundId, CancellationToken cancellationToken) => Task.FromResult(Round);
         public Task<LecturerAvailabilityData> GetLecturerAvailabilityAsync(int roundId, int lecturerId, CancellationToken cancellationToken) => Task.FromResult(LecturerAvailability);
+        public Task<IReadOnlyList<SlotRegistrationCount>> GetLecturerSlotRegistrationCountsAsync(int roundId, CancellationToken cancellationToken) => Task.FromResult(LecturerCounts);
         public Task ReplaceLecturerAvailabilityAsync(ReviewRoundData round, int lecturerId, IReadOnlyCollection<ReviewAvailabilitySlot> slots, DateTime changedAt, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task SubmitLecturerAvailabilityAsync(ReviewRoundData round, int lecturerId, DateTime submittedAt, CancellationToken cancellationToken) { LecturerAvailabilitySubmitted = true; return Task.CompletedTask; }
         public Task<StudentProfileData?> FindStudentByUserIdAsync(int userId, CancellationToken cancellationToken) => Task.FromResult(Student);
         public Task<IReadOnlyList<int>> GetActiveSemesterIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<int>>([30]);
         public Task<IReadOnlyList<StudentRoundData>> GetStudentRoundsAsync(IReadOnlyCollection<int> semesterIds, int? groupId, CancellationToken cancellationToken) => Task.FromResult(StudentRounds);
         public Task<IReadOnlyList<StudentRegistrationData>> GetStudentRegistrationsAsync(int roundId, int groupId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StudentRegistrationData>>([]);
+        public Task<IReadOnlyList<SlotRegistrationCount>> GetStudentSlotRegistrationCountsAsync(int roundId, CancellationToken cancellationToken) => Task.FromResult(StudentCounts);
         public Task ReplaceStudentAvailabilityAsync(int roundId, int groupId, int studentId, IReadOnlyCollection<ReviewAvailabilitySlot> slots, CancellationToken cancellationToken) { StudentAvailabilityReplaced = true; return Task.CompletedTask; }
         public Task<bool> ClearStudentAvailabilityAsync(int roundId, int groupId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<IReadOnlyList<StudentScheduleData>> GetStudentScheduleAsync(int groupId, CancellationToken cancellationToken) => Task.FromResult(Schedules);

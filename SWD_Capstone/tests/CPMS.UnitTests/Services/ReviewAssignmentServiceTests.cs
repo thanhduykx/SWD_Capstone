@@ -46,6 +46,28 @@ public sealed class ReviewAssignmentServiceTests
     }
 
     [Fact]
+    public async Task Generate_AssignsEveryoneWhoRegisteredTheSharedSlot()
+    {
+        ReviewAssignmentSnapshot snapshot = Snapshot() with
+        {
+            SubmittedAvailability =
+            [
+                new(1, 1, 1),
+                new(2, 1, 1),
+                new(3, 1, 1),
+                new(4, 1, 1)
+            ]
+        };
+        var store = new FakeStore { AssignmentSnapshot = snapshot };
+        var service = new ReviewAssignmentService(store, new AssignmentRules());
+
+        GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
+
+        Assert.Equal(1, result.AssignedCount);
+        Assert.Equal([1, 2, 3, 4], store.AssignedGroups[0].ReviewerIds);
+    }
+
+    [Fact]
     public async Task Generate_ReusesPanelOnlyUntilThreeGroups()
     {
         var panel = new AssignmentPanel(

@@ -3,11 +3,27 @@ using CPMS.BLL.Enums;
 using CPMS.DAL.Entities;
 using CPMS.DAL.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CPMS.DAL.Repositories.Reviews;
 
 public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRegistrationStore
 {
+    public async Task<TResult> ExecuteLockedAsync<TResult>(
+        int roundId,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var lockKey = $"review-registration:{roundId}";
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+        TResult result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     public Task<int?> FindLecturerIdByUserIdAsync(int userId, CancellationToken cancellationToken) =>
         dbContext.Lecturers.Where(x => x.UserId == userId).Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(cancellationToken);
@@ -32,6 +48,16 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
             .SingleOrDefaultAsync(cancellationToken);
         return new LecturerAvailabilityData(submittedAt, slots);
     }
+
+    public async Task<IReadOnlyList<SlotRegistrationCount>> GetLecturerSlotRegistrationCountsAsync(
+        int roundId, CancellationToken cancellationToken) =>
+        await dbContext.ReviewAvailabilities
+            .Where(x => x.ReviewRoundId == roundId)
+            .GroupBy(x => new { x.DayOfWeek, x.Slot })
+            .Select(group => new SlotRegistrationCount(
+                group.Key.DayOfWeek, group.Key.Slot, group.Count()))
+            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
+            .ToListAsync(cancellationToken);
 
     public async Task ReplaceLecturerAvailabilityAsync(
         ReviewRoundData round,
@@ -143,6 +169,16 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
                 x.Id, x.GroupId,
                 dbContext.CapstoneGroups.Where(group => group.Id == x.GroupId).Select(group => group.Code).Single(),
                 x.DayOfWeek, x.Slot))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SlotRegistrationCount>> GetStudentSlotRegistrationCountsAsync(
+        int roundId, CancellationToken cancellationToken) =>
+        await dbContext.StudentSlotRegistrations
+            .Where(x => x.ReviewRoundId == roundId)
+            .GroupBy(x => new { x.DayOfWeek, x.Slot })
+            .Select(group => new SlotRegistrationCount(
+                group.Key.DayOfWeek, group.Key.Slot, group.Count()))
+            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
             .ToListAsync(cancellationToken);
 
     public async Task ReplaceStudentAvailabilityAsync(
