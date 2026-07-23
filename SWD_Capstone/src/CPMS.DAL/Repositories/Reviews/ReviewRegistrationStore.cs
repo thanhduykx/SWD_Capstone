@@ -50,14 +50,23 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
     }
 
     public async Task<IReadOnlyList<SlotRegistrationCount>> GetLecturerSlotRegistrationCountsAsync(
-        int roundId, CancellationToken cancellationToken) =>
-        await dbContext.ReviewAvailabilities
+        int roundId, CancellationToken cancellationToken)
+    {
+        var counts = await dbContext.ReviewAvailabilities
             .Where(x => x.ReviewRoundId == roundId)
             .GroupBy(x => new { x.DayOfWeek, x.Slot })
-            .Select(group => new SlotRegistrationCount(
-                group.Key.DayOfWeek, group.Key.Slot, group.Count()))
-            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
+            .Select(group => new
+            {
+                group.Key.DayOfWeek,
+                group.Key.Slot,
+                RegisteredCount = group.Count()
+            })
             .ToListAsync(cancellationToken);
+        return counts
+            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
+            .Select(x => new SlotRegistrationCount(x.DayOfWeek, x.Slot, x.RegisteredCount))
+            .ToArray();
+    }
 
     public async Task ReplaceLecturerAvailabilityAsync(
         ReviewRoundData round,
@@ -172,14 +181,23 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<SlotRegistrationCount>> GetStudentSlotRegistrationCountsAsync(
-        int roundId, CancellationToken cancellationToken) =>
-        await dbContext.StudentSlotRegistrations
+        int roundId, CancellationToken cancellationToken)
+    {
+        var counts = await dbContext.StudentSlotRegistrations
             .Where(x => x.ReviewRoundId == roundId)
             .GroupBy(x => new { x.DayOfWeek, x.Slot })
-            .Select(group => new SlotRegistrationCount(
-                group.Key.DayOfWeek, group.Key.Slot, group.Count()))
-            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
+            .Select(group => new
+            {
+                group.Key.DayOfWeek,
+                group.Key.Slot,
+                RegisteredCount = group.Count()
+            })
             .ToListAsync(cancellationToken);
+        return counts
+            .OrderBy(x => x.DayOfWeek).ThenBy(x => x.Slot)
+            .Select(x => new SlotRegistrationCount(x.DayOfWeek, x.Slot, x.RegisteredCount))
+            .ToArray();
+    }
 
     public async Task ReplaceStudentAvailabilityAsync(
         int roundId,
