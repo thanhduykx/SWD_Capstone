@@ -47,6 +47,7 @@ public sealed class ReviewSession
 public sealed class ReviewSessionAccessGrant
 {
     public int SessionId { get; set; }
+    public int GroupId { get; set; }
     public int LecturerId { get; set; }
     public int CodeVersion { get; set; }
     public DateTime VerifiedAt { get; set; } = DateTime.UtcNow;
@@ -65,6 +66,10 @@ public sealed class GroupReviewSlot
     public int SessionId { get; set; }
     public int GroupId { get; set; }
     public int GroupPosition { get; set; }
+    public string? AccessCodeHash { get; set; }
+    public int AccessCodeVersion { get; set; }
+    public DateTime? AccessCodeGeneratedAt { get; set; }
+    public int? AccessCodeGeneratedByUserId { get; set; }
     public ReviewResult? Result { get; set; }
     public string? Notes { get; set; }
     public bool ConflictFlag { get; set; }

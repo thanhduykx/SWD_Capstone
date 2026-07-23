@@ -788,6 +788,23 @@ namespace CPMS.DAL.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AccessCodeGeneratedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("access_code_generated_at");
+
+                    b.Property<int?>("AccessCodeGeneratedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_code_generated_by_user_id");
+
+                    b.Property<string>("AccessCodeHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("access_code_hash");
+
+                    b.Property<int>("AccessCodeVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_code_version");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -829,6 +846,9 @@ namespace CPMS.DAL.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_group_review_slots");
+
+                    b.HasIndex("AccessCodeGeneratedByUserId")
+                        .HasDatabaseName("ix_group_review_slots_access_code_generated_by_user_id");
 
                     b.HasIndex("CompletedByLecturerId")
                         .HasDatabaseName("ix_group_review_slots_completed_by_lecturer_id");
@@ -1620,6 +1640,10 @@ namespace CPMS.DAL.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("session_id");
 
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
                     b.Property<int>("LecturerId")
                         .HasColumnType("integer")
                         .HasColumnName("lecturer_id");
@@ -1632,8 +1656,11 @@ namespace CPMS.DAL.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("verified_at");
 
-                    b.HasKey("SessionId", "LecturerId")
+                    b.HasKey("SessionId", "GroupId", "LecturerId")
                         .HasName("pk_review_session_access_grants");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_review_session_access_grants_group_id");
 
                     b.HasIndex("LecturerId")
                         .HasDatabaseName("ix_review_session_access_grants_lecturer_id");
@@ -2525,6 +2552,12 @@ namespace CPMS.DAL.Data.Migrations
 
             modelBuilder.Entity("CPMS.DAL.Entities.GroupReviewSlot", b =>
                 {
+                    b.HasOne("CPMS.DAL.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AccessCodeGeneratedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_group_review_slots_users_access_code_generated_by_user_id");
+
                     b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("CompletedByLecturerId")
@@ -2792,6 +2825,13 @@ namespace CPMS.DAL.Data.Migrations
 
             modelBuilder.Entity("CPMS.DAL.Entities.ReviewSessionAccessGrant", b =>
                 {
+                    b.HasOne("CPMS.DAL.Entities.CapstoneGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_review_session_access_grants_capstone_groups_group_id");
+
                     b.HasOne("CPMS.DAL.Entities.Lecturer", null)
                         .WithMany()
                         .HasForeignKey("LecturerId")

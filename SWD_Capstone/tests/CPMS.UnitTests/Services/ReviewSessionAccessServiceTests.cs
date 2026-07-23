@@ -1,4 +1,4 @@
-using CPMS.BLL.Abstractions.Security;
+﻿using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Exceptions;
 using CPMS.BLL.Reviews.Access;
 
@@ -11,24 +11,20 @@ public sealed class ReviewSessionAccessServiceTests
     {
         var store = new FakeStore
         {
-            Session = new ReviewSessionAccessState(58, null, 2),
-            SlotSessions =
-            [
-                new ReviewSessionAccessState(56, null, 4),
-                new ReviewSessionAccessState(58, null, 2)
-            ]
+            Session = new ReviewSessionAccessState(58, 5, null, 2)
         };
         var service = new ReviewSessionAccessService(store, new FakeHasher());
 
         GeneratedReviewSessionAccessCode result = await service.GenerateAsync(
             58,
+            5,
             7,
             CancellationToken.None);
 
         Assert.Equal(8, result.AccessCode.Length);
-        Assert.Equal(5, result.CodeVersion);
-        Assert.Equal([56, 58], result.AffectedSessionIds);
-        Assert.Equal([56, 58], store.StoredSessionIds);
+        Assert.Equal(3, result.CodeVersion);
+        Assert.Equal(5, result.GroupId);
+        Assert.Equal((58, 5), store.StoredTarget);
         Assert.Equal($"hashed:{new string(result.AccessCode.Reverse().ToArray())}", store.StoredHash);
         Assert.DoesNotContain(result.AccessCode, store.StoredHash);
         Assert.Equal(7, store.GeneratedByUserId);
@@ -39,19 +35,20 @@ public sealed class ReviewSessionAccessServiceTests
     {
         var store = new FakeStore
         {
-            Session = new ReviewSessionAccessState(58, "hashed:5432DCBA", 4),
+            Session = new ReviewSessionAccessState(58, 5, "hashed:5432DCBA", 4),
             AssignedLecturerId = 12
         };
         var service = new ReviewSessionAccessService(store, new FakeHasher());
 
         VerifiedReviewSessionAccess result = await service.VerifyAsync(
             58,
+            5,
             21,
             "abcd2345",
             CancellationToken.None);
 
         Assert.True(result.IsVerified);
-        Assert.Equal((58, 12, 4), store.SavedGrant);
+        Assert.Equal((58, 5, 12, 4), store.SavedGrant);
     }
 
     [Fact]
@@ -59,13 +56,13 @@ public sealed class ReviewSessionAccessServiceTests
     {
         var store = new FakeStore
         {
-            Session = new ReviewSessionAccessState(58, "hashed:5432DCBA", 4),
+            Session = new ReviewSessionAccessState(58, 5, "hashed:5432DCBA", 4),
             AssignedLecturerId = 12
         };
         var service = new ReviewSessionAccessService(store, new FakeHasher());
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            service.VerifyAsync(58, 21, "WXYZ6789", CancellationToken.None));
+            service.VerifyAsync(58, 5, 21, "WXYZ6789", CancellationToken.None));
 
         Assert.Null(store.SavedGrant);
     }
@@ -75,14 +72,14 @@ public sealed class ReviewSessionAccessServiceTests
     {
         var store = new FakeStore
         {
-            Session = new ReviewSessionAccessState(58, "hashed:5432DCBA", 5),
+            Session = new ReviewSessionAccessState(58, 5, "hashed:5432DCBA", 5),
             AssignedLecturerId = 12,
             HasCurrentGrant = false
         };
         var service = new ReviewSessionAccessService(store, new FakeHasher());
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            service.EnsureLecturerAccessAsync(58, 21, CancellationToken.None));
+            service.EnsureLecturerAccessAsync(58, 5, 21, CancellationToken.None));
     }
 
     private sealed class FakeHasher : IPasswordHasher
@@ -97,43 +94,36 @@ public sealed class ReviewSessionAccessServiceTests
     private sealed class FakeStore : IReviewSessionAccessStore
     {
         public ReviewSessionAccessState? Session { get; init; }
-        public IReadOnlyList<ReviewSessionAccessState>? SlotSessions { get; init; }
         public int? AssignedLecturerId { get; init; }
         public bool HasCurrentGrant { get; init; }
         public string? StoredHash { get; private set; }
-        public IReadOnlyCollection<int>? StoredSessionIds { get; private set; }
+        public (int SessionId, int GroupId)? StoredTarget { get; private set; }
         public int? GeneratedByUserId { get; private set; }
-        public (int SessionId, int LecturerId, int Version)? SavedGrant { get; private set; }
+        public (int SessionId, int GroupId, int LecturerId, int Version)? SavedGrant { get; private set; }
 
-        public Task<ReviewSessionAccessState?> FindSessionAsync(
+        public Task<ReviewSessionAccessState?> FindGroupAsync(
             int sessionId,
+            int groupId,
             CancellationToken cancellationToken) =>
-            Task.FromResult(Session?.SessionId == sessionId ? Session : null);
-
-        public Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
-            int sessionId,
-            CancellationToken cancellationToken)
-        {
-            IReadOnlyList<ReviewSessionAccessState> sessions = SlotSessions
-                ?? (Session is { } session && session.SessionId == sessionId ? [session] : []);
-            return Task.FromResult(sessions);
-        }
+            Task.FromResult(Session?.SessionId == sessionId && Session.GroupId == groupId ? Session : null);
 
         public Task<int?> FindAssignedLecturerAsync(
             int sessionId,
+            int groupId,
             int lecturerUserId,
             CancellationToken cancellationToken) =>
             Task.FromResult(AssignedLecturerId);
 
         public Task SaveAccessCodeAsync(
-            IReadOnlyCollection<int> sessionIds,
+            int sessionId,
+            int groupId,
             string accessCodeHash,
             int codeVersion,
             int generatedByUserId,
             DateTime generatedAt,
             CancellationToken cancellationToken)
         {
-            StoredSessionIds = sessionIds;
+            StoredTarget = (sessionId, groupId);
             StoredHash = accessCodeHash;
             GeneratedByUserId = generatedByUserId;
             return Task.CompletedTask;
@@ -141,17 +131,19 @@ public sealed class ReviewSessionAccessServiceTests
 
         public Task SaveGrantAsync(
             int sessionId,
+            int groupId,
             int lecturerId,
             int codeVersion,
             DateTime verifiedAt,
             CancellationToken cancellationToken)
         {
-            SavedGrant = (sessionId, lecturerId, codeVersion);
+            SavedGrant = (sessionId, groupId, lecturerId, codeVersion);
             return Task.CompletedTask;
         }
 
         public Task<bool> HasCurrentGrantAsync(
             int sessionId,
+            int groupId,
             int lecturerId,
             int codeVersion,
             CancellationToken cancellationToken) =>

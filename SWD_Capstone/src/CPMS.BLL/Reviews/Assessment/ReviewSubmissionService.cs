@@ -131,6 +131,7 @@ public sealed class ReviewSubmissionService(
         {
             await sessionAccessService.EnsureLecturerAccessAsync(
                 state.SessionId,
+                state.GroupId,
                 actor.UserId,
                 cancellationToken);
             return;
@@ -148,6 +149,7 @@ public sealed class ReviewSubmissionService(
             throw new UnauthorizedAccessException("Only the assigned reviewer can edit this review submission.");
         await sessionAccessService.EnsureLecturerAccessAsync(
             state.SessionId,
+            state.GroupId,
             actor.UserId,
             cancellationToken);
         if (state.GroupCompleted)

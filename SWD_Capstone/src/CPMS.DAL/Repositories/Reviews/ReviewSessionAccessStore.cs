@@ -8,91 +8,58 @@ namespace CPMS.DAL.Repositories.Reviews;
 public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
     : IReviewSessionAccessStore
 {
-    public Task<ReviewSessionAccessState?> FindSessionAsync(
+    public Task<ReviewSessionAccessState?> FindGroupAsync(
         int sessionId,
+        int groupId,
         CancellationToken cancellationToken) =>
-        dbContext.ReviewSessions
-            .Where(session => session.Id == sessionId)
-            .Select(session => new ReviewSessionAccessState(
-                session.Id,
-                session.AccessCodeHash,
-                session.AccessCodeVersion))
+        dbContext.GroupReviewSlots
+            .Where(slot => slot.SessionId == sessionId && slot.GroupId == groupId)
+            .Select(slot => new ReviewSessionAccessState(
+                slot.SessionId,
+                slot.GroupId,
+                slot.AccessCodeHash,
+                slot.AccessCodeVersion))
             .SingleOrDefaultAsync(cancellationToken);
-
-    public async Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
-        int sessionId,
-        CancellationToken cancellationToken)
-    {
-        var anchor = await dbContext.ReviewSessions
-            .Where(session => session.Id == sessionId)
-            .Select(session => new
-            {
-                session.SemesterId,
-                session.Type,
-                session.SessionDate,
-                session.Slot
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (anchor is null)
-        {
-            return [];
-        }
-
-        return await dbContext.ReviewSessions
-            .Where(session =>
-                session.SemesterId == anchor.SemesterId
-                && session.Type == anchor.Type
-                && session.SessionDate == anchor.SessionDate
-                && session.Slot == anchor.Slot)
-            .Select(session => new ReviewSessionAccessState(
-                session.Id,
-                session.AccessCodeHash,
-                session.AccessCodeVersion))
-            .ToArrayAsync(cancellationToken);
-    }
 
     public Task<int?> FindAssignedLecturerAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         CancellationToken cancellationToken) =>
-        dbContext.ReviewSessionReviewers
-            .Where(assignment =>
-                assignment.SessionId == sessionId
+        dbContext.ReviewChecklistSubmissions
+            .Where(submission =>
+                submission.SessionId == sessionId
+                && submission.GroupId == groupId
                 && dbContext.Lecturers.Any(lecturer =>
-                    lecturer.Id == assignment.LecturerId
+                    lecturer.Id == submission.ReviewerId
                     && lecturer.UserId == lecturerUserId))
-            .Select(assignment => (int?)assignment.LecturerId)
+            .Select(submission => (int?)submission.ReviewerId)
+            .Distinct()
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task SaveAccessCodeAsync(
-        IReadOnlyCollection<int> sessionIds,
+        int sessionId,
+        int groupId,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,
         DateTime generatedAt,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(sessionIds);
-        ReviewSession[] sessions = await dbContext.ReviewSessions
-            .Where(item => sessionIds.Contains(item.Id))
-            .ToArrayAsync(cancellationToken);
-        if (sessions.Length != sessionIds.Count)
-        {
-            throw new KeyNotFoundException("One or more review sessions were not found.");
-        }
-
-        foreach (ReviewSession session in sessions)
-        {
-            session.AccessCodeHash = accessCodeHash;
-            session.AccessCodeVersion = codeVersion;
-            session.AccessCodeGeneratedByUserId = generatedByUserId;
-            session.AccessCodeGeneratedAt = generatedAt;
-        }
+        GroupReviewSlot groupSlot = await dbContext.GroupReviewSlots.SingleOrDefaultAsync(
+            item => item.SessionId == sessionId && item.GroupId == groupId,
+            cancellationToken)
+            ?? throw new KeyNotFoundException("Review group was not found in this session.");
+        groupSlot.AccessCodeHash = accessCodeHash;
+        groupSlot.AccessCodeVersion = codeVersion;
+        groupSlot.AccessCodeGeneratedByUserId = generatedByUserId;
+        groupSlot.AccessCodeGeneratedAt = generatedAt;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SaveGrantAsync(
         int sessionId,
+        int groupId,
         int lecturerId,
         int codeVersion,
         DateTime verifiedAt,
@@ -100,13 +67,16 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
     {
         ReviewSessionAccessGrant? grant = await dbContext.ReviewSessionAccessGrants
             .SingleOrDefaultAsync(
-                item => item.SessionId == sessionId && item.LecturerId == lecturerId,
+                item => item.SessionId == sessionId
+                    && item.GroupId == groupId
+                    && item.LecturerId == lecturerId,
                 cancellationToken);
         if (grant is null)
         {
             dbContext.ReviewSessionAccessGrants.Add(new ReviewSessionAccessGrant
             {
                 SessionId = sessionId,
+                GroupId = groupId,
                 LecturerId = lecturerId,
                 CodeVersion = codeVersion,
                 VerifiedAt = verifiedAt
@@ -122,11 +92,13 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
 
     public Task<bool> HasCurrentGrantAsync(
         int sessionId,
+        int groupId,
         int lecturerId,
         int codeVersion,
         CancellationToken cancellationToken) =>
         dbContext.ReviewSessionAccessGrants.AnyAsync(
             grant => grant.SessionId == sessionId
+                && grant.GroupId == groupId
                 && grant.LecturerId == lecturerId
                 && grant.CodeVersion == codeVersion,
             cancellationToken);

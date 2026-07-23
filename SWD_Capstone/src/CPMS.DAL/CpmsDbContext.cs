@@ -200,9 +200,10 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
         modelBuilder.Entity<ReviewSessionAccessGrant>(entity =>
         {
             entity.ToTable("review_session_access_grants");
-            entity.HasKey(x => new { x.SessionId, x.LecturerId });
+            entity.HasKey(x => new { x.SessionId, x.GroupId, x.LecturerId });
             entity.HasIndex(x => x.LecturerId);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.LecturerId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<ReviewSessionReviewer>(entity =>
@@ -222,11 +223,13 @@ public sealed class CpmsDbContext(DbContextOptions<CpmsDbContext> options) : DbC
             });
             entity.HasIndex(x => new { x.SessionId, x.GroupId }).IsUnique();
             entity.HasIndex(x => new { x.SessionId, x.GroupPosition }).IsUnique();
+            entity.Property(x => x.AccessCodeHash).HasMaxLength(100);
             entity.Property(x => x.Result).HasConversion<string>();
             entity.Property(x => x.Status).HasConversion<string>().HasDefaultValue(ReviewGroupStatus.Scheduled);
             entity.HasOne<ReviewSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<CapstoneGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Lecturer>().WithMany().HasForeignKey(x => x.CompletedByLecturerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AccessCodeGeneratedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ReviewChecklistSubmission>(entity =>
         {

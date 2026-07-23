@@ -2,26 +2,26 @@ namespace CPMS.BLL.Reviews.Access;
 
 public sealed record ReviewSessionAccessState(
     int SessionId,
+    int GroupId,
     string? AccessCodeHash,
     int CodeVersion);
 
 public interface IReviewSessionAccessStore
 {
-    Task<ReviewSessionAccessState?> FindSessionAsync(
+    Task<ReviewSessionAccessState?> FindGroupAsync(
         int sessionId,
-        CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
-        int sessionId,
+        int groupId,
         CancellationToken cancellationToken);
 
     Task<int?> FindAssignedLecturerAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         CancellationToken cancellationToken);
 
     Task SaveAccessCodeAsync(
-        IReadOnlyCollection<int> sessionIds,
+        int sessionId,
+        int groupId,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,
@@ -30,6 +30,7 @@ public interface IReviewSessionAccessStore
 
     Task SaveGrantAsync(
         int sessionId,
+        int groupId,
         int lecturerId,
         int codeVersion,
         DateTime verifiedAt,
@@ -37,6 +38,7 @@ public interface IReviewSessionAccessStore
 
     Task<bool> HasCurrentGrantAsync(
         int sessionId,
+        int groupId,
         int lecturerId,
         int codeVersion,
         CancellationToken cancellationToken);

@@ -6,12 +6,14 @@ internal sealed class TestReviewSessionAccessService : IReviewSessionAccessServi
 {
     public Task<GeneratedReviewSessionAccessCode> GenerateAsync(
         int sessionId,
+        int groupId,
         int generatedByUserId,
         CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 
     public Task<VerifiedReviewSessionAccess> VerifyAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         string accessCode,
         CancellationToken cancellationToken) =>
@@ -19,6 +21,7 @@ internal sealed class TestReviewSessionAccessService : IReviewSessionAccessServi
 
     public Task EnsureLecturerAccessAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         CancellationToken cancellationToken) =>
         Task.CompletedTask;

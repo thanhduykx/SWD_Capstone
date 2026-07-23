@@ -67,11 +67,12 @@ public sealed record MyReviewSessionResponse(
 public sealed record VerifyReviewSessionAccessCodeRequest(string AccessCode);
 public sealed record GeneratedReviewSessionAccessCodeResponse(
     int SessionId,
-    IReadOnlyList<int> AffectedSessionIds,
+    int GroupId,
     string AccessCode,
     int CodeVersion,
     DateTime GeneratedAt);
 public sealed record VerifiedReviewSessionAccessResponse(
     int SessionId,
+    int GroupId,
     bool IsVerified,
     DateTime VerifiedAt);

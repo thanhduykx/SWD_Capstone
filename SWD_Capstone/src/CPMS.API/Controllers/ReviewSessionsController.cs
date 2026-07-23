@@ -93,21 +93,23 @@ public sealed class ReviewSessionsController(
             x.HasAccessCode, x.IsAccessVerified)).ToArray();
     }
 
-    [HttpPost("{sessionId:int}/access-code")]
+    [HttpPost("{sessionId:int}/groups/{groupId:int}/access-code")]
     [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
     public async Task<ActionResult<GeneratedReviewSessionAccessCodeResponse>> GenerateAccessCode(
         int sessionId,
+        int groupId,
         CancellationToken cancellationToken)
     {
         try
         {
             GeneratedReviewSessionAccessCode result = await accessService.GenerateAsync(
                 sessionId,
+                groupId,
                 CurrentUserId(),
                 cancellationToken);
             return Ok(new GeneratedReviewSessionAccessCodeResponse(
                 result.SessionId,
-                result.AffectedSessionIds,
+                result.GroupId,
                 result.AccessCode,
                 result.CodeVersion,
                 result.GeneratedAt));
@@ -118,11 +120,12 @@ public sealed class ReviewSessionsController(
         }
     }
 
-    [HttpPost("{sessionId:int}/access-code/verify")]
+    [HttpPost("{sessionId:int}/groups/{groupId:int}/access-code/verify")]
     [Authorize(Roles = "Lecturer")]
     [EnableRateLimiting("review-access-code")]
     public async Task<ActionResult<VerifiedReviewSessionAccessResponse>> VerifyAccessCode(
         int sessionId,
+        int groupId,
         VerifyReviewSessionAccessCodeRequest request,
         CancellationToken cancellationToken)
     {
@@ -131,11 +134,13 @@ public sealed class ReviewSessionsController(
         {
             VerifiedReviewSessionAccess result = await accessService.VerifyAsync(
                 sessionId,
+                groupId,
                 CurrentUserId(),
                 request.AccessCode,
                 cancellationToken);
             return Ok(new VerifiedReviewSessionAccessResponse(
                 result.SessionId,
+                result.GroupId,
                 result.IsVerified,
                 result.VerifiedAt));
         }
@@ -147,9 +152,9 @@ public sealed class ReviewSessionsController(
         {
             return BadRequest(new { error = exception.Message });
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException exception)
         {
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = exception.Message });
         }
     }
 

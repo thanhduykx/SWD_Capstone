@@ -76,8 +76,8 @@ public sealed class ReviewSchedulingBoardStore(CpmsDbContext dbContext) : IRevie
                     session.DayOfWeek,
                     session.Slot,
                     session.Room,
-                    HasAccessCode = session.AccessCodeHash != null,
-                    session.AccessCodeGeneratedAt,
+                    HasAccessCode = groupSlot.AccessCodeHash != null,
+                    groupSlot.AccessCodeGeneratedAt,
                     GroupStatus = groupSlot.Status,
                     groupSlot.GroupPosition
                 })

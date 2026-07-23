@@ -16,7 +16,7 @@ public sealed class ReviewAttendanceService(
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewAttendance(context, actor);
-        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
+        await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         EnsureAttendanceHasOpened(context);
         return await BuildAttendanceAsync(context, cancellationToken);
     }
@@ -37,7 +37,7 @@ public sealed class ReviewAttendanceService(
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can submit attendance.");
         }
-        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
+        await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
             throw new ConflictException("Attendance is locked after the group's review is completed.");
@@ -67,7 +67,7 @@ public sealed class ReviewAttendanceService(
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewComments(context, actor);
-        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
+        await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         return await store.GetCommentsAsync(sessionId, context.GroupId, cancellationToken);
     }
 
@@ -86,7 +86,7 @@ public sealed class ReviewAttendanceService(
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can add comments.");
         }
-        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
+        await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         if (context.GroupStatus == ReviewGroupStatus.Completed)
         {
             throw new ConflictException("Comments are locked after the group's review is completed.");
@@ -110,7 +110,7 @@ public sealed class ReviewAttendanceService(
         {
             throw new UnauthorizedAccessException("Only an assigned reviewer can complete the review.");
         }
-        await EnsureSessionCodeAsync(sessionId, actor, cancellationToken);
+        await EnsureSessionCodeAsync(sessionId, context.GroupId, actor, cancellationToken);
         if (context.SessionStatus != ReviewSessionStatus.Published)
         {
             throw new ConflictException("Only a published review session can be completed.");
@@ -141,11 +141,13 @@ public sealed class ReviewAttendanceService(
 
     private Task EnsureSessionCodeAsync(
         int sessionId,
+        int groupId,
         ReviewActor actor,
         CancellationToken cancellationToken) =>
         actor.Role == UserRole.Lecturer
             ? sessionAccessService.EnsureLecturerAccessAsync(
                 sessionId,
+                groupId,
                 actor.UserId,
                 cancellationToken)
             : Task.CompletedTask;

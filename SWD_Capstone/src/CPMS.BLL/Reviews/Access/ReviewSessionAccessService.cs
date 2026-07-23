@@ -13,28 +13,19 @@ public sealed class ReviewSessionAccessService(
 
     public async Task<GeneratedReviewSessionAccessCode> GenerateAsync(
         int sessionId,
+        int groupId,
         int generatedByUserId,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<ReviewSessionAccessState> slotSessions =
-            await store.FindSlotSessionsAsync(sessionId, cancellationToken);
-        if (slotSessions.Count == 0)
-        {
-            throw new KeyNotFoundException("Review session not found.");
-        }
-
-        int codeVersion = checked(slotSessions.Max(session => session.CodeVersion) + 1);
+        ReviewSessionAccessState state = await RequireGroupAsync(
+            sessionId, groupId, cancellationToken);
+        int codeVersion = checked(state.CodeVersion + 1);
         string accessCode = RandomNumberGenerator.GetString(AccessCodeAlphabet, AccessCodeLength);
         string accessCodeHash = passwordHasher.Hash(accessCode);
         DateTime generatedAt = DateTime.UtcNow;
-        int[] affectedSessionIds = slotSessions
-            .Select(session => session.SessionId)
-            .Distinct()
-            .Order()
-            .ToArray();
-
         await store.SaveAccessCodeAsync(
-            affectedSessionIds,
+            sessionId,
+            groupId,
             accessCodeHash,
             codeVersion,
             generatedByUserId,
@@ -43,7 +34,7 @@ public sealed class ReviewSessionAccessService(
 
         return new GeneratedReviewSessionAccessCode(
             sessionId,
-            affectedSessionIds,
+            groupId,
             accessCode,
             codeVersion,
             generatedAt);
@@ -51,69 +42,78 @@ public sealed class ReviewSessionAccessService(
 
     public async Task<VerifiedReviewSessionAccess> VerifyAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         string accessCode,
         CancellationToken cancellationToken)
     {
         string normalizedCode = NormalizeCode(accessCode);
-        ReviewSessionAccessState state = await RequireSessionAsync(sessionId, cancellationToken);
+        ReviewSessionAccessState state = await RequireGroupAsync(
+            sessionId, groupId, cancellationToken);
         int lecturerId = await store.FindAssignedLecturerAsync(
             sessionId,
+            groupId,
             lecturerUserId,
             cancellationToken)
             ?? throw new UnauthorizedAccessException(
-                "Only a lecturer assigned to this review session can enter its access code.");
+                "Only a lecturer assigned to this review group can enter its access code.");
 
         if (string.IsNullOrWhiteSpace(state.AccessCodeHash))
         {
             throw new BusinessRuleException(
-                "The Training Department has not generated an access code for this review session.");
+                "The Training Department has not generated an access code for this review group.");
         }
         if (!passwordHasher.Verify(state.AccessCodeHash, normalizedCode))
         {
-            throw new BusinessRuleException("The review session access code is incorrect.");
+            throw new BusinessRuleException("The review group access code is incorrect.");
         }
 
         DateTime verifiedAt = DateTime.UtcNow;
         await store.SaveGrantAsync(
             sessionId,
+            groupId,
             lecturerId,
             state.CodeVersion,
             verifiedAt,
             cancellationToken);
-        return new VerifiedReviewSessionAccess(sessionId, true, verifiedAt);
+        return new VerifiedReviewSessionAccess(sessionId, groupId, true, verifiedAt);
     }
 
     public async Task EnsureLecturerAccessAsync(
         int sessionId,
+        int groupId,
         int lecturerUserId,
         CancellationToken cancellationToken)
     {
-        ReviewSessionAccessState state = await RequireSessionAsync(sessionId, cancellationToken);
+        ReviewSessionAccessState state = await RequireGroupAsync(
+            sessionId, groupId, cancellationToken);
         int lecturerId = await store.FindAssignedLecturerAsync(
             sessionId,
+            groupId,
             lecturerUserId,
             cancellationToken)
             ?? throw new UnauthorizedAccessException(
-                "You are not assigned to this review session.");
+                "You are not assigned to this review group.");
 
         if (string.IsNullOrWhiteSpace(state.AccessCodeHash)
             || !await store.HasCurrentGrantAsync(
                 sessionId,
+                groupId,
                 lecturerId,
                 state.CodeVersion,
                 cancellationToken))
         {
             throw new UnauthorizedAccessException(
-                "Enter the correct review session access code before opening this session.");
+                "Enter the correct review group access code before opening this group.");
         }
     }
 
-    private async Task<ReviewSessionAccessState> RequireSessionAsync(
+    private async Task<ReviewSessionAccessState> RequireGroupAsync(
         int sessionId,
+        int groupId,
         CancellationToken cancellationToken) =>
-        await store.FindSessionAsync(sessionId, cancellationToken)
-        ?? throw new KeyNotFoundException("Review session not found.");
+        await store.FindGroupAsync(sessionId, groupId, cancellationToken)
+        ?? throw new KeyNotFoundException("Review group was not found in this session.");
 
     private static string NormalizeCode(string? accessCode)
     {

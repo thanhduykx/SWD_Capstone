@@ -216,14 +216,18 @@ public sealed class ReviewSessionStore(CpmsDbContext dbContext) : IReviewSession
                 dbContext.ReviewSessionReviewers.Count(reviewer => reviewer.SessionId == submission.SessionId),
                 submission.Status,
                 submission.LastSavedAt,
-                dbContext.ReviewSessions.Where(session => session.Id == submission.SessionId)
-                    .Select(session => session.AccessCodeHash != null).Single(),
+                dbContext.GroupReviewSlots.Any(slot =>
+                    slot.SessionId == submission.SessionId
+                    && slot.GroupId == submission.GroupId
+                    && slot.AccessCodeHash != null),
                 dbContext.ReviewSessionAccessGrants.Any(grant =>
                     grant.SessionId == submission.SessionId
+                    && grant.GroupId == submission.GroupId
                     && grant.LecturerId == lecturerId
-                    && grant.CodeVersion == dbContext.ReviewSessions
-                        .Where(session => session.Id == submission.SessionId)
-                        .Select(session => session.AccessCodeVersion)
+                    && grant.CodeVersion == dbContext.GroupReviewSlots
+                        .Where(slot => slot.SessionId == submission.SessionId
+                            && slot.GroupId == submission.GroupId)
+                        .Select(slot => slot.AccessCodeVersion)
                         .Single())))
             .ToListAsync(cancellationToken);
 

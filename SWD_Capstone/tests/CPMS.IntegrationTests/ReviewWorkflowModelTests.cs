@@ -107,6 +107,24 @@ public sealed class ReviewWorkflowModelTests
     }
 
     [Fact]
+    public void ReviewAccessCode_IsScopedToOneSessionGroup()
+    {
+        using CpmsDbContext context = CreateContext();
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        IEntityType groupSlot = model.FindEntityType(typeof(GroupReviewSlot))!;
+        IEntityType grant = model.FindEntityType(typeof(ReviewSessionAccessGrant))!;
+
+        Assert.Equal(100, groupSlot.FindProperty(nameof(GroupReviewSlot.AccessCodeHash))!.GetMaxLength());
+        Assert.Equal(
+            [
+                nameof(ReviewSessionAccessGrant.SessionId),
+                nameof(ReviewSessionAccessGrant.GroupId),
+                nameof(ReviewSessionAccessGrant.LecturerId)
+            ],
+            grant.FindPrimaryKey()!.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
     public void ReviewRound_IsUniquePerSemesterAndType()
     {
         using CpmsDbContext context = CreateContext();
