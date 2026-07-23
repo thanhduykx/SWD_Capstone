@@ -189,7 +189,10 @@ public sealed class ReviewSubmissionStore(CpmsDbContext dbContext) : IReviewSubm
             : string.Join(Environment.NewLine, draft.ReviewerComments.Select(x => $"• {x}"));
         submission.Suggestion = draft.Suggestion;
         submission.ResultText = draft.ResultText;
-        submission.Status = ReviewSubmissionStatus.Draft;
+        if (submission.Status != ReviewSubmissionStatus.Submitted)
+        {
+            submission.Status = ReviewSubmissionStatus.Draft;
+        }
         submission.LastSavedAt = draft.ChangedAt;
         List<ReviewSubmissionComment> existingComments = await dbContext.ReviewSubmissionComments
             .Where(x => x.SubmissionId == submissionId)

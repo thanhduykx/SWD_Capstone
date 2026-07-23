@@ -51,7 +51,6 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
     {
         await SeedModeratorAsync(cancellationToken);
         await SeedTestAccountsAsync(cancellationToken);
-        await SeedAcademicDataAsync(cancellationToken);
     }
 
     private async Task SeedModeratorAsync(CancellationToken cancellationToken)

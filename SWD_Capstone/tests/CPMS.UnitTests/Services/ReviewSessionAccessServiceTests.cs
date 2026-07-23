@@ -1,4 +1,4 @@
-﻿using CPMS.BLL.Abstractions.Security;
+using CPMS.BLL.Abstractions.Security;
 using CPMS.BLL.Exceptions;
 using CPMS.BLL.Reviews.Access;
 
@@ -132,6 +132,7 @@ public sealed class ReviewSessionAccessServiceTests
         public Task SaveAccessCodeAsync(
             int sessionId,
             int groupId,
+            string accessCode,
             string accessCodeHash,
             int codeVersion,
             int generatedByUserId,

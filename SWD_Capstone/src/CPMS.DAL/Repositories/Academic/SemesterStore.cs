@@ -65,22 +65,29 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
     {
         ArgumentNullException.ThrowIfNull(term);
         Semester? semester = await dbContext.Semesters.SingleOrDefaultAsync(x => x.Code == term.Code, cancellationToken);
-        if (term.IsActive)
-            await dbContext.Semesters.Where(x => x.IsActive && (semester == null || x.Id != semester.Id))
-                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsActive, false), cancellationToken);
         if (semester is null)
         {
-            semester = NewEntity(term);
-            dbContext.Semesters.Add(semester);
+            Semester? activeSemester = await dbContext.Semesters
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.IsActive, cancellationToken);
+            if (activeSemester is not null)
+            {
+                return MapProjection(activeSemester);
+            }
+
+            return new SemesterResult(0, term.Code, term.Name, term.AcademicYear, term.StartDate, term.EndDate, term.IsActive);
         }
-        else
-        {
-            semester.Name = term.Name;
-            semester.AcademicYear = term.AcademicYear;
-            semester.StartDate = term.StartDate;
-            semester.EndDate = term.EndDate;
-            if (term.IsActive) semester.IsActive = true;
-        }
+
+        if (term.IsActive)
+            await dbContext.Semesters.Where(x => x.IsActive && x.Id != semester.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsActive, false), cancellationToken);
+
+        semester.Name = term.Name;
+        semester.AcademicYear = term.AcademicYear;
+        semester.StartDate = term.StartDate;
+        semester.EndDate = term.EndDate;
+        if (term.IsActive) semester.IsActive = true;
+
         await dbContext.SaveChangesAsync(cancellationToken);
         return Map(semester);
     }
@@ -112,18 +119,70 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
 
     public async Task DeleteAsync(int semesterId, CancellationToken cancellationToken)
     {
-        bool hasGroups = await dbContext.CapstoneGroups.AnyAsync(x => x.SemesterId == semesterId, cancellationToken);
-        if (hasGroups) throw new CPMS.BLL.Exceptions.BusinessRuleException("Không thể xóa kỳ học đang có nhóm đồ án (Capstone Groups) tham gia.");
-        
-        try
+        // Cascade xóa toàn bộ dữ liệu liên quan trước khi xóa kỳ học
+
+        // 1. Lấy danh sách session IDs thuộc kỳ học
+        var sessionIds = await dbContext.ReviewSessions
+            .Where(x => x.SemesterId == semesterId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (sessionIds.Count > 0)
         {
-            var rows = await dbContext.Semesters.Where(x => x.Id == semesterId).ExecuteDeleteAsync(cancellationToken);
-            if (rows == 0) throw new InvalidOperationException("Semester not found.");
+            // Lấy submission IDs để xóa comments và responses
+            var submissionIds = await dbContext.ReviewChecklistSubmissions
+                .Where(x => sessionIds.Contains(x.SessionId))
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+
+            if (submissionIds.Count > 0)
+            {
+                await dbContext.ReviewSubmissionComments.Where(x => submissionIds.Contains(x.SubmissionId)).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.ReviewChecklistItemResponses.Where(x => submissionIds.Contains(x.SubmissionId)).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.ReviewChecklistSubmissions.Where(x => submissionIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
+            }
+
+            await dbContext.ReviewComments.Where(x => sessionIds.Contains(x.SessionId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewAttendances.Where(x => sessionIds.Contains(x.SessionId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.GroupReviewSlots.Where(x => sessionIds.Contains(x.SessionId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewSessionAccessGrants.Where(x => sessionIds.Contains(x.SessionId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewSessionReviewers.Where(x => sessionIds.Contains(x.SessionId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewSessions.Where(x => sessionIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
         }
-        catch (Exception ex) when (ex.Message.Contains("foreign key") || ex.Message.Contains("constraint"))
+
+        // 2. Xóa slot đăng ký và nhóm
+        var groupIds = await dbContext.CapstoneGroups
+            .Where(x => x.SemesterId == semesterId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (groupIds.Count > 0)
         {
-            throw new CPMS.BLL.Exceptions.BusinessRuleException("Không thể xóa kỳ học này vì đã có dữ liệu ràng buộc (đề tài, lịch review, đợt bảo vệ...) tham chiếu đến.");
+            await dbContext.StudentSlotRegistrations.Where(x => groupIds.Contains(x.GroupId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Students.Where(x => x.GroupId != null && groupIds.Contains(x.GroupId!.Value))
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.GroupId, (int?)null), cancellationToken);
+            await dbContext.CapstoneGroups.Where(x => groupIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
         }
+
+        // 3. Xóa review rounds & liên quan
+        var roundIds = await dbContext.ReviewRounds
+            .Where(x => x.SemesterId == semesterId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (roundIds.Count > 0)
+        {
+            await dbContext.ReviewAvailabilitySubmissions.Where(x => roundIds.Contains(x.ReviewRoundId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewAvailabilities.Where(x => roundIds.Contains(x.ReviewRoundId)).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewSchedulePublications.Where(x => x.SemesterId == semesterId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ReviewRounds.Where(x => roundIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // 4. Xóa topics và kỳ học
+        await dbContext.Topics.Where(x => x.SemesterId == semesterId).ExecuteDeleteAsync(cancellationToken);
+
+        var rows = await dbContext.Semesters.Where(x => x.Id == semesterId).ExecuteDeleteAsync(cancellationToken);
+        if (rows == 0) throw new InvalidOperationException("Semester not found.");
     }
 
     public async Task<IReadOnlyList<SemesterGroupResult>> GetGroupsAsync(

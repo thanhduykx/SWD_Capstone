@@ -26,6 +26,7 @@ public sealed class ReviewSessionAccessService(
         await store.SaveAccessCodeAsync(
             sessionId,
             groupId,
+            accessCode,
             accessCodeHash,
             codeVersion,
             generatedByUserId,
@@ -135,6 +136,7 @@ public sealed class ReviewSessionAccessService(
             await store.SaveAccessCodeAsync(
                 sessionId,
                 groupId,
+                accessCode,
                 accessCodeHash,
                 codeVersion,
                 generatedByUserId,

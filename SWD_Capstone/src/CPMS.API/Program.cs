@@ -64,7 +64,9 @@ builder.Host.UseSerilog((context, configuration) => configuration
 
 builder.Services.AddProblemDetails();
 builder.Services.AddDbContext<CpmsDbContext>(options =>
-    options.UseNpgsql(cpmsConnectionString).UseSnakeCaseNamingConvention());
+    options.UseNpgsql(cpmsConnectionString)
+           .UseSnakeCaseNamingConvention()
+           .ConfigureWarnings(warnings => warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<CpmsDbContext>());
 builder.Services.AddBLLServices();
 // Đọc Gemini từ builder.Configuration (appsettings + env Gemini__ApiKey trên Render).
@@ -206,13 +208,19 @@ static string GetCpmsConnectionString(IConfiguration configuration) =>
 
 static void ConfigurePublicHttpBinding()
 {
-    // Prefer Render PORT; fall back to container HTTP ports / 8080.
-    string configuredPort = Environment.GetEnvironmentVariable("PORT")
-        ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS")
-        ?? "8080";
-    configuredPort = configuredPort.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+    // Prefer Render PORT; fall back to container HTTP ports / 5122.
+    string? envPort = Environment.GetEnvironmentVariable("PORT")
+        ?? Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS");
+
+    if (string.IsNullOrEmpty(envPort) && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+    {
+        return;
+    }
+
+    string configuredPort = envPort?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
         .FirstOrDefault()
-        ?? "8080";
+        ?? "5122";
+
     if (!int.TryParse(configuredPort, NumberStyles.Integer, CultureInfo.InvariantCulture, out int httpPort)
         || httpPort is < 1 or > 65535)
     {

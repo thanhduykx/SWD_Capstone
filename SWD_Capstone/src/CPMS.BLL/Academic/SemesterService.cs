@@ -10,7 +10,6 @@ public sealed class SemesterService(ISemesterStore store) : ISemesterService
         PagedRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await ResolveAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
         (IReadOnlyList<SemesterResult> Items, int Total) result = await store.GetAllAsync(new SemesterQuery(
             request.SafePage, request.SafePageSize, request.Search?.Trim(), request.FilterBy?.Trim(),
             request.FilterValue?.Trim(), request.SortBy?.Trim(), request.Desc), cancellationToken);

@@ -31,7 +31,8 @@ public sealed record ReviewSchedulingSession(
     ReviewGroupStatus GroupStatus = ReviewGroupStatus.Scheduled,
     IReadOnlyList<ReviewSchedulingReviewerFeedback>? ReviewerFeedback = null,
     bool HasAccessCode = false,
-    DateTime? AccessCodeGeneratedAt = null);
+    DateTime? AccessCodeGeneratedAt = null,
+    string? AccessCode = null);
 
 public sealed record ReviewSchedulingReviewerFeedback(
     int ReviewerId,

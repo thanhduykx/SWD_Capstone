@@ -49,14 +49,14 @@ public sealed class ReviewRegistrationServiceTests
             LecturerId = 7,
             Round = OpenRound(),
             LecturerAvailability = new LecturerAvailabilityData(null, [new ReviewAvailabilitySlot(1, 1)]),
-            LecturerCounts = [new SlotRegistrationCount(1, 1, 4)]
+            LecturerCounts = [new SlotRegistrationCount(1, 1, 3)]
         };
         var service = new ReviewRegistrationService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SubmitLecturerAvailabilityAsync(1, 1, CancellationToken.None));
 
-        Assert.Contains("4/4 lecturer", exception.Message);
+        Assert.Contains("3/3 lecturer", exception.Message);
         Assert.False(store.LecturerAvailabilitySubmitted);
     }
 

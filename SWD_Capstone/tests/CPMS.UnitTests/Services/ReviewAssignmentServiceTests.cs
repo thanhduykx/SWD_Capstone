@@ -64,7 +64,7 @@ public sealed class ReviewAssignmentServiceTests
         GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
         Assert.Equal(1, result.AssignedCount);
-        Assert.Equal([1, 2, 3, 4], store.AssignedGroups[0].ReviewerIds);
+        Assert.Equal(3, store.AssignedGroups[0].ReviewerIds.Count);
     }
 
     [Fact]

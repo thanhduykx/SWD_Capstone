@@ -29,6 +29,7 @@ public sealed class ReviewSession
 {
     public int Id { get; set; }
     public required string Code { get; set; }
+    public string? AccessCode { get; set; }
     public string? AccessCodeHash { get; set; }
     public int AccessCodeVersion { get; set; }
     public DateTime? AccessCodeGeneratedAt { get; set; }
@@ -66,6 +67,7 @@ public sealed class GroupReviewSlot
     public int SessionId { get; set; }
     public int GroupId { get; set; }
     public int GroupPosition { get; set; }
+    public string? AccessCode { get; set; }
     public string? AccessCodeHash { get; set; }
     public int AccessCodeVersion { get; set; }
     public DateTime? AccessCodeGeneratedAt { get; set; }

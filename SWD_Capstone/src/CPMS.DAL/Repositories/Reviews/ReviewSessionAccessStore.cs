@@ -78,6 +78,7 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
     public async Task SaveAccessCodeAsync(
         int sessionId,
         int groupId,
+        string accessCode,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,
@@ -88,6 +89,7 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
             item => item.SessionId == sessionId && item.GroupId == groupId,
             cancellationToken)
             ?? throw new KeyNotFoundException("Review group was not found in this session.");
+        groupSlot.AccessCode = accessCode;
         groupSlot.AccessCodeHash = accessCodeHash;
         groupSlot.AccessCodeVersion = codeVersion;
         groupSlot.AccessCodeGeneratedByUserId = generatedByUserId;

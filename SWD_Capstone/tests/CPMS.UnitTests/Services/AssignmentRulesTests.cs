@@ -74,15 +74,15 @@ public sealed class AssignmentRulesTests
     }
 
     [Fact]
-    public void ReviewAssignment_AcceptsFlexiblePanelWithFourReviewers()
+    public void ReviewAssignment_AcceptsFlexiblePanelWithThreeReviewers()
     {
-        AssignmentRules.ValidateReviewAssignment(10, [11, 12, 13, 14]);
+        AssignmentRules.ValidateReviewAssignment(10, [11, 12, 13]);
     }
 
     [Fact]
-    public void ReviewAssignment_RejectsMoreThanFourReviewers()
+    public void ReviewAssignment_RejectsMoreThanThreeReviewers()
     {
-        Action action = () => AssignmentRules.ValidateReviewAssignment(10, [11, 12, 13, 14, 15]);
+        Action action = () => AssignmentRules.ValidateReviewAssignment(10, [11, 12, 13, 14]);
 
         Assert.Throws<BusinessRuleException>(action);
     }

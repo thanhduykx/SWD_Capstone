@@ -8,7 +8,7 @@ public static class AssignmentRules
 {
     public const int RequiredStudentAvailabilityCount = 5;
     public const int MaxGroupsPerReviewSession = 3;
-    public const int MaxLecturersPerAvailabilitySlot = 4;
+    public const int MaxLecturersPerAvailabilitySlot = 3;
     public const int MaxGroupsPerAvailabilitySlot = 3;
 
     public static void ValidateReviewSlot(int slot)

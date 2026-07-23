@@ -204,5 +204,5 @@ public sealed class ReviewSchedulingController(
             result.GroupStatus, (result.ReviewerFeedback ?? []).Select(x =>
                 new ReviewSchedulingReviewerFeedbackResponse(
                     x.ReviewerId, x.ReviewerCode, x.ReviewerName, x.Comment, x.SubmittedAt)).ToArray(),
-            result.HasAccessCode, result.AccessCodeGeneratedAt);
+            result.HasAccessCode, result.AccessCodeGeneratedAt, result.AccessCode);
 }

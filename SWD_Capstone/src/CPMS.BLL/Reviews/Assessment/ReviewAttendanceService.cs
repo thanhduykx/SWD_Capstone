@@ -124,8 +124,8 @@ public sealed class ReviewAttendanceService(
             await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
         if (counts.StudentCount == 0 || counts.SubmittedCount != context.ReviewerIds.Count)
         {
-            throw new ConflictException(
-                "All reviewer submissions are required before completion.");
+            return new CompleteReviewResult(
+                sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
 
         await store.FinalizeUnsignedCheckInsAsync(
@@ -133,7 +133,8 @@ public sealed class ReviewAttendanceService(
         counts = await store.GetCompletionCountsAsync(sessionId, groupId, cancellationToken);
         if (counts.AttendanceCount != counts.StudentCount)
         {
-            throw new ConflictException("Attendance could not be finalized for every student.");
+            return new CompleteReviewResult(
+                sessionId, groupId, context.GroupStatus, context.CompletedAt);
         }
         return await store.CompleteAsync(
             sessionId, groupId, context.LecturerId.Value, DateTime.UtcNow, cancellationToken);

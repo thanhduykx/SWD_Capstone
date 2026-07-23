@@ -31,6 +31,7 @@ public interface IReviewSessionAccessStore
     Task SaveAccessCodeAsync(
         int sessionId,
         int groupId,
+        string accessCode,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,

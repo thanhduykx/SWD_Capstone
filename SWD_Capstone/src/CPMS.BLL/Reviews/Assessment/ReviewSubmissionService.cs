@@ -56,8 +56,8 @@ public sealed class ReviewSubmissionService(
         ArgumentNullException.ThrowIfNull(actor);
         ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanEditAsync(state, actor, cancellationToken);
-        if (state.Status == ReviewSubmissionStatus.Submitted)
-            throw new ConflictException("A submitted review cannot be moved back to Draft.");
+        if (state.GroupCompleted)
+            return Map(await store.GetDataAsync(submissionId, cancellationToken));
         if (state.SessionStatus != ReviewSessionStatus.Published)
             throw new ConflictException("Review feedback can only be edited after the schedule is published.");
         var allowedKeys = templateProvider.GetItems(state.Type).Where(x => !x.IsSection)
@@ -89,8 +89,8 @@ public sealed class ReviewSubmissionService(
         ArgumentNullException.ThrowIfNull(actor);
         ReviewSubmissionState state = await RequireStateAsync(submissionId, cancellationToken);
         await EnsureCanEditAsync(state, actor, cancellationToken);
-        if (state.Status == ReviewSubmissionStatus.Submitted)
-            throw new ConflictException("This review submission has already been submitted.");
+        if (state.GroupCompleted || state.Status == ReviewSubmissionStatus.Submitted)
+            return Map(await store.GetDataAsync(submissionId, cancellationToken));
         if (state.SessionStatus != ReviewSessionStatus.Published)
             throw new ConflictException("Review feedback can only be submitted for a published session.");
         if (string.IsNullOrWhiteSpace(state.ReviewerComment))
@@ -152,8 +152,6 @@ public sealed class ReviewSubmissionService(
             state.GroupId,
             actor.UserId,
             cancellationToken);
-        if (state.GroupCompleted)
-            throw new BusinessRuleException("Review feedback is locked after the group's review is completed.");
     }
 
     private ReviewSubmissionResult Map(ReviewSubmissionData data)

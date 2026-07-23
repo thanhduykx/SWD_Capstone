@@ -30,7 +30,8 @@ public sealed record ReviewSchedulingSessionResponse(
     ReviewGroupStatus GroupStatus,
     IReadOnlyCollection<ReviewSchedulingReviewerFeedbackResponse> ReviewerFeedback,
     bool HasAccessCode,
-    DateTime? AccessCodeGeneratedAt);
+    DateTime? AccessCodeGeneratedAt,
+    string? AccessCode = null);
 public sealed record ReviewSchedulingReviewerFeedbackResponse(
     int ReviewerId,
     string ReviewerCode,
