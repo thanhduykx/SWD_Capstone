@@ -148,18 +148,20 @@ public sealed class ReviewAttendanceStore(CpmsDbContext dbContext) : IReviewAtte
                 {
                     SessionId = sessionId,
                     StudentId = studentId,
-                    IsPresent = false,
-                    Note = "Không ký xác nhận tham dự",
+                    IsPresent = true,
+                    Note = "Chưa ký xác nhận",
                     MarkedByLecturerId = lecturerId,
                     MarkedAt = finalizedAt
                 });
             }
-            else if (attendance.StudentConfirmedAt is null)
+            else
             {
-                attendance.IsPresent = false;
-                attendance.Note ??= "Không ký xác nhận tham dự";
-                attendance.MarkedByLecturerId = lecturerId;
-                attendance.MarkedAt = finalizedAt;
+                // Giữ nguyên trạng thái IsPresent nếu đã được đánh dấu Có mặt (true)
+                if (attendance.StudentConfirmedAt is null)
+                {
+                    attendance.Note ??= "Chưa ký xác nhận";
+                }
+                attendance.MarkedByLecturerId ??= lecturerId;
             }
         }
         await dbContext.SaveChangesAsync(cancellationToken);

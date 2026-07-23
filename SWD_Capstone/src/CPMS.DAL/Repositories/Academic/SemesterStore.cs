@@ -161,6 +161,22 @@ public sealed class SemesterStore(CpmsDbContext dbContext) : ISemesterStore
             await dbContext.StudentSlotRegistrations.Where(x => groupIds.Contains(x.GroupId)).ExecuteDeleteAsync(cancellationToken);
             await dbContext.Students.Where(x => x.GroupId != null && groupIds.Contains(x.GroupId!.Value))
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.GroupId, (int?)null), cancellationToken);
+
+            var docIds = await dbContext.Documents.Where(x => groupIds.Contains(x.GroupId)).Select(x => x.Id).ToListAsync(cancellationToken);
+            if (docIds.Count > 0)
+            {
+                await dbContext.InlineComments.Where(x => docIds.Contains(x.DocumentId)).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.Documents.Where(x => docIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
+            }
+
+            var groupSubIds = await dbContext.ReviewChecklistSubmissions.Where(x => groupIds.Contains(x.GroupId)).Select(x => x.Id).ToListAsync(cancellationToken);
+            if (groupSubIds.Count > 0)
+            {
+                await dbContext.ReviewSubmissionComments.Where(x => groupSubIds.Contains(x.SubmissionId)).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.ReviewChecklistItemResponses.Where(x => groupSubIds.Contains(x.SubmissionId)).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.ReviewChecklistSubmissions.Where(x => groupSubIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
+            }
+
             await dbContext.CapstoneGroups.Where(x => groupIds.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken);
         }
 
