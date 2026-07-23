@@ -30,6 +30,7 @@ public sealed class ReviewAttendanceController(
         }
         catch (KeyNotFoundException exception) { return NotFound(new { error = exception.Message }); }
         catch (UnauthorizedAccessException) { return Forbid(); }
+        catch (BusinessRuleException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
     [HttpPost("{sessionId:int}")]

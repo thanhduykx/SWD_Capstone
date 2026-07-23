@@ -1,6 +1,7 @@
 using CPMS.BLL.Common.Exceptions;
 using CPMS.BLL.Enums;
 using CPMS.BLL.Exceptions;
+using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Reviews.Assessment;
 
@@ -12,6 +13,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         ArgumentNullException.ThrowIfNull(actor);
         ReviewAttendanceContext context = await RequireContextAsync(sessionId, groupId, actor.UserId, cancellationToken);
         EnsureCanViewAttendance(context, actor);
+        EnsureAttendanceHasOpened(context);
         return await BuildAttendanceAsync(context, cancellationToken);
     }
 
@@ -35,6 +37,7 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
         {
             throw new ConflictException("Attendance is locked after the group's review is completed.");
         }
+        EnsureAttendanceHasOpened(context);
         if (entries.Count == 0 || entries.Select(x => x.StudentId).Distinct().Count() != entries.Count)
         {
             throw new BusinessRuleException("Attendance entries must contain distinct students.");
@@ -147,6 +150,15 @@ public sealed class ReviewAttendanceService(IReviewAttendanceStore store) : IRev
             _ => false
         };
         if (!allowed) throw new UnauthorizedAccessException("You cannot view this attendance.");
+    }
+
+    private static void EnsureAttendanceHasOpened(ReviewAttendanceContext context)
+    {
+        if (!ReviewSessionTiming.HasStarted(context.SessionDate, context.Slot, DateTime.UtcNow))
+        {
+            throw new BusinessRuleException(
+                $"Attendance opens when slot {context.Slot} starts.");
+        }
     }
 
     private static void EnsureCanViewComments(ReviewAttendanceContext context, ReviewActor actor)

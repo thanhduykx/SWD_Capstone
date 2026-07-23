@@ -117,7 +117,7 @@ public sealed class ReviewRegistrationServiceTests
     [Fact]
     public async Task ConfirmStudentCheckIn_RecordsSignatureForAssignedPublishedSession()
     {
-        var past = DateTime.UtcNow.AddHours(-1);
+        var past = DateTime.UtcNow.AddDays(-1);
         var store = new FakeStore
         {
             Student = new StudentProfileData(10, 20, false, 30),
@@ -138,13 +138,34 @@ public sealed class ReviewRegistrationServiceTests
         var store = new FakeStore
         {
             Student = new StudentProfileData(10, 20, false, 30),
-            CheckIns = [new(2, "FUTURE", ReviewType.Review1, DateTime.UtcNow.AddHours(2), 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
+            CheckIns = [new(2, "FUTURE", ReviewType.Review1, DateTime.UtcNow.AddDays(1), 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.ConfirmStudentCheckInAsync(1, 2, CancellationToken.None));
         Assert.False(store.StudentCheckInConfirmed);
+    }
+
+    [Fact]
+    public async Task GetStudentCheckIns_KeepsConfirmationClosedBeforeSlotStart()
+    {
+        var store = new FakeStore
+        {
+            Student = new StudentProfileData(10, 20, false, 30),
+            CheckIns =
+            [
+                new(2, "FUTURE", ReviewType.Review1, DateTime.UtcNow.AddDays(1), 3, "B",
+                    ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)
+            ]
+        };
+        var service = new ReviewRegistrationService(store, new AssignmentRules());
+
+        IReadOnlyList<StudentCheckInResult> result =
+            await service.GetStudentCheckInsAsync(1, CancellationToken.None);
+
+        Assert.Single(result);
+        Assert.False(result[0].CanConfirm);
     }
 
     private static ReviewRoundData OpenRound(int id = 1) =>

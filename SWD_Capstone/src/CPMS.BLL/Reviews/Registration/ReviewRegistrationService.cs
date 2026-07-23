@@ -208,8 +208,8 @@ public sealed class ReviewRegistrationService(
         if (row.GroupStatus == ReviewGroupStatus.Completed)
             throw new BusinessRuleException("This review has ended. Missing signatures are recorded as absent.");
         DateTime now = DateTime.UtcNow;
-        if (now < row.SessionDate.AddMinutes(-30))
-            throw new BusinessRuleException("You can sign attendance from 30 minutes before the review session starts.");
+        if (!ReviewSessionTiming.HasStarted(row.SessionDate, row.Slot, now))
+            throw new BusinessRuleException("You can sign attendance when the review session starts.");
         DateTime confirmedAt = row.ConfirmedAt ?? await store.ConfirmStudentCheckInAsync(
             userId, student.Id, groupId, sessionId, now, cancellationToken);
         return MapCheckIn(row with { ConfirmedAt = confirmedAt }, now);
@@ -218,7 +218,8 @@ public sealed class ReviewRegistrationService(
     private static StudentCheckInResult MapCheckIn(StudentCheckInData row, DateTime now) =>
         new(row.SessionId, row.SessionCode, row.Type, row.SessionDate, row.Slot, row.Room,
             row.GroupStatus, row.ConfirmedAt,
-            row.GroupStatus != ReviewGroupStatus.Completed && row.ConfirmedAt is null && now >= row.SessionDate.AddMinutes(-30));
+            row.GroupStatus != ReviewGroupStatus.Completed && row.ConfirmedAt is null &&
+            ReviewSessionTiming.HasStarted(row.SessionDate, row.Slot, now));
 
     public async Task<IReadOnlyList<StudentAttendanceResult>> GetStudentAttendanceAsync(int userId, CancellationToken cancellationToken)
     {
