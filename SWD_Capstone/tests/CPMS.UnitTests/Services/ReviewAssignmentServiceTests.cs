@@ -11,7 +11,7 @@ public sealed class ReviewAssignmentServiceTests
     public async Task Generate_RejectsRoundThatIsNotClosed()
     {
         var store = new FakeStore { AssignmentSnapshot = Snapshot(roundStatus: ReviewRoundStatus.Open) };
-        var service = new ReviewAssignmentService(store, new AssignmentRules());
+        var service = new ReviewAssignmentService(store);
 
         await Assert.ThrowsAsync<ConflictException>(() => service.GenerateAsync(Command(), CancellationToken.None));
 
@@ -22,7 +22,7 @@ public sealed class ReviewAssignmentServiceTests
     public async Task Generate_LeavesGroupUnassignedWhenLeaderHasNotSubmittedFiveSlots()
     {
         var store = new FakeStore { AssignmentSnapshot = Snapshot(studentSlotCount: 4) };
-        var service = new ReviewAssignmentService(store, new AssignmentRules());
+        var service = new ReviewAssignmentService(store);
 
         GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
@@ -35,7 +35,7 @@ public sealed class ReviewAssignmentServiceTests
     public async Task Generate_ExcludesSupervisorAndCreatesAssignment()
     {
         var store = new FakeStore { AssignmentSnapshot = Snapshot() };
-        var service = new ReviewAssignmentService(store, new AssignmentRules());
+        var service = new ReviewAssignmentService(store);
 
         GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
@@ -59,7 +59,7 @@ public sealed class ReviewAssignmentServiceTests
             ]
         };
         var store = new FakeStore { AssignmentSnapshot = snapshot };
-        var service = new ReviewAssignmentService(store, new AssignmentRules());
+        var service = new ReviewAssignmentService(store);
 
         GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 
@@ -84,7 +84,7 @@ public sealed class ReviewAssignmentServiceTests
             ReusablePanels = [panel]
         };
         var store = new FakeStore { AssignmentSnapshot = snapshot };
-        var service = new ReviewAssignmentService(store, new AssignmentRules());
+        var service = new ReviewAssignmentService(store);
 
         GenerateReviewAssignmentsResult result = await service.GenerateAsync(Command(), CancellationToken.None);
 

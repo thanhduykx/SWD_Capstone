@@ -6,7 +6,7 @@ using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Reviews.Scheduling;
 
-public sealed class ReviewAssignmentService(IReviewAssignmentStore store, AssignmentRules rules)
+public sealed class ReviewAssignmentService(IReviewAssignmentStore store)
     : IReviewAssignmentService
 {
     public Task<GenerateReviewAssignmentsResult> GenerateAsync(
@@ -53,6 +53,8 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         var assignedSessions = new List<ReviewSchedulingSession>();
         var unassignedGroups = new List<UnassignedReviewGroup>();
         var roomPrefix = string.IsNullOrWhiteSpace(requestedRoomPrefix) ? "AUTO" : requestedRoomPrefix.Trim();
+        var panelContext = new PanelCreationContext(
+            scope, snapshot, roomPrefix, panels, occupiedSlots, usedCodes, random);
 
         foreach (AssignmentGroup? group in Shuffle(snapshot.Groups, random))
         {
@@ -69,9 +71,8 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
             MutablePanel? selectedPanel = FindReusablePanel(
                 panels, group, groupAvailability, previousReviewerIds, minimumReviewers);
             selectedPanel ??= await CreatePanelAsync(
-                scope, snapshot, group, groupAvailability, previousReviewerIds,
-                minimumReviewers, roomPrefix, panels, occupiedSlots, usedCodes, random,
-                cancellationToken);
+                panelContext, group, groupAvailability, previousReviewerIds,
+                minimumReviewers, cancellationToken);
             if (selectedPanel is null)
             {
                 unassignedGroups.Add(new UnassignedReviewGroup(
@@ -79,7 +80,7 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
                 continue;
             }
 
-            rules.EnsureReviewSessionCapacity(selectedPanel.GroupCount);
+            AssignmentRules.EnsureReviewSessionCapacity(selectedPanel.GroupCount);
             await store.AssignGroupAsync(
                 selectedPanel.SessionId,
                 group.Id,
@@ -138,25 +139,19 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         .FirstOrDefault();
 
     private async Task<MutablePanel?> CreatePanelAsync(
-        ReviewAssignmentScope scope,
-        ReviewAssignmentSnapshot snapshot,
+        PanelCreationContext context,
         AssignmentGroup group,
         IReadOnlySet<string> groupAvailability,
         IReadOnlySet<int> previousReviewerIds,
         int minimumReviewers,
-        string roomPrefix,
-        List<MutablePanel> panels,
-        HashSet<string> occupiedSlots,
-        HashSet<string> usedCodes,
-        Random random,
         CancellationToken cancellationToken)
     {
-        var eligibleSlots = snapshot.SubmittedAvailability
+        var eligibleSlots = context.Snapshot.SubmittedAvailability
             .Where(slot => slot.LecturerId != group.SupervisorId &&
                            groupAvailability.Contains(SlotKey(slot.DayOfWeek, slot.Slot)) &&
                            !previousReviewerIds.Contains(slot.LecturerId) &&
-                           !occupiedSlots.Contains(OccupiedKey(
-                               slot.LecturerId, SessionDate(scope.WeekStart, slot.DayOfWeek), slot.Slot)))
+                           !context.OccupiedSlots.Contains(OccupiedKey(
+                               slot.LecturerId, SessionDate(context.Scope.WeekStart, slot.DayOfWeek), slot.Slot)))
             .GroupBy(slot => new { slot.DayOfWeek, slot.Slot })
             .Where(groupedSlots =>
             {
@@ -166,22 +161,22 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
             .ToArray();
         if (eligibleSlots.Length == 0) return null;
 
-        var selectedSlot = Shuffle(eligibleSlots, random)[0];
+        var selectedSlot = Shuffle(eligibleSlots, context.Random)[0];
         int[] reviewerIds = selectedSlot.Select(x => x.LecturerId).Distinct().Order().ToArray();
-        rules.ValidateReviewAssignment(group.SupervisorId, reviewerIds, previousReviewerIds);
-        DateTime sessionDate = SessionDate(scope.WeekStart, selectedSlot.Key.DayOfWeek);
+        AssignmentRules.ValidateReviewAssignment(group.SupervisorId, reviewerIds, previousReviewerIds);
+        DateTime sessionDate = SessionDate(context.Scope.WeekStart, selectedSlot.Key.DayOfWeek);
         AssignmentPanel created = await store.CreatePanelAsync(
             new CreateAssignmentPanel(
-                NextSessionCode(snapshot.SemesterCode!, scope.ReviewType, group.Code, sessionDate,
-                    selectedSlot.Key.Slot, usedCodes),
-                scope.SemesterId, selectedSlot.Key.DayOfWeek, selectedSlot.Key.Slot,
-                $"{roomPrefix}-{selectedSlot.Key.DayOfWeek}{selectedSlot.Key.Slot}-{panels.Count + 1:D2}",
-                scope.ReviewType, reviewerIds, sessionDate),
+                NextSessionCode(context.Snapshot.SemesterCode!, context.Scope.ReviewType, group.Code, sessionDate,
+                    selectedSlot.Key.Slot, context.UsedCodes),
+                context.Scope.SemesterId, selectedSlot.Key.DayOfWeek, selectedSlot.Key.Slot,
+                $"{context.RoomPrefix}-{selectedSlot.Key.DayOfWeek}{selectedSlot.Key.Slot}-{context.Panels.Count + 1:D2}",
+                context.Scope.ReviewType, reviewerIds, sessionDate),
             cancellationToken);
         var panel = new MutablePanel(created);
-        panels.Add(panel);
+        context.Panels.Add(panel);
         foreach (var reviewerId in reviewerIds)
-            occupiedSlots.Add(OccupiedKey(reviewerId, sessionDate, panel.Slot));
+            context.OccupiedSlots.Add(OccupiedKey(reviewerId, sessionDate, panel.Slot));
         return panel;
     }
 
@@ -220,6 +215,15 @@ public sealed class ReviewAssignmentService(IReviewAssignmentStore store, Assign
         }
         return items;
     }
+
+    private sealed record PanelCreationContext(
+        ReviewAssignmentScope Scope,
+        ReviewAssignmentSnapshot Snapshot,
+        string RoomPrefix,
+        List<MutablePanel> Panels,
+        HashSet<string> OccupiedSlots,
+        HashSet<string> UsedCodes,
+        Random Random);
 
     private sealed class MutablePanel(AssignmentPanel panel)
     {

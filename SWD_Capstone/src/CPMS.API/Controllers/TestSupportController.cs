@@ -12,6 +12,8 @@ public sealed class TestSupportController(
     IConfiguration configuration,
     ITestDataResetService resetService) : ControllerBase
 {
+    private string DefaultTestPassword => configuration.GetValue<string>("TestData:DefaultPassword") ?? string.Empty;
+    private const string LecturerRole = "Lecturer";
     private static readonly string[] DatasetChecks =
     [
         "GET /api/review-sessions/my",
@@ -103,7 +105,7 @@ public sealed class TestSupportController(
         {
             message = "Shared lecturer dataset ensured on the active semester (same data space as website).",
             loginEmail = "minhnd.gv24001@fpt.edu.vn",
-            password = "Test@123456",
+            password = DefaultTestPassword,
             note = "Groups SE2601–SE2606, published review/defense rows are visible to both web and mobile APIs.",
             check = DatasetChecks
         });
@@ -112,13 +114,13 @@ public sealed class TestSupportController(
     private bool IsEnabled() =>
         environment.IsDevelopment() || configuration.GetValue<bool>("Swagger:ExposeTestSupport");
 
-    private static IReadOnlyCollection<TestAccountResponse> TestAccounts() =>
+    private IReadOnlyCollection<TestAccountResponse> TestAccounts() =>
     [
-        new("TrainingDepartment", "pdt.dieuphoi@fpt.edu.vn", "Test@123456", "Phòng Đào tạo — điều phối đồ án."),
-        new("Lecturer", "minhnd.gv24001@fpt.edu.vn", "Test@123456", "GV24001 Nguyễn Đức Minh — review + hội đồng (chairman)."),
-        new("Lecturer", "hapt.gv24002@fpt.edu.vn", "Test@123456", "GV24002 Phạm Thu Hà — reviewer / thư ký hội đồng."),
-        new("Lecturer", "namlh.gv24003@fpt.edu.vn", "Test@123456", "GV24003 Lê Hoàng Nam — reviewer / thành viên hội đồng."),
-        new("Student", "maunv.se199999@fpt.edu.vn", "Test@123456", "Use for student visibility checks.")
+        new("TrainingDepartment", "pdt.dieuphoi@fpt.edu.vn", DefaultTestPassword, "Phòng Đào tạo — điều phối đồ án."),
+        new(LecturerRole, "minhnd.gv24001@fpt.edu.vn", DefaultTestPassword, "GV24001 Nguyễn Đức Minh — review + hội đồng (chairman)."),
+        new(LecturerRole, "hapt.gv24002@fpt.edu.vn", DefaultTestPassword, "GV24002 Phạm Thu Hà — reviewer / thư ký hội đồng."),
+        new(LecturerRole, "namlh.gv24003@fpt.edu.vn", DefaultTestPassword, "GV24003 Lê Hoàng Nam — reviewer / thành viên hội đồng."),
+        new("Student", "maunv.se199999@fpt.edu.vn", DefaultTestPassword, "Use for student visibility checks.")
     ];
 
     private static IReadOnlyCollection<RoleEndpointGroupResponse> RoleGroups() =>
@@ -134,7 +136,7 @@ public sealed class TestSupportController(
             "GET /api/review-submissions/export.zip",
             "GET/POST /api/defense-management/*"
         ]),
-        new("Lecturer", [
+        new(LecturerRole, [
             "GET/PUT /api/review-availability/week",
             "POST /api/review-availability/week/submit",
             "GET /api/review-sessions/my",

@@ -57,7 +57,6 @@ builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<Cp
 builder.Services.AddBLLServices();
 // Đọc Gemini từ builder.Configuration (appsettings + env Gemini__ApiKey trên Render).
 builder.Services.AddDALServices(builder.Configuration);
-builder.Services.AddScoped<AssignmentRules>();
 builder.Services.AddSingleton<ReviewChecklistTemplateService>();
 builder.Services.AddSingleton<IReviewChecklistTemplateProvider>(provider =>
     provider.GetRequiredService<ReviewChecklistTemplateService>());

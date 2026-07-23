@@ -5,8 +5,7 @@ using CPMS.BLL.Services;
 namespace CPMS.BLL.Reviews.Registration;
 
 public sealed class ReviewRegistrationService(
-    IReviewRegistrationStore store,
-    AssignmentRules rules) : IReviewRegistrationService
+    IReviewRegistrationStore store) : IReviewRegistrationService
 {
     public async Task<ReviewAvailabilityWeekResult> GetLecturerAvailabilityAsync(
         int userId, int roundId, CancellationToken cancellationToken)
@@ -36,7 +35,7 @@ public sealed class ReviewRegistrationService(
             {
                 throw new BusinessRuleException("Review availability dayOfWeek must be between 1 and 6.");
             }
-            rules.ValidateReviewSlot(slot.Slot);
+            AssignmentRules.ValidateReviewSlot(slot.Slot);
         }
 
         ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
@@ -67,7 +66,7 @@ public sealed class ReviewRegistrationService(
                 await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
             IReadOnlyCollection<ReviewAvailabilitySlot> currentOfficialSlots =
                 state.SubmittedAt is null ? [] : state.Slots;
-            rules.EnsureSlotRegistrationCapacity(
+            AssignmentRules.EnsureSlotRegistrationCapacity(
                 state.Slots,
                 currentOfficialSlots,
                 counts,
@@ -122,7 +121,7 @@ public sealed class ReviewRegistrationService(
             throw new BusinessRuleException("Slots are required.");
         }
         StudentProfileData student = await RequireGroupedStudentAsync(userId, cancellationToken);
-        rules.ValidateStudentAvailability(slots.Select(x => (x.DayOfWeek, x.Slot)).ToArray());
+        AssignmentRules.ValidateStudentAvailability(slots.Select(x => (x.DayOfWeek, x.Slot)).ToArray());
         if (!student.IsLeader)
         {
             throw new BusinessRuleException("Only the group leader can register a review slot.");
@@ -139,7 +138,7 @@ public sealed class ReviewRegistrationService(
             IReadOnlyList<StudentRegistrationData> current = await store.GetStudentRegistrationsAsync(
                 roundId, student.GroupId!.Value, token);
             IReadOnlyList<SlotRegistrationCount> counts = await store.GetStudentSlotRegistrationCountsAsync(roundId, token);
-            rules.EnsureSlotRegistrationCapacity(
+            AssignmentRules.EnsureSlotRegistrationCapacity(
                 distinctSlots,
                 current.Select(x => new ReviewAvailabilitySlot(x.DayOfWeek, x.Slot)).ToArray(),
                 counts,

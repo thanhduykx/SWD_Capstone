@@ -27,15 +27,9 @@ public sealed class ReviewSessionsController(
     {
         ArgumentNullException.ThrowIfNull(request);
         ReviewSessionResult result = await sessionService.CreateAsync(
-            ToCommand(
-                request.Code,
-                request.GroupId,
-                request.Type,
-                request.ReviewerIds,
-                request.PreviousReviewerIds,
-                request.Slot,
-                request.Room,
-                request.SessionDate),
+            new AssignReviewSessionCommand(
+                request.Code, request.GroupId, request.Type, request.ReviewerIds,
+                request.PreviousReviewerIds, request.Slot, request.Room, request.SessionDate),
             cancellationToken);
         ReviewSessionResponse response = Map(result);
         return CreatedAtAction(nameof(Create), new { response.Id }, response);
@@ -52,7 +46,7 @@ public sealed class ReviewSessionsController(
         {
             return BadRequest(new { error = "Sessions is required." });
         }
-        AssignReviewSessionCommand[] commands = request.Sessions.Select(x => ToCommand(
+        AssignReviewSessionCommand[] commands = request.Sessions.Select(x => new AssignReviewSessionCommand(
             x.Code, x.GroupId, x.Type, x.ReviewerIds, x.PreviousReviewerIds,
             x.Slot, x.Room, x.SessionDate)).ToArray();
         IReadOnlyList<ReviewSessionResult> results = await sessionService.BulkAssignAsync(commands, cancellationToken);
@@ -165,17 +159,6 @@ public sealed class ReviewSessionsController(
         if (string.IsNullOrWhiteSpace(idStr)) throw new UnauthorizedAccessException("Missing user identifier.");
         return int.Parse(idStr, CultureInfo.InvariantCulture);
     }
-
-    private static AssignReviewSessionCommand ToCommand(
-        string code,
-        int groupId,
-        ReviewType type,
-        IReadOnlyCollection<int> reviewerIds,
-        IReadOnlyCollection<int>? previousReviewerIds,
-        int slot,
-        string room,
-        DateTime sessionDate) =>
-        new(code, groupId, type, reviewerIds, previousReviewerIds, slot, room, sessionDate);
 
     private static ReviewSessionResponse Map(ReviewSessionResult result) =>
         new(

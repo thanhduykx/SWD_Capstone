@@ -13,6 +13,10 @@ internal sealed class GeminiProjectSuggestionGenerator(
     ILogger<GeminiProjectSuggestionGenerator> logger) : IProjectSuggestionGenerator
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const string ContentSummaryField = "contentSummary";
+    private const string StrengthsSummaryField = "strengthsSummary";
+    private const string ImprovementSummaryField = "improvementSummary";
+    private const string StringSchemaType = "STRING";
 
     public async Task<ProjectSuggestionResult> GenerateAsync(
         ProjectSuggestionInput input,
@@ -165,7 +169,7 @@ internal sealed class GeminiProjectSuggestionGenerator(
             .Select(part => part.Text!.Trim());
 
         string? jsonLike = texts.LastOrDefault(text =>
-            text.StartsWith('{') || text.Contains("contentSummary", StringComparison.Ordinal));
+            text.StartsWith('{') || text.Contains(ContentSummaryField, StringComparison.Ordinal));
         return NormalizeJsonPayload(jsonLike ?? texts.LastOrDefault());
     }
 
@@ -230,23 +234,23 @@ internal sealed class GeminiProjectSuggestionGenerator(
                 type = "OBJECT",
                 properties = new Dictionary<string, object>
                 {
-                    ["contentSummary"] = new
+                    [ContentSummaryField] = new
                     {
-                        type = "STRING",
+                        type = StringSchemaType,
                         description = "Tóm tắt nội dung, mục tiêu và phạm vi đồ án trong một đoạn ngắn."
                     },
-                    ["strengthsSummary"] = new
+                    [StrengthsSummaryField] = new
                     {
-                        type = "STRING",
+                        type = StringSchemaType,
                         description = "Tóm tắt các điểm mạnh có căn cứ từ nội dung được cung cấp."
                     },
-                    ["improvementSummary"] = new
+                    [ImprovementSummaryField] = new
                     {
-                        type = "STRING",
+                        type = StringSchemaType,
                         description = "Tóm tắt các điểm cần cải thiện và hướng cải thiện khả thi."
                     }
                 },
-                required = new[] { "contentSummary", "strengthsSummary", "improvementSummary" }
+                required = new[] { ContentSummaryField, StrengthsSummaryField, ImprovementSummaryField }
             }
         }
     };
@@ -284,11 +288,11 @@ internal sealed class GeminiProjectSuggestionGenerator(
             type = "OBJECT",
             properties = new Dictionary<string, object>
             {
-                ["contentSummary"] = new { type = "STRING", description = "Tóm tắt nội dung, mục tiêu và phạm vi đồ án." },
-                ["strengthsSummary"] = new { type = "STRING", description = "Các điểm mạnh có căn cứ trong tài liệu." },
-                ["improvementSummary"] = new { type = "STRING", description = "Các điểm cần cải thiện và hướng cải thiện khả thi." }
+                [ContentSummaryField] = new { type = StringSchemaType, description = "Tóm tắt nội dung, mục tiêu và phạm vi đồ án." },
+                [StrengthsSummaryField] = new { type = StringSchemaType, description = "Các điểm mạnh có căn cứ trong tài liệu." },
+                [ImprovementSummaryField] = new { type = StringSchemaType, description = "Các điểm cần cải thiện và hướng cải thiện khả thi." }
             },
-            required = new[] { "contentSummary", "strengthsSummary", "improvementSummary" }
+            required = new[] { ContentSummaryField, StrengthsSummaryField, ImprovementSummaryField }
         }
     };
 

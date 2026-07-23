@@ -167,9 +167,9 @@ public sealed class ReviewSubmissionService(
         IReadOnlyCollection<string>? comments,
         string? legacyComment)
     {
-        IEnumerable<string?> values = comments is { Count: > 0 }
-            ? comments.Select(comment => (string?)comment)
-            : [legacyComment];
+        IReadOnlyCollection<string> values = comments is { Count: > 0 }
+            ? comments
+            : [legacyComment ?? string.Empty];
         return values.Select(EmptyToNull).Where(x => x is not null).Select(x => x!)
             .Distinct(StringComparer.Ordinal).ToArray();
     }

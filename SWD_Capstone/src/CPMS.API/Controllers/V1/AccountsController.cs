@@ -17,10 +17,8 @@ namespace CPMS.API.Controllers.V1;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/accounts")]
 [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
-public sealed class AccountsController(
-    GetAccountsQueryHandler getAccounts,
-    CreateAccountCommandHandler createAccount,
-    IValidator<CreateAccountCommand> createValidator) : ControllerBase
+public sealed class AccountsQueryController(
+    GetAccountsQueryHandler getAccounts) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<CPMS.BLL.DTOs.Accounts.AccountResponse>>), StatusCodes.Status200OK)]
@@ -33,39 +31,32 @@ public sealed class AccountsController(
             result,
             HttpContext.TraceIdentifier));
     }
+}
 
+[ApiController]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/accounts")]
+[Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+public sealed class AccountsCommandController(
+    CreateAccountCommandHandler createAccount,
+    IValidator<CreateAccountCommand> createValidator) : ControllerBase
+{
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>), StatusCodes.Status201Created)]
     public async Task<ActionResult<ApiResponse<CPMS.BLL.DTOs.Accounts.AccountCreatedResponse>>> Create(
-        CreateAccountRequest request,
-        CancellationToken cancellationToken)
+        CreateAccountRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var command = new CreateAccountCommand(
-            request.IdentityCode,
-            request.Email,
-            request.Password,
-            request.Role,
-            request.FullName,
-            request.Department,
-            request.Position,
-            request.PermissionScope,
-            request.IsPartTime,
-            request.ClassCode,
-            request.Batch,
-            request.Major,
-            CurrentUserId(),
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent);
+            request.IdentityCode, request.Email, request.Password, request.Role, request.FullName,
+            request.Department, request.Position, request.PermissionScope, request.IsPartTime,
+            request.ClassCode, request.Batch, request.Major, CurrentUserId(),
+            HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent);
 
         await createValidator.ValidateAndThrowAsync(command, cancellationToken);
         AccountCreatedResponse response = await createAccount.HandleAsync(command, cancellationToken);
-
-        return StatusCode(
-            StatusCodes.Status201Created,
-            ApiResponse.Created(
-                response,
-                HttpContext.TraceIdentifier));
+        return StatusCode(StatusCodes.Status201Created,
+            ApiResponse.Created(response, HttpContext.TraceIdentifier));
     }
 
     private int CurrentUserId() =>

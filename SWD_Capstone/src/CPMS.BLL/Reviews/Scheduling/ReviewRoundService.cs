@@ -5,7 +5,7 @@ using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Reviews.Scheduling;
 
-public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules rules) : IReviewRoundService
+public sealed class ReviewRoundService(IReviewRoundStore store) : IReviewRoundService
 {
     private const int RegistrationWindowDays = 7;
     private const int DaysBetweenRegistrationAndReview = 5;
@@ -121,7 +121,7 @@ public sealed class ReviewRoundService(IReviewRoundStore store, AssignmentRules 
             ?? throw new KeyNotFoundException("Review round not found.");
         try
         {
-            rules.EnsureReviewRoundTransition(round.Status, nextStatus);
+            AssignmentRules.EnsureReviewRoundTransition(round.Status, nextStatus);
         }
         catch (BusinessRuleException exception)
         {

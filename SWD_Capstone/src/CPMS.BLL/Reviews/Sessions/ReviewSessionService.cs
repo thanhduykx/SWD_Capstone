@@ -5,7 +5,7 @@ using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Reviews.Sessions;
 
-public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRules rules) : IReviewSessionService
+public sealed class ReviewSessionService(IReviewSessionStore store) : IReviewSessionService
 {
     public Task<ReviewSessionResult> CreateAsync(
         AssignReviewSessionCommand command, CancellationToken cancellationToken)
@@ -58,14 +58,14 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
     {
         ValidateText(command.Code, "Session code");
         ValidateText(command.Room, "Room");
-        rules.ValidateReviewSlot(command.Slot);
+        AssignmentRules.ValidateReviewSlot(command.Slot);
         DateTime sessionDate = NormalizeSessionDate(command.SessionDate);
         var dayOfWeek = IsoDayOfWeek(sessionDate);
         var reviewerIds = NormalizeReviewers(command.ReviewerIds);
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
         ReviewGroupState group = await store.FindGroupAsync(command.GroupId, cancellationToken)
             ?? throw new KeyNotFoundException("Capstone group does not exist.");
-        rules.ValidateReviewAssignment(
+        AssignmentRules.ValidateReviewAssignment(
             group.SupervisorId,
             reviewerIds,
             command.Type == ReviewType.Review2 ? command.PreviousReviewerIds : null);
@@ -88,8 +88,8 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
         await EnsureReviewersAvailableAsync(round.Id, dayOfWeek, command.Slot, reviewerIds, cancellationToken);
         var alreadyScheduled = await store.IsGroupScheduledAsync(
             group.Id, command.Type, weekStart, weekStart.AddDays(7), cancellationToken);
-        rules.EnsureGroupCanBeScheduledForReviewType(alreadyScheduled);
-        rules.EnsureLecturerAvailableForReviewSlot(await store.HasReviewerConflictAsync(
+        AssignmentRules.EnsureGroupCanBeScheduledForReviewType(alreadyScheduled);
+        AssignmentRules.EnsureLecturerAvailableForReviewSlot(await store.HasReviewerConflictAsync(
             null, sessionDate, command.Slot, reviewerIds, cancellationToken));
 
         return await store.CreateSessionAsync(
@@ -112,13 +112,13 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
                 "Only Draft sessions can be edited; publishing must use the schedule publish endpoint.");
         }
 
-        rules.ValidateReviewSlot(command.Slot);
+        AssignmentRules.ValidateReviewSlot(command.Slot);
         DateTime sessionDate = NormalizeSessionDate(command.SessionDate);
         var dayOfWeek = IsoDayOfWeek(sessionDate);
         var reviewerIds = NormalizeReviewers(command.ReviewerIds);
         foreach (var supervisorId in session.SupervisorIds)
         {
-            rules.ValidateReviewAssignment(supervisorId, reviewerIds, command.PreviousReviewerIds);
+            AssignmentRules.ValidateReviewAssignment(supervisorId, reviewerIds, command.PreviousReviewerIds);
         }
         await EnsureLecturersExistAsync(reviewerIds, cancellationToken);
 
@@ -138,7 +138,7 @@ public sealed class ReviewSessionService(IReviewSessionStore store, AssignmentRu
                 "Every assigned group must include the selected date and slot in its five submitted slots.");
         }
         await EnsureReviewersAvailableAsync(round.Id, dayOfWeek, command.Slot, reviewerIds, cancellationToken);
-        rules.EnsureLecturerAvailableForReviewSlot(await store.HasReviewerConflictAsync(
+        AssignmentRules.EnsureLecturerAvailableForReviewSlot(await store.HasReviewerConflictAsync(
             sessionId, sessionDate, command.Slot, reviewerIds, cancellationToken));
 
         return await store.UpdateSessionAsync(

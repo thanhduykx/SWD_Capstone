@@ -3,7 +3,7 @@ using CPMS.BLL.Services;
 
 namespace CPMS.BLL.Defense.Sessions;
 
-public sealed class DefenseSessionService(IDefenseSessionStore store, AssignmentRules rules)
+public sealed class DefenseSessionService(IDefenseSessionStore store)
     : IDefenseSessionService
 {
     private const long MaxEvidenceBytes = 5_242_880;
@@ -22,7 +22,7 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
         DefenseLecturerState lecturer = await RequireLecturerAsync(userId, cancellationToken);
         DefenseSessionAccessState session = await store.ResolveAsync(code.Trim(), cancellationToken)
             ?? throw new KeyNotFoundException("Defense code was not found.");
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
         return Map(session, lecturer.Id == session.ChairmanId);
     }
 
@@ -32,8 +32,8 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
         ArgumentNullException.ThrowIfNull(actor);
         DefenseLecturerState lecturer = await RequireLecturerAsync(actor.UserId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureChairman(lecturer.Id, session.ChairmanId);
-        rules.EnsureSessionEditable(session.IsLocked);
+        AssignmentRules.EnsureChairman(lecturer.Id, session.ChairmanId);
+        AssignmentRules.EnsureSessionEditable(session.IsLocked);
         if (session.StartedAt is null)
             session = await store.StartAsync(sessionId, actor, DateTime.UtcNow, cancellationToken);
         return Map(session, true);
@@ -44,7 +44,7 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
     {
         DefenseLecturerState lecturer = await RequireLecturerAsync(userId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
         return await store.GetCommentsAsync(sessionId, lecturer.Id, cancellationToken);
     }
 
@@ -61,8 +61,8 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
             throw new BusinessRuleException("A defense comment is required and cannot exceed 2000 characters.");
         DefenseLecturerState lecturer = await RequireLecturerAsync(actor.UserId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
-        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
         return await store.SaveCommentAsync(
             sessionId, lecturer.Id, comment with { Content = content }, actor, DateTime.UtcNow, cancellationToken);
     }
@@ -72,7 +72,7 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
     {
         DefenseLecturerState lecturer = await RequireLecturerAsync(userId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
         return await store.GetEvidencesAsync(sessionId, cancellationToken);
     }
 
@@ -92,8 +92,8 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
             throw new BusinessRuleException("Evidence note cannot exceed 1000 characters.");
         DefenseLecturerState lecturer = await RequireLecturerAsync(actor.UserId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
-        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
         return await store.SaveEvidenceAsync(
             sessionId, lecturer.Id, evidence with { Note = evidence.Note?.Trim() },
             actor, DateTime.UtcNow, cancellationToken);
@@ -105,9 +105,9 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
         ArgumentNullException.ThrowIfNull(actor);
         DefenseLecturerState lecturer = await RequireLecturerAsync(actor.UserId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureChairman(lecturer.Id, session.ChairmanId);
-        rules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
-        rules.EnsureSessionEditable(session.IsLocked);
+        AssignmentRules.EnsureChairman(lecturer.Id, session.ChairmanId);
+        AssignmentRules.EnsureSessionStarted(session.StartedAt, session.IsLocked);
+        AssignmentRules.EnsureSessionEditable(session.IsLocked);
         return Map(await store.CloseAsync(sessionId, actor, DateTime.UtcNow, cancellationToken), true);
     }
 
@@ -116,7 +116,7 @@ public sealed class DefenseSessionService(IDefenseSessionStore store, Assignment
     {
         DefenseLecturerState lecturer = await RequireLecturerAsync(userId, cancellationToken);
         DefenseSessionAccessState session = await RequireSessionAsync(sessionId, cancellationToken);
-        rules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
+        AssignmentRules.EnsureCouncilMember(lecturer.Id, session.MemberIds);
         return new DefenseJoinResult(
             Map(session, lecturer.Id == session.ChairmanId), lecturer.Id, lecturer.Code, lecturer.FullName);
     }

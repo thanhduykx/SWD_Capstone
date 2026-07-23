@@ -15,7 +15,7 @@ public sealed class ReviewRegistrationServiceTests
             Student = new StudentProfileData(10, 20, false, 30),
             Round = OpenRound()
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SaveStudentAvailabilityAsync(1, 1, FiveSlots(), CancellationToken.None));
@@ -33,7 +33,7 @@ public sealed class ReviewRegistrationServiceTests
             Round = OpenRound(),
             LecturerAvailability = new LecturerAvailabilityData(null, [])
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SubmitLecturerAvailabilityAsync(1, 1, CancellationToken.None));
@@ -51,7 +51,7 @@ public sealed class ReviewRegistrationServiceTests
             LecturerAvailability = new LecturerAvailabilityData(null, [new ReviewAvailabilitySlot(1, 1)]),
             LecturerCounts = [new SlotRegistrationCount(1, 1, 4)]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SubmitLecturerAvailabilityAsync(1, 1, CancellationToken.None));
@@ -69,7 +69,7 @@ public sealed class ReviewRegistrationServiceTests
             Round = OpenRound(),
             StudentCounts = [new SlotRegistrationCount(1, 1, 3)]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.SaveStudentAvailabilityAsync(1, 1, FiveSlots(), CancellationToken.None));
@@ -90,7 +90,7 @@ public sealed class ReviewRegistrationServiceTests
                 new(2, "PUBLISHED", 20, "GROUP-20", ReviewType.Review1, DateTime.UtcNow, 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)
             ]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         IReadOnlyList<StudentScheduleResult> result = await service.GetStudentScheduleAsync(1, CancellationToken.None);
 
@@ -106,7 +106,7 @@ public sealed class ReviewRegistrationServiceTests
             Student = new StudentProfileData(10, 20, true, 30),
             StudentRounds = [new StudentRoundData(OpenRound(), 5), new StudentRoundData(OpenRound(2), 4)]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         IReadOnlyList<StudentReviewRoundResult> result = await service.GetStudentRoundsAsync(1, 30, CancellationToken.None);
 
@@ -123,7 +123,7 @@ public sealed class ReviewRegistrationServiceTests
             Student = new StudentProfileData(10, 20, false, 30),
             CheckIns = [new(2, "PUBLISHED", ReviewType.Review1, past, 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         StudentCheckInResult result = await service.ConfirmStudentCheckInAsync(1, 2, CancellationToken.None);
 
@@ -140,7 +140,7 @@ public sealed class ReviewRegistrationServiceTests
             Student = new StudentProfileData(10, 20, false, 30),
             CheckIns = [new(2, "FUTURE", ReviewType.Review1, DateTime.UtcNow.AddDays(1), 2, "B", ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.ConfirmStudentCheckInAsync(1, 2, CancellationToken.None));
@@ -159,7 +159,7 @@ public sealed class ReviewRegistrationServiceTests
                     ReviewSessionStatus.Published, ReviewGroupStatus.Scheduled, null)
             ]
         };
-        var service = new ReviewRegistrationService(store, new AssignmentRules());
+        var service = new ReviewRegistrationService(store);
 
         IReadOnlyList<StudentCheckInResult> result =
             await service.GetStudentCheckInsAsync(1, CancellationToken.None);

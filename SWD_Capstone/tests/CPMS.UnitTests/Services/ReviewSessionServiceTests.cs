@@ -12,7 +12,7 @@ public sealed class ReviewSessionServiceTests
     public async Task Create_RejectsGroupWithoutFiveSlotsIncludingSelectedSlot()
     {
         var store = new FakeStore { GroupsWithAvailability = 0 };
-        var service = new ReviewSessionService(store, new AssignmentRules());
+        var service = new ReviewSessionService(store);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateAsync(Command(), CancellationToken.None));
@@ -24,7 +24,7 @@ public sealed class ReviewSessionServiceTests
     public async Task Create_RejectsSupervisorAsReviewer()
     {
         var store = new FakeStore();
-        var service = new ReviewSessionService(store, new AssignmentRules());
+        var service = new ReviewSessionService(store);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateAsync(Command(reviewers: [9]), CancellationToken.None));
@@ -36,7 +36,7 @@ public sealed class ReviewSessionServiceTests
     public async Task Create_PersistsValidDraftAssignment()
     {
         var store = new FakeStore();
-        var service = new ReviewSessionService(store, new AssignmentRules());
+        var service = new ReviewSessionService(store);
 
         ReviewSessionResult result = await service.CreateAsync(Command(), CancellationToken.None);
 
@@ -52,7 +52,7 @@ public sealed class ReviewSessionServiceTests
             EditSession = new ReviewSessionEditState(
                 1, 3, ReviewType.Review1, ReviewSessionStatus.Published, [10], [9])
         };
-        var service = new ReviewSessionService(store, new AssignmentRules());
+        var service = new ReviewSessionService(store);
 
         await Assert.ThrowsAsync<ConflictException>(() => service.UpdateAsync(
             1,

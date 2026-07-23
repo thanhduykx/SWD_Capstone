@@ -4,14 +4,14 @@ using CPMS.BLL.Reviews.Registration;
 
 namespace CPMS.BLL.Services;
 
-public sealed class AssignmentRules
+public static class AssignmentRules
 {
     public const int RequiredStudentAvailabilityCount = 5;
     public const int MaxGroupsPerReviewSession = 3;
     public const int MaxLecturersPerAvailabilitySlot = 4;
     public const int MaxGroupsPerAvailabilitySlot = 3;
 
-    public void ValidateReviewSlot(int slot)
+    public static void ValidateReviewSlot(int slot)
     {
         if (slot is < 1 or > 5)
         {
@@ -19,7 +19,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void ValidateReviewAssignment(
+    public static void ValidateReviewAssignment(
         int supervisorId,
         IReadOnlyCollection<int> reviewerIds,
         IReadOnlyCollection<int>? previousRoundReviewerIds = null)
@@ -51,7 +51,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureSlotRegistrationCapacity(
+    public static void EnsureSlotRegistrationCapacity(
         IReadOnlyCollection<ReviewAvailabilitySlot> selectedSlots,
         IReadOnlyCollection<ReviewAvailabilitySlot> currentSlots,
         IReadOnlyCollection<SlotRegistrationCount> registrationCounts,
@@ -72,7 +72,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureLecturerAvailableForReviewSlot(bool hasSlotConflict)
+    public static void EnsureLecturerAvailableForReviewSlot(bool hasSlotConflict)
     {
         if (hasSlotConflict)
         {
@@ -80,7 +80,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureGroupCanBeScheduledForReviewType(bool alreadyScheduled)
+    public static void EnsureGroupCanBeScheduledForReviewType(bool alreadyScheduled)
     {
         if (alreadyScheduled)
         {
@@ -88,7 +88,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void ValidateStudentAvailability(IReadOnlyCollection<(int DayOfWeek, int Slot)> slots)
+    public static void ValidateStudentAvailability(IReadOnlyCollection<(int DayOfWeek, int Slot)> slots)
     {
         ArgumentNullException.ThrowIfNull(slots);
         if (slots.Count != RequiredStudentAvailabilityCount || slots.Distinct().Count() != RequiredStudentAvailabilityCount)
@@ -102,7 +102,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureReviewRoundTransition(ReviewRoundStatus current, ReviewRoundStatus next)
+    public static void EnsureReviewRoundTransition(ReviewRoundStatus current, ReviewRoundStatus next)
     {
         if (current == next) return;
         var valid = (current, next) switch
@@ -120,7 +120,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureReviewSessionCapacity(int existingGroupCount)
+    public static void EnsureReviewSessionCapacity(int existingGroupCount)
     {
         if (existingGroupCount is < 0 or >= MaxGroupsPerReviewSession)
         {
@@ -128,7 +128,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void ValidateCouncilAssignment(IReadOnlyCollection<int> memberIds, IReadOnlyCollection<int> supervisorIds)
+    public static void ValidateCouncilAssignment(IReadOnlyCollection<int> memberIds, IReadOnlyCollection<int> supervisorIds)
     {
         if (memberIds.Intersect(supervisorIds).Any())
         {
@@ -136,7 +136,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureCouncilMember(int lecturerId, IReadOnlyCollection<int> councilMemberIds)
+    public static void EnsureCouncilMember(int lecturerId, IReadOnlyCollection<int> councilMemberIds)
     {
         if (!councilMemberIds.Contains(lecturerId))
         {
@@ -144,7 +144,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureChairman(int lecturerId, int chairmanId)
+    public static void EnsureChairman(int lecturerId, int chairmanId)
     {
         if (lecturerId != chairmanId)
         {
@@ -152,7 +152,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void ValidateCouncilCapacity(int assignedGroupCount)
+    public static void ValidateCouncilCapacity(int assignedGroupCount)
     {
         if (assignedGroupCount >= 8)
         {
@@ -160,7 +160,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void ValidateScore(decimal value)
+    public static void ValidateScore(decimal value)
     {
         if (value is < 0 or > 10)
         {
@@ -168,7 +168,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureSessionEditable(bool isLocked)
+    public static void EnsureSessionEditable(bool isLocked)
     {
         if (isLocked)
         {
@@ -176,7 +176,7 @@ public sealed class AssignmentRules
         }
     }
 
-    public void EnsureSessionStarted(DateTime? startedAt, bool isLocked)
+    public static void EnsureSessionStarted(DateTime? startedAt, bool isLocked)
     {
         EnsureSessionEditable(isLocked);
         if (startedAt is null)

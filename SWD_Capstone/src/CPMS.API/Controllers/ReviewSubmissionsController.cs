@@ -93,7 +93,9 @@ public sealed class ReviewSubmissionsController(
                 {
                     ZipArchiveEntry entry = archive.CreateEntry(SafeFileName(
                         $"{data.GroupCode}_{data.Type}_{data.SessionId}.xlsx"));
+                    #pragma warning disable S6966 // ZipArchiveEntry has no asynchronous open API in .NET 9.
                     await using Stream entryStream = entry.Open();
+                    #pragma warning restore S6966
                     await entryStream.WriteAsync(templateService.ExportWorkbook(data), cancellationToken);
                 }
             }

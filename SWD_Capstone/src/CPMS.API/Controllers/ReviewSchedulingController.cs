@@ -39,7 +39,6 @@ public sealed class ReviewSchedulingController(
         {
             message = "Lecturer dataset ensured on the active semester (web + mobile share the same rows).",
             loginEmail = "minhnd.gv24001@fpt.edu.vn",
-            password = "Test@123456",
             check = LecturerDatasetChecks
         });
     }

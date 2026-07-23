@@ -16,7 +16,7 @@ public sealed class ReviewRoundServiceTests
             SemesterExists = true,
             ModeratorId = 12
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         ReviewRoundManagementResult result = await service.CreateRoundAsync(
             7, false, 3, ReviewType.Review1,
@@ -37,7 +37,7 @@ public sealed class ReviewRoundServiceTests
             ModeratorId = 12,
             RoundExists = true
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
@@ -52,7 +52,7 @@ public sealed class ReviewRoundServiceTests
     public async Task CreateRound_RejectsReviewDateThatIsNotFiveDaysAfterRegistrationEnds()
     {
         var store = new FakeStore { SemesterExists = true, ModeratorId = 12 };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
@@ -67,7 +67,7 @@ public sealed class ReviewRoundServiceTests
     public async Task CreateRound_RejectsRegistrationDeadlineThatCannotStartMondayReviewWeek()
     {
         var store = new FakeStore { SemesterExists = true, ModeratorId = 12 };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
@@ -90,7 +90,7 @@ public sealed class ReviewRoundServiceTests
                 type: ReviewType.Review1,
                 weekStartDate: new DateOnly(2026, 7, 6))
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
@@ -112,7 +112,7 @@ public sealed class ReviewRoundServiceTests
                 new DateOnly(2026, 5, 1),
                 new DateOnly(2026, 8, 31))
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
             service.CreateRoundAsync(
@@ -127,7 +127,7 @@ public sealed class ReviewRoundServiceTests
     public async Task UpdateStatus_RejectsInvalidTransitionWithoutWriting()
     {
         var store = new FakeStore { CurrentRound = Round(status: ReviewRoundStatus.Draft) };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             service.UpdateStatusAsync(1, ReviewRoundStatus.Published, CancellationToken.None));
@@ -143,7 +143,7 @@ public sealed class ReviewRoundServiceTests
             CurrentRound = Round(status: ReviewRoundStatus.Open),
             RegistrationCompletion = (4, 3)
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         ReviewRoundClosureException exception = await Assert.ThrowsAsync<ReviewRoundClosureException>(() =>
             service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None));
@@ -161,7 +161,7 @@ public sealed class ReviewRoundServiceTests
             CurrentRound = Round(status: ReviewRoundStatus.Open),
             RegistrationCompletion = (4, 4)
         };
-        var service = new ReviewRoundService(store, new AssignmentRules());
+        var service = new ReviewRoundService(store);
 
         ReviewRoundManagementResult result = await service.UpdateStatusAsync(1, ReviewRoundStatus.Closed, CancellationToken.None);
 

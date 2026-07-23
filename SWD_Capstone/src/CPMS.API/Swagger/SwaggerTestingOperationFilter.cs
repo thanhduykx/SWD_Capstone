@@ -9,6 +9,9 @@ namespace CPMS.API.Swagger;
 
 public sealed class SwaggerTestingOperationFilter : IOperationFilter
 {
+    private const string SemesterIdField = "semesterId";
+    private const string Review1Value = "Review1";
+    private const string SessionDateField = "sessionDate";
     private static readonly Dictionary<string, OperationDoc> OperationDocs = new(StringComparer.OrdinalIgnoreCase)
     {
         ["GET /api/test-support/swagger-guide"] = new(
@@ -179,8 +182,8 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
                 Obj(("dayOfWeek", Int(3)), ("slot", Int(2))),
                 Obj(("dayOfWeek", Int(5)), ("slot", Int(4)))))),
         ["POST /api/review-scheduling/random-assign"] = Obj(
-            ("semesterId", Int(1)),
-            ("reviewType", Str("Review1")),
+            (SemesterIdField, Int(1)),
+            ("reviewType", Str(Review1Value)),
             ("weekStart", Str("2026-06-15")),
             ("reviewersPerSession", Int(2)),
             ("roomPrefix", Str("AUTO")),
@@ -190,34 +193,34 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("code", Str("R1-SU26-G01")),
             ("groupId", Int(1)),
             ("groupPosition", Int(1)),
-            ("type", Str("Review1")),
+            ("type", Str(Review1Value)),
             ("reviewerIds", Arr(Int(2), Int(3), Int(4), Int(5))),
             ("previousReviewerIds", Arr()),
             ("slot", Int(1)),
             ("room", Str("NVH 601")),
-            ("sessionDate", Str("2026-06-15T00:00:00Z"))),
+            (SessionDateField, Str("2026-06-15T00:00:00Z"))),
         ["POST /api/review-sessions/bulk-assign"] = Obj(
             ("sessions", Arr(Obj(
                 ("code", Str("R1-SU26-G01")),
                 ("groupId", Int(1)),
                 ("groupPosition", Int(1)),
-                ("type", Str("Review1")),
+                ("type", Str(Review1Value)),
                 ("reviewerIds", Arr(Int(2), Int(3))),
                 ("previousReviewerIds", Arr()),
                 ("slot", Int(1)),
                 ("room", Str("NVH 601")),
-                ("sessionDate", Str("2026-06-15T00:00:00Z")))))),
+                (SessionDateField, Str("2026-06-15T00:00:00Z")))))),
         ["PATCH /api/review-sessions/{sessionId}"] = Obj(
             ("code", Str("R1-SU26-G01")),
             ("reviewerIds", Arr(Int(2), Int(3))),
             ("previousReviewerIds", Arr()),
             ("slot", Int(2)),
             ("room", Str("NVH 602")),
-            ("sessionDate", Str("2026-06-16T00:00:00Z")),
+            (SessionDateField, Str("2026-06-16T00:00:00Z")),
             ("status", Str("Draft"))),
         ["POST /api/review-schedules/publish"] = Obj(
-            ("semesterId", Int(1)),
-            ("reviewType", Str("Review1")),
+            (SemesterIdField, Int(1)),
+            ("reviewType", Str(Review1Value)),
             ("weekStart", Str("2026-06-15")),
             ("subject", Str("Review1 schedule - Week 2026-06-15")),
             ("message", Str("Please check your assigned review sessions in CPMS."))),
@@ -242,13 +245,13 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
         ["POST /api/defense-management/rounds"] = Obj(
             ("code", Str("DEF1-SU26")),
             ("name", Str("Defense 1 - Summer 2026")),
-            ("semesterId", Int(1)),
+            (SemesterIdField, Int(1)),
             ("type", Str("Defense1")),
             ("startDate", Str("2026-07-01")),
             ("endDate", Str("2026-07-15"))),
         ["POST /api/defense-management/boards"] = Obj(
             ("code", Str("BOARD-DEF1-01")),
-            ("semesterId", Int(1)),
+            (SemesterIdField, Int(1)),
             ("type", Str("Defense1")),
             ("chairmanId", Int(2)),
             ("secretaryId", Int(3)),
@@ -261,7 +264,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("defenseRoundId", Int(1)),
             ("councilId", Int(1)),
             ("groupId", Int(1)),
-            ("sessionDate", Str("2026-07-05T00:00:00Z")),
+            (SessionDateField, Str("2026-07-05T00:00:00Z")),
             ("slot", Int(1)),
             ("room", Str("NVH 701"))),
         ["POST /api/defense-sessions/{sessionId}/comments"] = Obj(

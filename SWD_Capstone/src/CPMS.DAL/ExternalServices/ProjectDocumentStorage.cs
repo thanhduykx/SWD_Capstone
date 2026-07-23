@@ -23,6 +23,9 @@ internal sealed class ProjectDocumentStorage(
     ILogger<ProjectDocumentStorage> logger,
     CpmsDbContext? db = null) : IProjectDocumentStorage
 {
+    private const string SupabasePrefix = "supabase:";
+    private const string DatabasePrefix = "database:";
+    private const string LocalPrefix = "local:";
     public async Task<StoredProjectDocument> SaveAsync(
         string objectPath, string contentType, Stream content, CancellationToken cancellationToken)
     {
@@ -67,9 +70,9 @@ internal sealed class ProjectDocumentStorage(
 
     public async Task<ProjectDocumentContent?> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
     {
-        if (storageKey.StartsWith("supabase:", StringComparison.Ordinal))
+        if (storageKey.StartsWith(SupabasePrefix, StringComparison.Ordinal))
         {
-            var objectPath = storageKey["supabase:".Length..];
+            var objectPath = storageKey[SupabasePrefix.Length..];
             using var request = CreateSupabaseRequest(HttpMethod.Get, $"object/authenticated/{Encode(options.Bucket)}/{EncodePath(objectPath)}");
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
@@ -78,35 +81,35 @@ internal sealed class ProjectDocumentStorage(
             return new ProjectDocumentContent(new MemoryStream(bytes, writable: false));
         }
 
-        if (storageKey.StartsWith("database:", StringComparison.Ordinal) && db is not null)
+        if (storageKey.StartsWith(DatabasePrefix, StringComparison.Ordinal) && db is not null)
         {
-            var key = storageKey["database:".Length..];
+            var key = storageKey[DatabasePrefix.Length..];
             var payload = await db.DocumentPayloads.AsNoTracking().SingleOrDefaultAsync(x => x.StorageKey == key, cancellationToken);
             return payload is null ? null : new ProjectDocumentContent(new MemoryStream(payload.Content, writable: false));
         }
 
-        var path = storageKey.StartsWith("local:", StringComparison.Ordinal) ? storageKey["local:".Length..] : storageKey;
+        var path = storageKey.StartsWith(LocalPrefix, StringComparison.Ordinal) ? storageKey[LocalPrefix.Length..] : storageKey;
         return File.Exists(path) ? new ProjectDocumentContent(File.OpenRead(path)) : null;
     }
 
     public async Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
     {
-        if (storageKey.StartsWith("supabase:", StringComparison.Ordinal))
+        if (storageKey.StartsWith(SupabasePrefix, StringComparison.Ordinal))
         {
-            var objectPath = storageKey["supabase:".Length..];
+            var objectPath = storageKey[SupabasePrefix.Length..];
             using var request = CreateSupabaseRequest(HttpMethod.Delete, $"object/{Encode(options.Bucket)}/{EncodePath(objectPath)}");
             using var response = await httpClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode) logger.LogWarning("Could not roll back Supabase object {ObjectPath}.", objectPath);
             return;
         }
-        if (storageKey.StartsWith("database:", StringComparison.Ordinal) && db is not null)
+        if (storageKey.StartsWith(DatabasePrefix, StringComparison.Ordinal) && db is not null)
         {
-            var key = storageKey["database:".Length..];
+            var key = storageKey[DatabasePrefix.Length..];
             var payload = await db.DocumentPayloads.SingleOrDefaultAsync(x => x.StorageKey == key, cancellationToken);
             if (payload is not null) { db.DocumentPayloads.Remove(payload); await db.SaveChangesAsync(cancellationToken); }
             return;
         }
-        var path = storageKey.StartsWith("local:", StringComparison.Ordinal) ? storageKey["local:".Length..] : storageKey;
+        var path = storageKey.StartsWith(LocalPrefix, StringComparison.Ordinal) ? storageKey[LocalPrefix.Length..] : storageKey;
         if (File.Exists(path)) File.Delete(path);
     }
 
