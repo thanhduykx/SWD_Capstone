@@ -39,40 +39,47 @@ public sealed class ReviewRegistrationService(
             rules.ValidateReviewSlot(slot.Slot);
         }
 
-        return await store.ExecuteLockedAsync(roundId, async token =>
-        {
-            ReviewRoundData round = await RequireRoundAsync(roundId, token);
-            EnsureOpen(round, "Lecturer availability can only be changed while registration is Open.");
-            LecturerAvailabilityData current = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, token);
-            IReadOnlyList<SlotRegistrationCount> counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
-            rules.EnsureSlotRegistrationCapacity(
-                distinctSlots, current.Slots, counts, AssignmentRules.MaxLecturersPerAvailabilitySlot, "lecturer");
-            await store.ReplaceLecturerAvailabilityAsync(round, lecturerId, distinctSlots, DateTime.UtcNow, token);
-            counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
-            return new ReviewAvailabilityWeekResult(
-                round.Id, round.SemesterId, lecturerId, round.WeekStartDate, false, null, distinctSlots,
-                AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
-        }, cancellationToken);
+        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
+        EnsureOpen(round, "Lecturer availability can only be changed while registration is Open.");
+        await store.ReplaceLecturerAvailabilityAsync(
+            round, lecturerId, distinctSlots, DateTime.UtcNow, cancellationToken);
+        IReadOnlyList<SlotRegistrationCount> counts =
+            await store.GetLecturerSlotRegistrationCountsAsync(roundId, cancellationToken);
+        return new ReviewAvailabilityWeekResult(
+            round.Id, round.SemesterId, lecturerId, round.WeekStartDate, false, null, distinctSlots,
+            AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
     }
 
     public async Task<ReviewAvailabilityWeekResult> SubmitLecturerAvailabilityAsync(
         int userId, int roundId, CancellationToken cancellationToken)
     {
         var lecturerId = await RequireLecturerIdAsync(userId, cancellationToken);
-        ReviewRoundData round = await RequireRoundAsync(roundId, cancellationToken);
-        EnsureOpen(round, "Lecturer availability can only be submitted while registration is Open.");
-        LecturerAvailabilityData state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, cancellationToken);
-        if (state.Slots.Count == 0)
+        return await store.ExecuteLockedAsync(roundId, async token =>
         {
-            throw new BusinessRuleException("At least one availability slot is required before submitting to moderator.");
-        }
-
-        DateTime submittedAt = DateTime.UtcNow;
-        await store.SubmitLecturerAvailabilityAsync(round, lecturerId, submittedAt, cancellationToken);
-        IReadOnlyList<SlotRegistrationCount> counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, cancellationToken);
-        return new ReviewAvailabilityWeekResult(
-            round.Id, round.SemesterId, lecturerId, round.WeekStartDate, true, submittedAt, state.Slots,
-            AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
+            ReviewRoundData round = await RequireRoundAsync(roundId, token);
+            EnsureOpen(round, "Lecturer availability can only be submitted while registration is Open.");
+            LecturerAvailabilityData state = await store.GetLecturerAvailabilityAsync(roundId, lecturerId, token);
+            if (state.Slots.Count == 0)
+            {
+                throw new BusinessRuleException("At least one availability slot is required before submitting to moderator.");
+            }
+            IReadOnlyList<SlotRegistrationCount> counts =
+                await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
+            IReadOnlyCollection<ReviewAvailabilitySlot> currentOfficialSlots =
+                state.SubmittedAt is null ? [] : state.Slots;
+            rules.EnsureSlotRegistrationCapacity(
+                state.Slots,
+                currentOfficialSlots,
+                counts,
+                AssignmentRules.MaxLecturersPerAvailabilitySlot,
+                "lecturer");
+            DateTime submittedAt = DateTime.UtcNow;
+            await store.SubmitLecturerAvailabilityAsync(round, lecturerId, submittedAt, token);
+            counts = await store.GetLecturerSlotRegistrationCountsAsync(roundId, token);
+            return new ReviewAvailabilityWeekResult(
+                round.Id, round.SemesterId, lecturerId, round.WeekStartDate, true, submittedAt, state.Slots,
+                AssignmentRules.MaxLecturersPerAvailabilitySlot, counts);
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<StudentReviewRoundResult>> GetStudentRoundsAsync(

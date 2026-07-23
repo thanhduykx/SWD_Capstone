@@ -53,7 +53,11 @@ public sealed class ReviewRegistrationStore(CpmsDbContext dbContext) : IReviewRe
         int roundId, CancellationToken cancellationToken)
     {
         var counts = await dbContext.ReviewAvailabilities
-            .Where(x => x.ReviewRoundId == roundId)
+            .Where(x => x.ReviewRoundId == roundId &&
+                        dbContext.ReviewAvailabilitySubmissions.Any(submission =>
+                            submission.ReviewRoundId == roundId &&
+                            submission.LecturerId == x.LecturerId &&
+                            submission.SubmittedAt != null))
             .GroupBy(x => new { x.DayOfWeek, x.Slot })
             .Select(group => new
             {

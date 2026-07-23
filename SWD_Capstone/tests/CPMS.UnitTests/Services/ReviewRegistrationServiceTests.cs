@@ -42,20 +42,22 @@ public sealed class ReviewRegistrationServiceTests
     }
 
     [Fact]
-    public async Task SaveLecturerAvailability_RejectsAFullSlot()
+    public async Task SubmitLecturerAvailability_RejectsAFullOfficialSlot()
     {
         var store = new FakeStore
         {
             LecturerId = 7,
             Round = OpenRound(),
+            LecturerAvailability = new LecturerAvailabilityData(null, [new ReviewAvailabilitySlot(1, 1)]),
             LecturerCounts = [new SlotRegistrationCount(1, 1, 4)]
         };
         var service = new ReviewRegistrationService(store, new AssignmentRules());
 
         BusinessRuleException exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            service.SaveLecturerAvailabilityAsync(1, 1, [new ReviewAvailabilitySlot(1, 1)], CancellationToken.None));
+            service.SubmitLecturerAvailabilityAsync(1, 1, CancellationToken.None));
 
         Assert.Contains("4/4 lecturer", exception.Message);
+        Assert.False(store.LecturerAvailabilitySubmitted);
     }
 
     [Fact]
