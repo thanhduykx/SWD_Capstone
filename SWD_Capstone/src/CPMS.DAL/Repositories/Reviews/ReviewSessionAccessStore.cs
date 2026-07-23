@@ -72,6 +72,7 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
         DateTime generatedAt,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(sessionIds);
         ReviewSession[] sessions = await dbContext.ReviewSessions
             .Where(item => sessionIds.Contains(item.Id))
             .ToArrayAsync(cancellationToken);
