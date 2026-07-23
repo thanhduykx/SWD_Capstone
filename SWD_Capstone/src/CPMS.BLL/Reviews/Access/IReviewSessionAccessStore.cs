@@ -11,13 +11,17 @@ public interface IReviewSessionAccessStore
         int sessionId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
+        int sessionId,
+        CancellationToken cancellationToken);
+
     Task<int?> FindAssignedLecturerAsync(
         int sessionId,
         int lecturerUserId,
         CancellationToken cancellationToken);
 
     Task SaveAccessCodeAsync(
-        int sessionId,
+        IReadOnlyCollection<int> sessionIds,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,

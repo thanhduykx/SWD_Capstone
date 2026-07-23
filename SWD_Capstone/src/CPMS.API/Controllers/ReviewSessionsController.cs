@@ -113,6 +113,7 @@ public sealed class ReviewSessionsController(
                 cancellationToken);
             return Ok(new GeneratedReviewSessionAccessCodeResponse(
                 result.SessionId,
+                result.AffectedSessionIds,
                 result.AccessCode,
                 result.CodeVersion,
                 result.GeneratedAt));

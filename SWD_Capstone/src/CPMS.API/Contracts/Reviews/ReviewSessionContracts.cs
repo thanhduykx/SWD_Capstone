@@ -67,6 +67,7 @@ public sealed record MyReviewSessionResponse(
 public sealed record VerifyReviewSessionAccessCodeRequest(string AccessCode);
 public sealed record GeneratedReviewSessionAccessCodeResponse(
     int SessionId,
+    IReadOnlyList<int> AffectedSessionIds,
     string AccessCode,
     int CodeVersion,
     DateTime GeneratedAt);

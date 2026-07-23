@@ -19,6 +19,38 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
                 session.AccessCodeVersion))
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
+        int sessionId,
+        CancellationToken cancellationToken)
+    {
+        var anchor = await dbContext.ReviewSessions
+            .Where(session => session.Id == sessionId)
+            .Select(session => new
+            {
+                session.SemesterId,
+                session.Type,
+                session.SessionDate,
+                session.Slot
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (anchor is null)
+        {
+            return [];
+        }
+
+        return await dbContext.ReviewSessions
+            .Where(session =>
+                session.SemesterId == anchor.SemesterId
+                && session.Type == anchor.Type
+                && session.SessionDate == anchor.SessionDate
+                && session.Slot == anchor.Slot)
+            .Select(session => new ReviewSessionAccessState(
+                session.Id,
+                session.AccessCodeHash,
+                session.AccessCodeVersion))
+            .ToArrayAsync(cancellationToken);
+    }
+
     public Task<int?> FindAssignedLecturerAsync(
         int sessionId,
         int lecturerUserId,
@@ -33,19 +65,28 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task SaveAccessCodeAsync(
-        int sessionId,
+        IReadOnlyCollection<int> sessionIds,
         string accessCodeHash,
         int codeVersion,
         int generatedByUserId,
         DateTime generatedAt,
         CancellationToken cancellationToken)
     {
-        ReviewSession session = await dbContext.ReviewSessions
-            .SingleAsync(item => item.Id == sessionId, cancellationToken);
-        session.AccessCodeHash = accessCodeHash;
-        session.AccessCodeVersion = codeVersion;
-        session.AccessCodeGeneratedByUserId = generatedByUserId;
-        session.AccessCodeGeneratedAt = generatedAt;
+        ReviewSession[] sessions = await dbContext.ReviewSessions
+            .Where(item => sessionIds.Contains(item.Id))
+            .ToArrayAsync(cancellationToken);
+        if (sessions.Length != sessionIds.Count)
+        {
+            throw new KeyNotFoundException("One or more review sessions were not found.");
+        }
+
+        foreach (ReviewSession session in sessions)
+        {
+            session.AccessCodeHash = accessCodeHash;
+            session.AccessCodeVersion = codeVersion;
+            session.AccessCodeGeneratedByUserId = generatedByUserId;
+            session.AccessCodeGeneratedAt = generatedAt;
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

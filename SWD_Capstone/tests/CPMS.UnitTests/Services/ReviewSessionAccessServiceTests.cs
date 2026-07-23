@@ -11,7 +11,12 @@ public sealed class ReviewSessionAccessServiceTests
     {
         var store = new FakeStore
         {
-            Session = new ReviewSessionAccessState(58, null, 2)
+            Session = new ReviewSessionAccessState(58, null, 2),
+            SlotSessions =
+            [
+                new ReviewSessionAccessState(56, null, 4),
+                new ReviewSessionAccessState(58, null, 2)
+            ]
         };
         var service = new ReviewSessionAccessService(store, new FakeHasher());
 
@@ -21,7 +26,9 @@ public sealed class ReviewSessionAccessServiceTests
             CancellationToken.None);
 
         Assert.Equal(8, result.AccessCode.Length);
-        Assert.Equal(3, result.CodeVersion);
+        Assert.Equal(5, result.CodeVersion);
+        Assert.Equal([56, 58], result.AffectedSessionIds);
+        Assert.Equal([56, 58], store.StoredSessionIds);
         Assert.Equal($"hashed:{new string(result.AccessCode.Reverse().ToArray())}", store.StoredHash);
         Assert.DoesNotContain(result.AccessCode, store.StoredHash);
         Assert.Equal(7, store.GeneratedByUserId);
@@ -90,9 +97,11 @@ public sealed class ReviewSessionAccessServiceTests
     private sealed class FakeStore : IReviewSessionAccessStore
     {
         public ReviewSessionAccessState? Session { get; init; }
+        public IReadOnlyList<ReviewSessionAccessState>? SlotSessions { get; init; }
         public int? AssignedLecturerId { get; init; }
         public bool HasCurrentGrant { get; init; }
         public string? StoredHash { get; private set; }
+        public IReadOnlyCollection<int>? StoredSessionIds { get; private set; }
         public int? GeneratedByUserId { get; private set; }
         public (int SessionId, int LecturerId, int Version)? SavedGrant { get; private set; }
 
@@ -101,6 +110,15 @@ public sealed class ReviewSessionAccessServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(Session?.SessionId == sessionId ? Session : null);
 
+        public Task<IReadOnlyList<ReviewSessionAccessState>> FindSlotSessionsAsync(
+            int sessionId,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<ReviewSessionAccessState> sessions = SlotSessions
+                ?? (Session is { } session && session.SessionId == sessionId ? [session] : []);
+            return Task.FromResult(sessions);
+        }
+
         public Task<int?> FindAssignedLecturerAsync(
             int sessionId,
             int lecturerUserId,
@@ -108,13 +126,14 @@ public sealed class ReviewSessionAccessServiceTests
             Task.FromResult(AssignedLecturerId);
 
         public Task SaveAccessCodeAsync(
-            int sessionId,
+            IReadOnlyCollection<int> sessionIds,
             string accessCodeHash,
             int codeVersion,
             int generatedByUserId,
             DateTime generatedAt,
             CancellationToken cancellationToken)
         {
+            StoredSessionIds = sessionIds;
             StoredHash = accessCodeHash;
             GeneratedByUserId = generatedByUserId;
             return Task.CompletedTask;

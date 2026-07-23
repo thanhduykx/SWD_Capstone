@@ -2,6 +2,7 @@ namespace CPMS.BLL.Reviews.Access;
 
 public sealed record GeneratedReviewSessionAccessCode(
     int SessionId,
+    IReadOnlyList<int> AffectedSessionIds,
     string AccessCode,
     int CodeVersion,
     DateTime GeneratedAt);

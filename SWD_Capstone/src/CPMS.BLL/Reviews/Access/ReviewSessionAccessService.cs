@@ -16,14 +16,25 @@ public sealed class ReviewSessionAccessService(
         int generatedByUserId,
         CancellationToken cancellationToken)
     {
-        ReviewSessionAccessState state = await RequireSessionAsync(sessionId, cancellationToken);
+        IReadOnlyList<ReviewSessionAccessState> slotSessions =
+            await store.FindSlotSessionsAsync(sessionId, cancellationToken);
+        if (slotSessions.Count == 0)
+        {
+            throw new KeyNotFoundException("Review session not found.");
+        }
+
+        int codeVersion = checked(slotSessions.Max(session => session.CodeVersion) + 1);
         string accessCode = RandomNumberGenerator.GetString(AccessCodeAlphabet, AccessCodeLength);
         string accessCodeHash = passwordHasher.Hash(accessCode);
-        int codeVersion = checked(state.CodeVersion + 1);
         DateTime generatedAt = DateTime.UtcNow;
+        int[] affectedSessionIds = slotSessions
+            .Select(session => session.SessionId)
+            .Distinct()
+            .Order()
+            .ToArray();
 
         await store.SaveAccessCodeAsync(
-            sessionId,
+            affectedSessionIds,
             accessCodeHash,
             codeVersion,
             generatedByUserId,
@@ -32,6 +43,7 @@ public sealed class ReviewSessionAccessService(
 
         return new GeneratedReviewSessionAccessCode(
             sessionId,
+            affectedSessionIds,
             accessCode,
             codeVersion,
             generatedAt);
