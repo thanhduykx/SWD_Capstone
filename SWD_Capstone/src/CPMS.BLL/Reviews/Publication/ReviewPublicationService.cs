@@ -62,11 +62,10 @@ public sealed class ReviewPublicationService(
             throw new BusinessRuleException(
                 "No review sessions exist for the selected week and review round.");
         }
-        if (snapshot.FullyRegisteredGroupCount != snapshot.ActiveGroupCount ||
-            snapshot.ScheduledGroupCount != snapshot.ActiveGroupCount)
+        if (snapshot.ScheduledGroupCount == 0)
         {
             throw new IncompleteReviewScheduleException(
-                "Every active group must submit five slots and receive an assignment before publication.",
+                "At least one group must be scheduled in a review session before publication.",
                 snapshot.ActiveGroupCount,
                 snapshot.FullyRegisteredGroupCount,
                 snapshot.ScheduledGroupCount);
