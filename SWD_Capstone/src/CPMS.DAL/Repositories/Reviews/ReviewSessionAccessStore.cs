@@ -21,21 +21,59 @@ public sealed class ReviewSessionAccessStore(CpmsDbContext dbContext)
                 slot.AccessCodeVersion))
             .SingleOrDefaultAsync(cancellationToken);
 
-    public Task<int?> FindAssignedLecturerAsync(
+    public async Task<int?> FindAssignedLecturerAsync(
         int sessionId,
         int groupId,
         int lecturerUserId,
-        CancellationToken cancellationToken) =>
-        dbContext.ReviewChecklistSubmissions
-            .Where(submission =>
-                submission.SessionId == sessionId
+        CancellationToken cancellationToken)
+    {
+        // /my lấy từ checklist submission — verify phải khớp nguồn này trước.
+        int? fromSubmission = await (
+            from submission in dbContext.ReviewChecklistSubmissions
+            join lecturer in dbContext.Lecturers on submission.ReviewerId equals lecturer.Id
+            where submission.SessionId == sessionId
                 && submission.GroupId == groupId
-                && dbContext.Lecturers.Any(lecturer =>
-                    lecturer.Id == submission.ReviewerId
-                    && lecturer.UserId == lecturerUserId))
-            .Select(submission => (int?)submission.ReviewerId)
-            .Distinct()
-            .SingleOrDefaultAsync(cancellationToken);
+                && lecturer.UserId == lecturerUserId
+            select (int?)lecturer.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (fromSubmission.HasValue)
+        {
+            return fromSubmission;
+        }
+
+        // Fallback: vẫn cho GV trong panel session (tránh lệch dữ liệu panel vs submission).
+        return await (
+            from assignment in dbContext.ReviewSessionReviewers
+            join lecturer in dbContext.Lecturers on assignment.LecturerId equals lecturer.Id
+            where assignment.SessionId == sessionId
+                && lecturer.UserId == lecturerUserId
+                && dbContext.GroupReviewSlots.Any(slot =>
+                    slot.SessionId == sessionId && slot.GroupId == groupId)
+            select (int?)lecturer.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<int>> FindGroupIdsInSessionAsync(
+        int sessionId,
+        CancellationToken cancellationToken) =>
+        await dbContext.GroupReviewSlots
+            .Where(slot => slot.SessionId == sessionId)
+            .OrderBy(slot => slot.GroupPosition)
+            .Select(slot => slot.GroupId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<int>> FindAssignedGroupIdsAsync(
+        int sessionId,
+        int lecturerUserId,
+        CancellationToken cancellationToken) =>
+        await (
+            from submission in dbContext.ReviewChecklistSubmissions
+            join lecturer in dbContext.Lecturers on submission.ReviewerId equals lecturer.Id
+            where submission.SessionId == sessionId && lecturer.UserId == lecturerUserId
+            select submission.GroupId
+        )
+        .Distinct()
+        .ToListAsync(cancellationToken);
 
     public async Task SaveAccessCodeAsync(
         int sessionId,

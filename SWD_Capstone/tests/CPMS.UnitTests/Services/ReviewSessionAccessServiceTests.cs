@@ -114,6 +114,21 @@ public sealed class ReviewSessionAccessServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(AssignedLecturerId);
 
+        public Task<IReadOnlyList<int>> FindGroupIdsInSessionAsync(
+            int sessionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<int>>(
+                Session?.SessionId == sessionId ? [Session.GroupId] : []);
+
+        public Task<IReadOnlyList<int>> FindAssignedGroupIdsAsync(
+            int sessionId,
+            int lecturerUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<int>>(
+                AssignedLecturerId.HasValue && Session?.SessionId == sessionId
+                    ? [Session.GroupId]
+                    : []);
+
         public Task SaveAccessCodeAsync(
             int sessionId,
             int groupId,

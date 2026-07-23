@@ -19,6 +19,15 @@ public interface IReviewSessionAccessStore
         int lecturerUserId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<int>> FindGroupIdsInSessionAsync(
+        int sessionId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<int>> FindAssignedGroupIdsAsync(
+        int sessionId,
+        int lecturerUserId,
+        CancellationToken cancellationToken);
+
     Task SaveAccessCodeAsync(
         int sessionId,
         int groupId,

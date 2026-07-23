@@ -33,4 +33,21 @@ public interface IReviewSessionAccessService
         int groupId,
         int lecturerUserId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tương thích FE/API cũ: tạo cùng một mã cho mọi nhóm trong session.
+    /// </summary>
+    Task<GeneratedReviewSessionAccessCode> GenerateForSessionAsync(
+        int sessionId,
+        int generatedByUserId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tương thích FE/API cũ: verify theo session — resolve nhóm GV được phân công.
+    /// </summary>
+    Task<VerifiedReviewSessionAccess> VerifyForSessionAsync(
+        int sessionId,
+        int lecturerUserId,
+        string accessCode,
+        CancellationToken cancellationToken);
 }

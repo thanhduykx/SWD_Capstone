@@ -120,8 +120,36 @@ public sealed class ReviewSessionsController(
         }
     }
 
+    /// <summary>
+    /// Legacy: PĐT FE cũ tạo mã theo session (áp dụng cùng mã cho mọi nhóm trong buổi).
+    /// </summary>
+    [HttpPost("{sessionId:int}/access-code")]
+    [Authorize(Roles = "SystemAdministrator,TrainingDepartment")]
+    public async Task<ActionResult<GeneratedReviewSessionAccessCodeResponse>> GenerateAccessCodeForSession(
+        int sessionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            GeneratedReviewSessionAccessCode result = await accessService.GenerateForSessionAsync(
+                sessionId,
+                CurrentUserId(),
+                cancellationToken);
+            return Ok(new GeneratedReviewSessionAccessCodeResponse(
+                result.SessionId,
+                result.GroupId,
+                result.AccessCode,
+                result.CodeVersion,
+                result.GeneratedAt));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
+        }
+    }
+
     [HttpPost("{sessionId:int}/groups/{groupId:int}/access-code/verify")]
-    [Authorize(Roles = "Lecturer")]
+    [Authorize]
     [EnableRateLimiting("review-access-code")]
     public async Task<ActionResult<VerifiedReviewSessionAccessResponse>> VerifyAccessCode(
         int sessionId,
@@ -130,11 +158,67 @@ public sealed class ReviewSessionsController(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (!User.IsInRole("Lecturer"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                error = "Only a lecturer assigned to this review group can enter its access code."
+            });
+        }
+
         try
         {
             VerifiedReviewSessionAccess result = await accessService.VerifyAsync(
                 sessionId,
                 groupId,
+                CurrentUserId(),
+                request.AccessCode,
+                cancellationToken);
+            return Ok(new VerifiedReviewSessionAccessResponse(
+                result.SessionId,
+                result.GroupId,
+                result.IsVerified,
+                result.VerifiedAt));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { error = exception.Message });
+        }
+        catch (BusinessRuleException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            // Không dùng Forbid() (body trống) — client cần message để hiện đúng nguyên nhân.
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = exception.Message });
+        }
+    }
+
+    /// <summary>
+    /// Legacy: verify theo sessionId (mobile/FE cũ khi production chưa kịp group-scoped).
+    /// </summary>
+    [HttpPost("{sessionId:int}/access-code/verify")]
+    [Authorize]
+    [EnableRateLimiting("review-access-code")]
+    public async Task<ActionResult<VerifiedReviewSessionAccessResponse>> VerifyAccessCodeForSession(
+        int sessionId,
+        VerifyReviewSessionAccessCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!User.IsInRole("Lecturer"))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                error = "Only a lecturer assigned to this review session can enter its access code."
+            });
+        }
+
+        try
+        {
+            VerifiedReviewSessionAccess result = await accessService.VerifyForSessionAsync(
+                sessionId,
                 CurrentUserId(),
                 request.AccessCode,
                 cancellationToken);
