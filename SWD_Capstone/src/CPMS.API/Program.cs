@@ -194,7 +194,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     {
         using IServiceScope scope = app.Services.CreateScope();
         IDatabaseLifecycleService database = scope.ServiceProvider.GetRequiredService<IDatabaseLifecycleService>();
-        var seedDevelopmentData = app.Environment.IsDevelopment() ||
+        var seedDevelopmentData = app.Environment.IsDevelopment() &&
                                   app.Configuration.GetValue<bool>("Swagger:ExposeTestSupport");
         await database.InitializeAsync(seedDevelopmentData, CancellationToken.None);
     }

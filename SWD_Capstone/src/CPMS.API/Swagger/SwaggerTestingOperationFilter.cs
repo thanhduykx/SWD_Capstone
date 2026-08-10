@@ -145,7 +145,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
     {
         ["POST /api/auth/login"] = Obj(
             ("username", Str("minhnd.gv24001@fpt.edu.vn")),
-            ("password", Str("Test@123456"))),
+            ("password", Str("configured-via-user-secrets"))),
         ["POST /api/auth/refresh"] = Obj(
             ("refreshToken", Str("paste-refresh-token-from-login"))),
         ["POST /api/auth/google"] = Obj(
@@ -154,7 +154,7 @@ public sealed class SwaggerTestingOperationFilter : IOperationFilter
             ("username", Null()),
             ("identityCode", Str("SE194673")),
             ("email", Str("gv001@cpms.local")),
-            ("password", Str("Test@123456")),
+            ("password", Str("configured-via-user-secrets")),
             ("role", Str("Lecturer")),
             ("fullName", Str("Duong Thanh Thanh Duy")),
             ("department", Null()),

@@ -112,7 +112,7 @@ public sealed class TestSupportController(
     }
 
     private bool IsEnabled() =>
-        environment.IsDevelopment() || configuration.GetValue<bool>("Swagger:ExposeTestSupport");
+        environment.IsDevelopment() && configuration.GetValue<bool>("Swagger:ExposeTestSupport");
 
     private IReadOnlyCollection<TestAccountResponse> TestAccounts() =>
     [

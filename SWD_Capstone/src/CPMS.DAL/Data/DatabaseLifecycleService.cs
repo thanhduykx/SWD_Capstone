@@ -5,10 +5,11 @@ using CPMS.BLL.Enums;
 using CPMS.BLL.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 
 namespace CPMS.DAL.Data;
 
-public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
+public sealed class DatabaseLifecycleService(CpmsDbContext dbContext, IConfiguration configuration)
     : IDatabaseLifecycleService, ITestDataResetService
 {
     private static readonly string[] ResetTables =
@@ -49,11 +50,12 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
 
     private async Task SeedDevelopmentDataAsync(CancellationToken cancellationToken)
     {
-        await SeedModeratorAsync(cancellationToken);
-        await SeedTestAccountsAsync(cancellationToken);
+        string seedPassword = GetSeedPassword();
+        await SeedModeratorAsync(seedPassword, cancellationToken);
+        await SeedTestAccountsAsync(seedPassword, cancellationToken);
     }
 
-    private async Task SeedModeratorAsync(CancellationToken cancellationToken)
+    private async Task SeedModeratorAsync(string seedPassword, CancellationToken cancellationToken)
     {
         const string username = "Admin@gmail.com";
         const string email = "Admin@gmail.com";
@@ -66,7 +68,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             {
                 Username = username,
                 Email = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345", workFactor: 12),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedPassword, workFactor: 12),
                 Role = UserRole.TrainingDepartment,
                 IsActive = true
             };
@@ -77,7 +79,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         {
             user.Username = username;
             user.Email = email;
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345", workFactor: 12);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedPassword, workFactor: 12);
             user.Role = UserRole.TrainingDepartment;
             user.IsActive = true;
             user.LockedUntil = null;
@@ -105,7 +107,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private async Task SeedTestAccountsAsync(CancellationToken cancellationToken)
+    private async Task SeedTestAccountsAsync(string seedPassword, CancellationToken cancellationToken)
     {
         (string, string, UserRole)[] accounts = new[]
         {
@@ -124,7 +126,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
                 {
                     Username = account.Item1,
                     Email = account.Item2,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12),
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedPassword, workFactor: 12),
                     Role = account.Item3,
                     IsActive = true
                 };
@@ -135,7 +137,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             {
                 user.Username = account.Item1;
                 user.Email = account.Item2;
-                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12);
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedPassword, workFactor: 12);
                 user.Role = account.Item3;
                 user.IsActive = true;
                 user.LockedUntil = null;
@@ -183,7 +185,7 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
             new StudentSeed("Vũ Minh Quang", "SE192755", "acc@gmail.com", false),
             new StudentSeed("Nguyễn Minh Thành", "SE191034", "ab@gmail.com", false)
         };
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Test@123456", workFactor: 12);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(GetSeedPassword(), workFactor: 12);
         foreach (StudentSeed? seed in students)
         {
             Student? student = await dbContext.Students.FirstOrDefaultAsync(x => x.Code == seed.Code, cancellationToken);
@@ -295,5 +297,18 @@ public sealed class DatabaseLifecycleService(CpmsDbContext dbContext)
         var code = $"TEST_TOPIC_{semesterCode}_SMART_HOME";
         return code.Length <= 50 ? code : code[..50];
     }
+
+    private string GetSeedPassword()
+    {
+        string? password = configuration["TestData:DefaultPassword"];
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 20)
+        {
+            throw new InvalidOperationException(
+                "Development test-data seeding requires TestData:DefaultPassword with at least 20 characters in User Secrets.");
+        }
+
+        return password;
+    }
+
     private sealed record StudentSeed(string FullName, string Code, string Email, bool IsLeader);
 }
