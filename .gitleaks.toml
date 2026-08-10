@@ -1,0 +1,36 @@
+title = "CPMS secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "dotnet-appsettings-sensitive-value"
+description = "Non-empty sensitive value in an appsettings JSON file"
+regex = '''(?i)"(?:password|clientsecret|apikey|servicerolekey)"\s*:\s*"([^"\s][^"]{7,})"'''
+secretGroup = 1
+path = '''(?i)(^|/)appsettings(?:\.[^/]+)?\.json$'''
+keywords = ["password", "clientsecret", "apikey", "servicerolekey"]
+
+[[rules]]
+id = "dotnet-appsettings-jwt-key"
+description = "JWT signing key stored in appsettings JSON"
+regex = '''(?i)"key"\s*:\s*"([A-Za-z0-9+/_=-]{32,})"'''
+secretGroup = 1
+path = '''(?i)(^|/)appsettings(?:\.[^/]+)?\.json$'''
+keywords = ["key"]
+
+[[rules]]
+id = "dotnet-appsettings-database-password"
+description = "Credential-bearing database connection string stored in appsettings JSON"
+regex = '''(?i)"(?:cpmsdatabase|defaultconnection)"\s*:\s*"([^"]*(?:password|pwd)=[^";]+[^"]*)"'''
+secretGroup = 1
+path = '''(?i)(^|/)appsettings(?:\.[^/]+)?\.json$'''
+keywords = ["cpmsdatabase", "defaultconnection", "password", "pwd"]
+
+[[allowlists]]
+description = "Known non-secret constants misclassified by the generic API-key rule"
+regexTarget = "line"
+regexes = [
+  '''private const string AccessCodeAlphabet\s*=''',
+  '''command\.CommandText\s*='''
+]

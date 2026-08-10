@@ -40,6 +40,10 @@ IConfigurationRoot appSettingsConfiguration = new ConfigurationBuilder()
     .Build();
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddConfiguration(appSettingsConfiguration);
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true);
+}
 ApplicationConfiguration.AddDeploymentOverrides(builder.Configuration);
 // Re-apply after Sources.Clear() so Kestrel keeps the public bind address.
 string? publicUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");

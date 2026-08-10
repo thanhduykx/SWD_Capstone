@@ -11,3 +11,19 @@ frontend/*.tsbuildinfo
 *.user
 .vs/
 tmp/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+**/appsettings.*.local.json
+**/secrets.json
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Runtime logs and secret-scan reports
+**/logs/
+.gitleaks-report.*

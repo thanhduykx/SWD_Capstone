@@ -69,26 +69,42 @@ dotnet test .\CPMS.sln
 dotnet run --project .\src\CPMS.API\CPMS.API.csproj
 ```
 
-The deployed application reads its configuration from `src/CPMS.API/appsettings.json`.
+`src/CPMS.API/appsettings.json` contains non-secret defaults only. Never put a real
+password, API key, JWT signing key, service-role key, or connection string in a
+tracked file, even temporarily.
+
+For local development, store secrets with .NET User Secrets:
+
+```powershell
+$project = '.\src\CPMS.API\CPMS.API.csproj'
+dotnet user-secrets --project $project set 'ConnectionStrings:CpmsDatabase' '<connection-string>'
+dotnet user-secrets --project $project set 'Jwt:Key' '<at-least-32-random-characters>'
+dotnet user-secrets --project $project set 'Smtp:FromEmail' '<sender-address>'
+dotnet user-secrets --project $project set 'Smtp:UserName' '<smtp-user>'
+dotnet user-secrets --project $project set 'Smtp:Password' '<new-app-password>'
+dotnet user-secrets --project $project set 'Gemini:ApiKey' '<api-key>'
+```
+
+User Secrets are for development only. Production secrets must be injected by the
+deployment platform as environment variables. Environment variables have the
+highest configuration precedence.
 
 ## Gmail / Google Login
 
 Google login is account-bound: the Google email must already exist in `users.email`.
 
-Configure the Google OAuth Client ID in `Authentication:Google:ClientId`.
-
-Configure SMTP and Google OAuth in `src/CPMS.API/appsettings.json`.
+Configure the Google OAuth Client ID in `Authentication:Google:ClientId`. Configure
+SMTP credentials through User Secrets locally or `Smtp__FromEmail`,
+`Smtp__UserName`, and `Smtp__Password` environment variables in production. Gmail
+must use a dedicated app password with 2-Step Verification; never use the account
+password and never reuse the app password for another application.
 
 ## Gemini Project Suggestions
 
 Lecturers can call `POST /api/project-suggestions/summary` to generate Vietnamese
 reference text containing a project-content summary, strengths, and areas for
-improvement. Configure `Gemini:ApiKey`, `Gemini:Model`, and
-`Gemini:TimeoutSeconds` directly in `src/CPMS.API/appsettings.json`.
-
-The API key must be an empty string in every commit and before every push. A
-developer may temporarily fill it in only in the tracked working copy for local
-execution, then clear it before staging the file.
+improvement. Keep the non-secret model and timeout in `appsettings.json`. Configure
+`Gemini:ApiKey` through User Secrets locally or `Gemini__ApiKey` in production.
 
 ## Deploy to Render
 
@@ -102,12 +118,19 @@ has the IPv4 add-on. Deployment environment variables override values in
 `appsettings.json`. The application runs EF Core migrations against the configured
 database during startup.
 
+At minimum, configure `ConnectionStrings__CpmsDatabase`, `Jwt__Key`,
+`Smtp__FromEmail`, `Smtp__UserName`, and `Smtp__Password` as Render secrets. Rotate
+each value immediately if it ever appears in Git, a build log, a screenshot, or a
+chat transcript. Rotation is still required after Git history is rewritten.
+
 After deployment, verify that `/health/ready` returns HTTP 200 before testing
 database-backed endpoints such as `/api/auth/login`.
 
 ## Quality Gates
 
 ```powershell
+git config core.hooksPath SWD_Capstone/.githooks
+powershell -ExecutionPolicy Bypass -File .\scripts\scan-secrets.ps1 -Tracked
 dotnet build .\CPMS.sln
 dotnet test .\CPMS.sln
 ```

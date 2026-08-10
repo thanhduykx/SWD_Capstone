@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+repository_root="$(git rev-parse --show-toplevel)"
+scanner="$repository_root/SWD_Capstone/scripts/scan-secrets.ps1"
+
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoProfile -File "$scanner" -Staged
+elif command -v powershell.exe >/dev/null 2>&1; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$scanner" -Staged
+else
+  echo "PowerShell is required to run the staged secret scan." >&2
+  exit 1
+fi

@@ -14,15 +14,35 @@ public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(recipientEmail);
         ArgumentException.ThrowIfNullOrWhiteSpace(subject);
-        var fromEmail = configuration["Smtp:FromEmail"];
+        string? fromEmail = configuration["Smtp:FromEmail"];
         if (string.IsNullOrWhiteSpace(fromEmail))
         {
             throw new BusinessRuleException("SMTP is not configured. Set Smtp:FromEmail before sending CPMS emails.");
         }
-        var host = configuration["Smtp:Host"];
+
+        string? host = configuration["Smtp:Host"];
         if (string.IsNullOrWhiteSpace(host))
         {
             throw new BusinessRuleException("SMTP is not configured. Set Smtp:Host before sending CPMS emails.");
+        }
+
+        string? userName = configuration["Smtp:UserName"];
+        string? password = configuration["Smtp:Password"];
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+        {
+            throw new BusinessRuleException(
+                "SMTP credentials are not configured. Set Smtp:UserName and Smtp:Password in a secret store.");
+        }
+
+        if (!configuration.GetValue("Smtp:EnableSsl", true))
+        {
+            throw new BusinessRuleException("SMTP TLS must be enabled.");
+        }
+
+        int port = configuration.GetValue("Smtp:Port", 587);
+        if (port is < 1 or > 65535)
+        {
+            throw new BusinessRuleException("Smtp:Port must be between 1 and 65535.");
         }
 
         using var message = new MailMessage
@@ -35,15 +55,14 @@ public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
             IsBodyHtml = false
         };
         message.To.Add(recipientEmail);
-        using var client = new SmtpClient(host, configuration.GetValue("Smtp:Port", 587))
+        using var client = new SmtpClient(host, port)
         {
-            EnableSsl = true
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(userName, password)
         };
-        var userName = configuration["Smtp:UserName"];
-        if (!string.IsNullOrWhiteSpace(userName))
-        {
-            client.Credentials = new NetworkCredential(userName, configuration["Smtp:Password"]);
-        }
+
         await client.SendMailAsync(message, cancellationToken);
     }
 }
